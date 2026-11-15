@@ -30,11 +30,17 @@ body{background:linear-gradient(135deg,#eef2f6 0%,#e0e7ff 100%);min-height:100vh
 .badge-online.off{background:#fef2f2;color:#ef4444;border-color:#fee2e2}
 .badge-auto{background:#eff6ff;color:#3b82f6;border:1px solid #dbeafe}
 .badge-auto.off{background:#f1f5f9;color:#94a3b8;border-color:#e2e8f0}
+.badge-bet{background:#fef3c7;color:#d97706;border:1px solid #fde68a}
+.badge-bet.off{background:#f1f5f9;color:#94a3b8;border-color:#e2e8f0}
+.badge-bet.active{background:#dcfce7;color:#16a34a;border-color:#bbf7d0}
 .dot{width:6px;height:6px;border-radius:50%;background:#3b82f6}
 .dot-green{background:#10b981}
 .dot-red{background:#ef4444}
 .dot-gray{background:#94a3b8}
-.prediction-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;position:relative;overflow:hidden}
+.dot-active{background:#16a34a}
+
+/* KHUNG DỰ ĐOÁN */
+.prediction-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;position:relative;overflow:hidden;transition:border-color .3s}
 .pred-left{display:flex;flex-direction:column;gap:5px;z-index:2}
 .pred-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase}
 .pred-value{font-size:32px;font-weight:800;color:#3b82f6;letter-spacing:1px}
@@ -44,12 +50,38 @@ body{background:linear-gradient(135deg,#eef2f6 0%,#e0e7ff 100%);min-height:100vh
 .session-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:4px;display:block}
 .session-value{font-size:16px;font-weight:800;color:#1e293b}
 
-/* Hiệu ứng Kết quả tại khung Dự đoán */
-.pred-result-flash{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(16, 185, 129, 0.1);display:none;align-items:center;justify-content:center;font-size:24px;font-weight:800;z-index:1;animation:fadeIn 0.3s}
-.pred-result-flash.lose{background:rgba(239, 68, 68, 0.1);}
-.pred-result-flash .text-win{color:#10b981;text-shadow:0 2px 4px rgba(255,255,255,0.8)}
-.pred-result-flash .text-lose{color:#ef4444;text-shadow:0 2px 4px rgba(255,255,255,0.8)}
+/* KẾT QUẢ PHIÊN TRƯỚC - LUÔN HIỂN THỊ */
+.last-result-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 18px;border-radius:10px;margin-bottom:15px;
+  background:#f1f5f9;border:1px solid #e2e8f0;
+  font-weight:600;transition:all .3s;
+}
+.last-result-bar.win{background:#ecfdf5;border-color:#a7f3d0}
+.last-result-bar.lose{background:#fef2f2;border-color:#fecaca}
+.last-result-bar.pending{background:#fefce8;border-color:#fde68a}
+.last-result-bar .lr-label{font-size:12px;color:#64748b;text-transform:uppercase;font-weight:600}
+.last-result-bar .lr-main{font-size:16px;font-weight:800;margin-top:2px}
+.last-result-bar.win .lr-main{color:#10b981}
+.last-result-bar.lose .lr-main{color:#ef4444}
+.last-result-bar.pending .lr-main{color:#d97706}
+.last-result-bar .lr-detail{font-size:12px;color:#64748b;font-weight:500;text-align:right;line-height:1.5}
+.last-result-bar .lr-detail b{color:#334155}
+
+/* Hiệu ứng flash nổi bật */
+.pred-result-flash{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  background:rgba(16, 185, 129, 0.18);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  font-size:26px;font-weight:800;z-index:10;animation:fadeIn 0.2s;
+}
+.pred-result-flash.lose{background:rgba(239, 68, 68, 0.18);}
+.pred-result-flash .text-win{color:#10b981;text-shadow:0 2px 4px rgba(255,255,255,0.9)}
+.pred-result-flash .text-lose{color:#ef4444;text-shadow:0 2px 4px rgba(255,255,255,0.9)}
+.pred-result-flash small{font-size:14px;font-weight:600;color:#64748b;margin-top:4px}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+.pred-result-flash .text-win, .pred-result-flash .text-lose{animation:pulse 0.5s ease}
 
 .info-grid{display:grid;grid-template-columns:1fr 1fr;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:20px;overflow:hidden}
 .info-item{padding:15px 20px;border-bottom:1px solid #e2e8f0}
@@ -72,9 +104,11 @@ td{padding:12px 10px;border-bottom:1px solid #f1f5f9;font-weight:600;color:#3341
 .val-xiu{color:#ef4444}
 .val-win{color:#10b981}
 .val-lose{color:#ef4444}
-.settings-panel{display:none;background:#f8fafc;padding:15px;border-radius:8px;margin-bottom:15px;border:1px dashed #cbd5e1;gap:10px;flex-wrap:wrap}
+.settings-panel{display:none;background:#f8fafc;padding:15px;border-radius:8px;margin-bottom:15px;border:1px dashed #cbd5e1;gap:10px;flex-wrap:wrap;align-items:flex-end}
 .settings-panel input{padding:8px;border:1px solid #cbd5e1;border-radius:6px;width:140px;outline:none}
+.settings-panel input:focus{border-color:#2563eb;background:#fff}
 .settings-panel label{font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px}
+.settings-hint{font-size:11px;color:#94a3b8;font-weight:500;margin-top:4px}
 .btn-settings{background:#f1f5f9;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600;color:#475569;margin-bottom:15px;font-size:12px;margin-right:8px}
 .btn-reset{background:#fef2f2;color:#ef4444;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;float:right}
 .toast-wrap{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:320px}
@@ -85,6 +119,10 @@ td{padding:12px 10px;border-bottom:1px solid #f1f5f9;font-weight:600;color:#3341
 @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
 .spinner{display:inline-block;width:12px;height:12px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:6px}
 @keyframes spin{to{transform:rotate(360deg)}}
+.balance-update{animation:flashBalance 0.5s ease}
+@keyframes flashBalance{0%{background:#dcfce7}100%{background:transparent}}
+.saved-indicator{display:inline-block;font-size:10px;color:#10b981;font-weight:600;margin-left:6px;opacity:0;transition:opacity .3s}
+.saved-indicator.show{opacity:1}
 </style>
 </head>
 <body>
@@ -120,6 +158,7 @@ td{padding:12px 10px;border-bottom:1px solid #f1f5f9;font-weight:600;color:#3341
     <div class="status-badges">
       <div class="badge badge-online off" id="socketBadge"><div class="dot dot-gray" id="socketDot"></div> Socket: OFF</div>
       <div class="badge badge-auto off" id="autoStatusBadge"><div class="dot dot-gray"></div> AUTO: OFF</div>
+      <div class="badge badge-bet off" id="betStatusBadge"><div class="dot dot-gray"></div> CƯỢC: CHỜ</div>
     </div>
 
     <div>
@@ -129,24 +168,34 @@ td{padding:12px 10px;border-bottom:1px solid #f1f5f9;font-weight:600;color:#3341
 
     <div class="settings-panel" id="settingsPanel">
       <div>
-        <label>Tiền cược cơ bản</label>
-        <input type="number" id="betAmount" value="10000">
+        <label>Tiền cược cơ bản <span class="saved-indicator" id="savedBetAmount">✓ đã lưu</span></label>
+        <input type="number" id="betAmount" value="10000" min="1000" step="1000" onchange="onConfigChange()">
       </div>
       <div>
-        <label>Giới hạn gấp thếp</label>
-        <input type="number" id="x2Limit" value="5">
+        <label>Giới hạn gấp thếp <span class="saved-indicator" id="savedX2Limit">✓ đã lưu</span></label>
+        <input type="number" id="x2Limit" value="5" min="1" max="20" onchange="onConfigChange()">
       </div>
       <div>
-        <label>Chốt lãi (0 = Tắt)</label>
-        <input type="number" id="targetProfit" value="0">
+        <label>Chốt lãi (0 = Tắt) <span class="saved-indicator" id="savedTargetProfit">✓ đã lưu</span></label>
+        <input type="number" id="targetProfit" value="0" min="0" step="10000" onchange="onConfigChange()">
       </div>
+      <div class="settings-hint">💾 Cài đặt được lưu tự động và áp dụng cho phiên cược kế tiếp</div>
+    </div>
+
+    <!-- KẾT QUẢ PHIÊN TRƯỚC - LUÔN HIỂN THỊ -->
+    <div class="last-result-bar pending" id="lastResultBar">
+      <div>
+        <div class="lr-label">KẾT QUẢ PHIÊN GẦN NHẤT</div>
+        <div class="lr-main" id="lastResultMain">⏳ Chờ kết quả...</div>
+      </div>
+      <div class="lr-detail" id="lastResultDetail"></div>
     </div>
 
     <!-- KHUNG DỰ ĐOÁN AI -->
-    <div class="prediction-box">
+    <div class="prediction-box" id="predictionBox">
       <div class="pred-result-flash" id="predResultFlash"></div>
       <div class="pred-left">
-        <span class="pred-label">DỰ ĐOÁN </span>
+        <span class="pred-label">DỰ ĐOÁN PHIÊN HIỆN TẠI</span>
         <div class="pred-value" id="predValue">—</div>
         <div class="pred-algo">Thuật toán LE MINH</div>
         <div class="pred-percent" id="predPercent">(Đang chờ dữ liệu...)</div>
@@ -191,183 +240,405 @@ td{padding:12px 10px;border-bottom:1px solid #f1f5f9;font-weight:600;color:#3341
 let socket = null;
 let autoOn = false;
 let curState = null;
+let lastBalance = 0;
+let saveTimer = null;
+let lastProcessedSession = 0;   // phiên đã xử lý kết quả
+let lastResultShown = null;      // {session, pred, result, is_win, dice, bet}
 
-function toast(msg, type='info') {
-  const el = document.createElement('div');
-  el.className = 'toast ' + type;
-  el.innerText = msg;
-  document.getElementById('toasts').appendChild(el);
-  setTimeout(() => el.remove(), 3500);
+const STORAGE_KEY_BALANCE = 'lc79_balance';
+const STORAGE_KEY_CONFIG  = 'lc79_config';
+const STORAGE_KEY_LAST_RESULT = 'lc79_last_result';
+
+// ============ LƯU / KHÔI PHỤC ============
+function saveBalance(b){ try{ localStorage.setItem(STORAGE_KEY_BALANCE, JSON.stringify({balance:b,timestamp:Date.now()})); }catch(e){} }
+function loadBalance(){ try{ const r=localStorage.getItem(STORAGE_KEY_BALANCE); if(!r)return null; const d=JSON.parse(r); if(Date.now()-d.timestamp<864e5)return d.balance; localStorage.removeItem(STORAGE_KEY_BALANCE); }catch(e){} return null; }
+
+function loadConfig(){ try{ const r=localStorage.getItem(STORAGE_KEY_CONFIG); return r?JSON.parse(r):null; }catch(e){ return null; } }
+function saveConfig(cfg){ try{ localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify({...cfg,timestamp:Date.now()})); }catch(e){} }
+function applyConfigToInputs(cfg){
+  if(!cfg)return;
+  if(cfg.betAmount!==undefined)    document.getElementById('betAmount').value    = cfg.betAmount;
+  if(cfg.x2Limit!==undefined)      document.getElementById('x2Limit').value      = cfg.x2Limit;
+  if(cfg.targetProfit!==undefined) document.getElementById('targetProfit').value = cfg.targetProfit;
+}
+function readConfigFromInputs(){
+  return {
+    betAmount:    parseInt(document.getElementById('betAmount').value)    || 10000,
+    x2Limit:      parseInt(document.getElementById('x2Limit').value)      || 5,
+    targetProfit: parseInt(document.getElementById('targetProfit').value) || 0
+  };
+}
+function showSavedIndicator(id){
+  const el=document.getElementById(id); if(!el)return;
+  el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1500);
+}
+function onConfigChange(){
+  const cfg=readConfigFromInputs();
+  saveConfig(cfg);
+  showSavedIndicator('savedBetAmount');
+  showSavedIndicator('savedX2Limit');
+  showSavedIndicator('savedTargetProfit');
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>pushConfigToServer(cfg),500);
+}
+async function pushConfigToServer(cfg){
+  try{
+    await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        auto_bet_enabled:autoOn,
+        betAmount:cfg.betAmount,
+        x2_loss_mode:true,
+        x2_loss_limit:cfg.x2Limit,
+        target_profit:cfg.targetProfit||null
+      })});
+    toast('💾 Đã lưu cài đặt cược','success');
+  }catch(e){ toast('Lỗi lưu cài đặt: '+e.message,'error'); }
 }
 
-async function handleLogin() {
-  const u = document.getElementById('username').value.trim();
-  const p = document.getElementById('password').value.trim();
-  if (!u || !p) return toast('Nhập đủ tài khoản/mật khẩu', 'error');
-
-  const btn = document.getElementById('btnLogin');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Đang đăng nhập...';
-
-  try {
-    const r = await fetch('/api/login', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({username: u, password: p})
-    });
-    const d = await r.json();
-    if (!d.success) {
-      toast(d.error || 'Lỗi đăng nhập', 'error');
-      btn.disabled = false;
-      btn.innerText = 'ĐĂNG NHẬP';
-      return;
-    }
-    document.getElementById('loginView').style.display = 'none';
-    document.getElementById('mainView').style.display = 'flex';
-    document.getElementById('nicknameDisplay').innerText = d.nickname;
-    document.getElementById('balanceDisplay').innerText = Number(d.balance).toLocaleString();
-    connectSocket();
-    toast('Đăng nhập thành công!', 'success');
-    setTimeout(pollStats, 500);
-  } catch(e) {
-    toast('Lỗi kết nối server: ' + e.message, 'error');
-    btn.disabled = false;
-    btn.innerText = 'ĐĂNG NHẬP';
-  }
+// ============ LƯU KẾT QUẢ PHIÊN GẦN NHẤT ============
+function saveLastResult(r){
+  try{ localStorage.setItem(STORAGE_KEY_LAST_RESULT, JSON.stringify({...r,timestamp:Date.now()})); }catch(e){}
+}
+function loadLastResult(){
+  try{ const r=localStorage.getItem(STORAGE_KEY_LAST_RESULT); return r?JSON.parse(r):null; }catch(e){ return null; }
 }
 
-function connectSocket() {
-  socket = io(window.location.origin, {transports:['websocket','polling']});
-
-  socket.on('connect', () => {
-    document.getElementById('statusText').innerText = 'Đã kết nối Server';
-    document.getElementById('statusText').style.color = '#10b981';
-  });
-  socket.on('disconnect', () => {
-    document.getElementById('statusText').innerText = 'Mất kết nối Server';
-    document.getElementById('statusText').style.color = '#ef4444';
-  });
-
-  socket.on('toast', d => toast(d.msg, d.type));
-
-  socket.on('session_update', d => {
-    document.getElementById('sessionValue').innerText = '#' + d.session_id;
-    if (d.prediction) {
-      const el = document.getElementById('predValue');
-      el.innerText = d.prediction.toUpperCase();
-      el.className = 'pred-value ' + (d.prediction === 'Tài' ? 'val-tai' : 'val-xiu');
-      document.getElementById('predPercent').innerText =
-        d.ready ? `(Độ tin cậy: ${d.conf}%)` : `(Đang lấy dữ liệu: ${d.history_len}/12)`;
-    } else {
-      document.getElementById('predPercent').innerText = `(Đang lấy dữ liệu: ${d.history_len}/12)`;
-    }
-    document.getElementById('betDisplay').innerText = Number(d.current_bet).toLocaleString();
-  });
-
-  socket.on('result_update', d => {
-    renderHistory(d.history);
-    
-    // HIỆU ỨNG KẾT QUẢ NGAY TẠI KHUNG DỰ ĐOÁN AI
-    if (d.is_win !== null && d.is_win !== undefined) {
-      const flash = document.getElementById('predResultFlash');
-      if (d.is_win) {
-        flash.innerHTML = '<span class="text-win"> THẮNG (Kết quả: ' + d.result + ')</span>';
-        flash.className = 'pred-result-flash';
-      } else {
-        flash.innerHTML = '<span class="text-lose"> THUA (Kết quả: ' + d.result + ')</span>';
-        flash.className = 'pred-result-flash lose';
-      }
-      flash.style.display = 'flex';
-      
-      // Ẩn hiệu ứng sau 2.5 giây
-      setTimeout(() => {
-        flash.style.display = 'none';
-      }, 2500);
-    }
-  });
-
-  socket.on('stats_update', s => applyState(s));
-}
-
-async function pollStats() {
-  try {
-    const r = await fetch('/api/stats');
-    const d = await r.json();
-    if (d.success) applyState(d.state);
-  } catch(e) {}
-}
-
-function applyState(s) {
-  curState = s;
-  autoOn = s.auto_bet_enabled;
-
-  document.getElementById('balanceDisplay').innerText = Number(s.balance).toLocaleString();
-  
-  // Hiển thị Lợi nhuận (Chốt lãi)
-  const pl = document.getElementById('plDisplay');
-  pl.innerText = (s.profit_loss >= 0 ? '+' : '') + Number(s.profit_loss).toLocaleString();
-  pl.style.color = s.profit_loss >= 0 ? '#10b981' : '#ef4444';
-  
-  document.getElementById('winCount').innerText = s.win_count;
-  document.getElementById('loseCount').innerText = s.lose_count;
-  document.getElementById('betDisplay').innerText = Number(s.current_bet).toLocaleString();
-  if (s.session_id) document.getElementById('sessionValue').innerText = '#' + s.session_id;
-
-  if (s.current_prediction) {
-    const el = document.getElementById('predValue');
-    el.innerText = s.current_prediction.toUpperCase();
-    el.className = 'pred-value ' + (s.current_prediction === 'Tài' ? 'val-tai' : 'val-xiu');
-  }
-
-  // Cập nhật trạng thái Socket
-  const sb = document.getElementById('socketBadge');
-  if (s.socket_connected) {
-    sb.className = 'badge badge-online';
-    sb.innerHTML = '<div class="dot dot-green"></div> Socket: ON';
-  } else {
-    sb.className = 'badge badge-online off';
-    sb.innerHTML = '<div class="dot dot-red"></div> Socket: OFF';
-  }
-
-  // Cập nhật trạng thái Auto
-  const badge = document.getElementById('autoStatusBadge');
-  const btn = document.getElementById('btnToggleAuto');
-  const statusTxt = document.getElementById('statusText');
-  
-  if (autoOn) {
-    btn.innerHTML = '<span></span> TẮT AUTO';
-    btn.classList.remove('off');
-    badge.className = 'badge badge-auto';
-    badge.innerHTML = '<div class="dot dot-green"></div> AUTO: ĐANG CHẠY';
-    statusTxt.innerText = 'Đang tự động đặt cược';
-    statusTxt.style.color = '#10b981';
-  } else {
-    btn.innerHTML = '<span>▶</span> BẬT AUTO';
-    btn.classList.add('off');
-    badge.className = 'badge badge-auto off';
-    badge.innerHTML = '<div class="dot dot-gray"></div> AUTO: ĐANG TẮT';
-    statusTxt.innerText = 'Đang chờ lệnh';
-    statusTxt.style.color = '#64748b';
-  }
-
-  if (s.history) renderHistory(s.history);
-}
-
-function renderHistory(rows) {
-  const tb = document.getElementById('historyBody');
-  tb.innerHTML = '';
-  if (!rows || !rows.length) {
-    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:20px">Chưa có lịch sử</td></tr>';
+// ============ HIỂN THỊ KẾT QUẢ PHIÊN TRƯỚC ============
+function renderLastResultBar(r){
+  const bar=document.getElementById('lastResultBar');
+  const main=document.getElementById('lastResultMain');
+  const detail=document.getElementById('lastResultDetail');
+  if(!r){
+    bar.className='last-result-bar pending';
+    main.innerText='⏳ Chờ kết quả...';
+    detail.innerHTML='';
     return;
   }
-  rows.forEach(r => {
-    const tr = document.createElement('tr');
-    const predClass = r.pred === 'TÀI' ? 'val-tai' : 'val-xiu';
-    const resClass = r.result === 'TÀI' ? 'val-tai' : 'val-xiu';
-    const wl = r.win === true ? '<span class="val-win">THẮNG</span>'
-             : r.win === false ? '<span class="val-lose">THUA</span>' : '—';
-    const dice = Array.isArray(r.dice) ? r.dice.slice(0,3).join(' - ') : '—';
-    tr.innerHTML = `
+  const isWin = r.is_win === true;
+  const isLose = r.is_win === false;
+  bar.className='last-result-bar ' + (isWin?'win':isLose?'lose':'pending');
+  const predStr = r.pred ? r.pred.toUpperCase() : '—';
+  const resStr  = r.result ? r.result.toUpperCase() : '—';
+  const emoji = isWin?'✓':isLose?'✗':'ℹ';
+  main.innerText = `${emoji} PHIÊN #${r.session} — DỰ ĐOÁN ${predStr} → KẾT QUẢ ${resStr}`;
+  const dice = Array.isArray(r.dice) ? r.dice.slice(0,3).join(' - ') : '—';
+  detail.innerHTML = `Xúc xắc: <b>${dice}</b><br>` +
+    (r.bet?`Cược: <b>${Number(r.bet).toLocaleString()}</b>`:'') +
+    (isWin?' · <span class="val-win">THẮNG</span>':isLose?' · <span class="val-lose">THUA</span>':'');
+}
+
+// ============ FLASH KẾT QUẢ ============
+function showResultFlash(isWin, result, pred, dice, bet){
+  const flash=document.getElementById('predResultFlash');
+  const box=document.getElementById('predictionBox');
+  if(isWin){
+    flash.innerHTML=`<div class="text-win">✓ THẮNG</div>
+      <small>Phiên trước: ${pred?pred.toUpperCase():'—'} → ${result||'—'}</small>`;
+    flash.className='pred-result-flash';
+    playSound('win');
+    box.style.borderColor='#10b981';
+  }else{
+    flash.innerHTML=`<div class="text-lose">✗ THUA</div>
+      <small>Phiên trước: ${pred?pred.toUpperCase():'—'} → ${result||'—'}</small>`;
+    flash.className='pred-result-flash lose';
+    playSound('lose');
+    box.style.borderColor='#ef4444';
+  }
+  flash.style.display='flex';
+  clearTimeout(showResultFlash._t);
+  showResultFlash._t=setTimeout(()=>{
+    flash.style.display='none';
+    box.style.borderColor='#e2e8f0';
+  },4000); // Tăng lên 4s để dễ đọc
+}
+
+// ============ ÂM THANH ============
+let audioCtx=null;
+function playSound(type){
+  try{
+    if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const osc=audioCtx.createOscillator(); const gain=audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    if(type==='win'){
+      osc.frequency.setValueAtTime(880,audioCtx.currentTime);
+      osc.frequency.setValueAtTime(1320,audioCtx.currentTime+0.1);
+      gain.gain.setValueAtTime(0.15,audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.3);
+      osc.start(); osc.stop(audioCtx.currentTime+0.3);
+    }else{
+      osc.frequency.setValueAtTime(220,audioCtx.currentTime);
+      osc.frequency.setValueAtTime(165,audioCtx.currentTime+0.15);
+      gain.gain.setValueAtTime(0.15,audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.3);
+      osc.start(); osc.stop(audioCtx.currentTime+0.3);
+    }
+  }catch(e){}
+}
+
+function toast(msg,type='info'){
+  const el=document.createElement('div');
+  el.className='toast '+type; el.innerText=msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>el.remove(),3500);
+}
+function updateBalanceUI(balance,animate=false){
+  const el=document.getElementById('balanceDisplay');
+  const newVal=Number(balance).toLocaleString();
+  if(el.innerText!==newVal){
+    el.innerText=newVal;
+    if(animate){ el.classList.remove('balance-update'); void el.offsetWidth; el.classList.add('balance-update'); }
+  }
+  lastBalance=balance; saveBalance(balance);
+}
+function updateProfitUI(profit){
+  const pl=document.getElementById('plDisplay');
+  pl.innerText=(profit>=0?'+':'')+Number(profit).toLocaleString();
+  pl.style.color=profit>=0?'#10b981':'#ef4444';
+}
+function updateBetBadge(betAmount){
+  const badge=document.getElementById('betStatusBadge');
+  if(betAmount>0){
+    badge.className='badge badge-bet active';
+    badge.innerHTML=`<div class="dot dot-active"></div> CƯỢC: ${Number(betAmount).toLocaleString()}`;
+  }else{
+    badge.className='badge badge-bet off';
+    badge.innerHTML='<div class="dot dot-gray"></div> CƯỢC: CHỜ';
+  }
+}
+
+// ============ XỬ LÝ KẾT QUẢ (dùng chung cho socket + poll) ============
+function processResult(payload){
+  // payload: {session, pred, result, is_win, dice, bet, balance, profit_loss, history}
+  if(!payload) return;
+
+  // Cập nhật balance/profit
+  if(payload.balance!==undefined) updateBalanceUI(payload.balance,true);
+  if(payload.profit_loss!==undefined) updateProfitUI(payload.profit_loss);
+
+  // Render history
+  if(payload.history) renderHistory(payload.history);
+
+  // Chỉ xử lý khi có session + kết quả thực
+  if(payload.session && payload.session !== lastProcessedSession &&
+     payload.is_win !== null && payload.is_win !== undefined && payload.result){
+    lastProcessedSession = payload.session;
+    const rec = {
+      session: payload.session,
+      pred:    payload.pred || '',
+      result:  payload.result,
+      is_win:  payload.is_win,
+      dice:    payload.dice || [],
+      bet:     payload.bet  || 0,
+      ts:      Date.now()
+    };
+    lastResultShown = rec;
+    saveLastResult(rec);
+    renderLastResultBar(rec);
+    showResultFlash(payload.is_win, payload.result, payload.pred, payload.dice, payload.bet);
+  }
+}
+
+// ============ LOGIN ============
+async function handleLogin(){
+  const u=document.getElementById('username').value.trim();
+  const p=document.getElementById('password').value.trim();
+  if(!u||!p) return toast('Nhập đủ tài khoản/mật khẩu','error');
+
+  const btn=document.getElementById('btnLogin');
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span> Đang đăng nhập...';
+
+  try{
+    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const d=await r.json();
+    if(!d.success){
+      toast(d.error||'Lỗi đăng nhập','error');
+      btn.disabled=false; btn.innerText='ĐĂNG NHẬP'; return;
+    }
+    document.getElementById('loginView').style.display='none';
+    document.getElementById('mainView').style.display='flex';
+    document.getElementById('nicknameDisplay').innerText=d.nickname;
+
+    const cachedBalance=loadBalance();
+    updateBalanceUI(cachedBalance!==null?cachedBalance:d.balance);
+
+    const cachedCfg=loadConfig();
+    if(cachedCfg){
+      applyConfigToInputs(cachedCfg);
+      toast('Đã khôi phục cài đặt cược: '+cachedCfg.betAmount.toLocaleString()+' | x2: '+cachedCfg.x2Limit,'info');
+      setTimeout(()=>pushConfigToServer(cachedCfg),300);
+    }
+
+    // Hiển thị kết quả phiên trước đã lưu (nếu có)
+    const lastRes=loadLastResult();
+    if(lastRes){
+      lastResultShown=lastRes;
+      lastProcessedSession=lastRes.session;
+      renderLastResultBar(lastRes);
+    }
+
+    connectSocket();
+    toast('Đăng nhập thành công!','success');
+    setTimeout(pollStats,500);
+  }catch(e){
+    toast('Lỗi kết nối server: '+e.message,'error');
+    btn.disabled=false; btn.innerText='ĐĂNG NHẬP';
+  }
+}
+
+// ============ SOCKET ============
+function connectSocket(){
+  socket=io(window.location.origin,{transports:['websocket','polling']});
+
+  socket.on('connect',()=>{
+    document.getElementById('statusText').innerText='Đã kết nối Server';
+    document.getElementById('statusText').style.color='#10b981';
+  });
+  socket.on('disconnect',()=>{
+    document.getElementById('statusText').innerText='Mất kết nối Server';
+    document.getElementById('statusText').style.color='#ef4444';
+  });
+
+  socket.on('toast',d=>toast(d.msg,d.type));
+
+  socket.on('session_update',d=>{
+    document.getElementById('sessionValue').innerText='#'+d.session_id;
+    if(d.prediction){
+      const el=document.getElementById('predValue');
+      el.innerText=d.prediction.toUpperCase();
+      el.className='pred-value '+(d.prediction==='Tài'?'val-tai':'val-xiu');
+      document.getElementById('predPercent').innerText = d.ready?`(Độ tin cậy: ${d.conf}%)`:`(Đang lấy dữ liệu: ${d.history_len}/12)`;
+    }else{
+      document.getElementById('predPercent').innerText=`(Đang lấy dữ liệu: ${d.history_len}/12)`;
+    }
+    const betVal=Number(d.current_bet||0);
+    document.getElementById('betDisplay').innerText=betVal.toLocaleString();
+    updateBetBadge(betVal);
+  });
+
+  // KẾT QUẢ PHIÊN — XỬ LÝ NGAY
+  socket.on('result_update',d=>processResult(d));
+
+  // STATS — cũng có thể chứa kết quả phiên vừa xong (fallback)
+  socket.on('stats_update',s=>{
+    applyState(s);
+    // Nếu history có phần tử mới hơn lastProcessedSession và có kết quả → xử lý luôn
+    if(Array.isArray(s.history) && s.history.length){
+      const newest=s.history[0];
+      if(newest && newest.session > lastProcessedSession &&
+         newest.win !== null && newest.win !== undefined && newest.result){
+        processResult({
+          session:newest.session,
+          pred:newest.pred,
+          result:newest.result,
+          is_win:newest.win,
+          dice:newest.dice,
+          bet:newest.bet,
+          balance:s.balance,
+          profit_loss:s.profit_loss,
+          history:s.history
+        });
+      }
+    }
+  });
+}
+
+// ============ POLL FALLBACK ============
+async function pollStats(){
+  try{
+    const r=await fetch('/api/stats');
+    const d=await r.json();
+    if(d.success){
+      applyState(d.state);
+      // Fallback: kiểm tra history có kết quả mới
+      const s=d.state;
+      if(Array.isArray(s.history) && s.history.length){
+        const newest=s.history[0];
+        if(newest && newest.session > lastProcessedSession &&
+           newest.win !== null && newest.win !== undefined && newest.result){
+          processResult({
+            session:newest.session,
+            pred:newest.pred,
+            result:newest.result,
+            is_win:newest.win,
+            dice:newest.dice,
+            bet:newest.bet,
+            balance:s.balance,
+            profit_loss:s.profit_loss,
+            history:s.history
+          });
+        }
+      }
+    }
+  }catch(e){}
+}
+
+function applyState(s){
+  curState=s; autoOn=s.auto_bet_enabled;
+
+  if(s.balance!==undefined) updateBalanceUI(s.balance,true);
+  if(s.profit_loss!==undefined) updateProfitUI(s.profit_loss);
+
+  document.getElementById('winCount').innerText=s.win_count;
+  document.getElementById('loseCount').innerText=s.lose_count;
+
+  const betVal=Number(s.current_bet||0);
+  document.getElementById('betDisplay').innerText=betVal.toLocaleString();
+  updateBetBadge(betVal);
+
+  if(s.session_id) document.getElementById('sessionValue').innerText='#'+s.session_id;
+
+  if(s.current_prediction){
+    const el=document.getElementById('predValue');
+    el.innerText=s.current_prediction.toUpperCase();
+    el.className='pred-value '+(s.current_prediction==='Tài'?'val-tai':'val-xiu');
+  }
+
+  if(s.base_bet_amount!==undefined && !loadConfig()){
+    const cfg={betAmount:s.base_bet_amount,x2Limit:s.x2_loss_limit||5,targetProfit:s.target_profit||0};
+    applyConfigToInputs(cfg); saveConfig(cfg);
+  }
+
+  const sb=document.getElementById('socketBadge');
+  if(s.socket_connected){ sb.className='badge badge-online'; sb.innerHTML='<div class="dot dot-green"></div> Socket: ON'; }
+  else{ sb.className='badge badge-online off'; sb.innerHTML='<div class="dot dot-red"></div> Socket: OFF'; }
+
+  const badge=document.getElementById('autoStatusBadge');
+  const btn=document.getElementById('btnToggleAuto');
+  const statusTxt=document.getElementById('statusText');
+
+  if(autoOn){
+    btn.innerHTML='<span></span> TẮT AUTO'; btn.classList.remove('off');
+    badge.className='badge badge-auto';
+    badge.innerHTML='<div class="dot dot-green"></div> AUTO: ĐANG CHẠY';
+    statusTxt.innerText='Đang tự động đặt cược';
+    statusTxt.style.color='#10b981';
+  }else{
+    btn.innerHTML='<span>▶</span> BẬT AUTO'; btn.classList.add('off');
+    badge.className='badge badge-auto off';
+    badge.innerHTML='<div class="dot dot-gray"></div> AUTO: ĐANG TẮT';
+    statusTxt.innerText='Đang chờ lệnh';
+    statusTxt.style.color='#64748b';
+  }
+
+  if(s.history) renderHistory(s.history);
+}
+
+function renderHistory(rows){
+  const tb=document.getElementById('historyBody');
+  tb.innerHTML='';
+  if(!rows||!rows.length){
+    tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:20px">Chưa có lịch sử</td></tr>';
+    return;
+  }
+  rows.forEach(r=>{
+    const tr=document.createElement('tr');
+    const predClass=r.pred==='TÀI'?'val-tai':'val-xiu';
+    const resClass=r.result==='TÀI'?'val-tai':'val-xiu';
+    const wl=r.win===true?'<span class="val-win">THẮNG</span>'
+            :r.win===false?'<span class="val-lose">THUA</span>':'—';
+    const dice=Array.isArray(r.dice)?r.dice.slice(0,3).join(' - '):'—';
+    tr.innerHTML=`
       <td>#${r.session}</td>
       <td class="${predClass}">${r.pred}</td>
       <td>${Number(r.bet).toLocaleString()}</td>
@@ -378,53 +649,55 @@ function renderHistory(rows) {
   });
 }
 
-async function toggleAuto() {
-  const newVal = !autoOn;
-  const betAmount = parseInt(document.getElementById('betAmount').value) || 10000;
-  const x2Limit = parseInt(document.getElementById('x2Limit').value) || 5;
-  const target = parseInt(document.getElementById('targetProfit').value) || 0;
-
-  await fetch('/api/config', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      auto_bet_enabled: newVal,
-      betAmount: betAmount,
-      x2_loss_mode: true,
-      x2_loss_limit: x2Limit,
-      target_profit: target || null,
-    })
-  });
-  toast(newVal ? '✅ Đã bật chế độ Auto Cược' : '⏸ Đã tắt chế độ Auto Cược', newVal ? 'success' : 'info');
+async function toggleAuto(){
+  const cfg=readConfigFromInputs(); saveConfig(cfg);
+  const newVal=!autoOn;
+  await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      auto_bet_enabled:newVal,
+      betAmount:cfg.betAmount,
+      x2_loss_mode:true,
+      x2_loss_limit:cfg.x2Limit,
+      target_profit:cfg.targetProfit||null
+    })});
+  toast(newVal?'✅ Đã bật chế độ Auto Cược':'⏸ Đã tắt chế độ Auto Cược',newVal?'success':'info');
   pollStats();
 }
 
-async function stopBot() {
-  await fetch('/api/config', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({auto_bet_enabled: false})
-  });
-  autoOn = false;
-  toast('Đã ngắt Bot khẩn cấp', 'error');
-  pollStats();
+async function stopBot(){
+  await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({auto_bet_enabled:false})});
+  autoOn=false; toast('Đã ngắt Bot khẩn cấp','error'); pollStats();
 }
 
-async function resetHistory() {
-  if (!confirm('Xóa toàn bộ lịch sử và đưa lợi nhuận về 0?')) return;
-  await fetch('/api/reset_history', {method:'POST'});
-  toast('Đã xóa lịch sử', 'success');
-  document.getElementById('plDisplay').innerText = '0';
-  document.getElementById('plDisplay').style.color = '#1e293b';
+async function resetHistory(){
+  if(!confirm('Xóa toàn bộ lịch sử và đưa lợi nhuận về 0?')) return;
+  await fetch('/api/reset_history',{method:'POST'});
+  toast('Đã xóa lịch sử','success');
+  updateProfitUI(0);
+  localStorage.removeItem(STORAGE_KEY_BALANCE);
+  localStorage.removeItem(STORAGE_KEY_LAST_RESULT);
+  lastProcessedSession=0;
+  lastResultShown=null;
+  renderLastResultBar(null);
 }
 
-function toggleSettings() {
-  const p = document.getElementById('settingsPanel');
-  p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
-  if (curState) {
-    document.getElementById('betAmount').value = curState.base_bet_amount;
-    document.getElementById('x2Limit').value = curState.x2_loss_limit;
-    document.getElementById('targetProfit').value = curState.target_profit || 0;
-  }
+function toggleSettings(){
+  const p=document.getElementById('settingsPanel');
+  p.style.display=p.style.display==='flex'?'none':'flex';
 }
+
+// Poll định kỳ 3s — đảm bảo bắt kết quả ngay cả khi miss socket
+setInterval(()=>{
+  if(socket && socket.connected) pollStats();
+}, 3000);
+
+// Khôi phục cài đặt + kết quả phiên trước ngay khi load
+(function init(){
+  const cfg=loadConfig();
+  if(cfg) applyConfigToInputs(cfg);
+  const lastRes=loadLastResult();
+  if(lastRes) renderLastResultBar(lastRes);
+})();
 </script>
 </body>
 </html>
