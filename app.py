@@ -1,5 +1,5 @@
 import eventlet
-eventlet.monkey_patch() # BẮT BUỘC: Phải để ở đầu tiên để tránh lỗi recursion và block I/O
+eventlet.monkey_patch() # Bắt buộc để tránh lỗi recursion
 
 import os, json, time, base64, hashlib, threading, logging, random
 import requests
@@ -19,22 +19,22 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 # ==========================================
 API_LOGIN_URL   = "https://apifo88daigia.tele68.com/api"
 API_LOBBY_URL   = "https://wlb.tele68.com/v1/lobby/auth/login"
-API_HISTORY_URL = "https://leminhdzctemd5.onrender.com/lc79md5"
+API_HISTORY_URL = "https://leminhdzctemd5.onrender.com/lc79md5" # API mới của bạn
 GAME_WS_URL     = "https://wtxmd52.tele68.com"
 GAME_WS_PATH    = "txmd5/"
 GAME_WS_NS      = "/txmd5"
 COMMON_PARAMS   = "cp=R&cl=R&pf=web"
 
 # ==========================================
-# DỮ LIỆU TOÀN CỤC (dùng chung cho mọi user)
+# DỮ LIỆU TOÀN CỤC
 # ==========================================
 GLOBAL_HISTORY = []
 MAX_GLOBAL_HISTORY = 2000
-WEB_SESSIONS = {}       # sid -> state
-WS_CLIENTS = {}         # sid -> socketio.Client
+WEB_SESSIONS = {}       
+WS_CLIENTS = {}         
 
 # ==========================================
-# API DATA WORKER (poll lịch sử phiên)
+# API DATA WORKER (Poll dữ liệu từ API của bạn)
 # ==========================================
 def api_data_worker():
     logger.info("API data worker started")
@@ -43,47 +43,73 @@ def api_data_worker():
             url = f"{API_HISTORY_URL}?{COMMON_PARAMS}&at=&_t={int(time.time()*1000)}"
             r = requests.get(url, timeout=5, headers={"Cache-Control":"no-store","User-Agent":"Mozilla/5.0"})
             data = r.json()
-            sessions = sorted(data.get("list", []), key=lambda x: x.get("id", 0))
-            new_history = []
-            for s in sessions:
-                res = s.get("resultTruyenThong", "").upper()
-                if res in ("TAI","XIU"):
-                    new_history.append({
-                        "session": s["id"],
-                        "dice": s.get("dices", []),
-                        "total": s.get("point", 0),
-                        "side": "Tài" if res == "TAI" else "Xỉu",
-                    })
-            if new_history:
-                GLOBAL_HISTORY.clear()
-                GLOBAL_HISTORY.extend(new_history[-MAX_GLOBAL_HISTORY:])
-        except Exception:
-            pass
-        time.sleep(1.5)
+            
+            # API mới trả về một dict duy nhất, không phải list
+            session_id = data.get("phien")
+            result_str = data.get("ket_qua", "").lower() # Ví dụ: "tài 4-6-5"
+            
+            if session_id and result_str:
+                # Xác định Tài/Xỉu
+                side = "Tài" if "tài" in result_str else ("Xỉu" if "xỉu" in result_str else None)
+                
+                # Trích xuất xúc xắc từ chuỗi (nếu có)
+                dices = []
+                try:
+                    parts = result_str.split()
+                    if len(parts) > 1:
+                        dices = [int(x) for x in parts[1].split('-')]
+                except:
+                    pass
+
+                if side:
+                    # Cập nhật lịch sử toàn cục (tránh trùng lặp phiên)
+                    if not GLOBAL_HISTORY or GLOBAL_HISTORY[-1]["session"] != session_id:
+                        GLOBAL_HISTORY.append({
+                            "session": session_id,
+                            "dice": dices,
+                            "total": sum(dices) if dices else 0,
+                            "side": side,
+                        })
+                        # Giữ giới hạn bộ nhớ
+                        if len(GLOBAL_HISTORY) > MAX_GLOBAL_HISTORY:
+                            GLOBAL_HISTORY.pop(0)
+
+        except Exception as e:
+            logger.error(f"API Worker Error: {e}")
+        
+        time.sleep(2) # Cứ 2 giây gọi API một lần
 
 threading.Thread(target=api_data_worker, daemon=True).start()
 
 # ==========================================
-# THUẬT TOÁN DỰ ĐOÁN
+# THUẬT TOÁN DỰ ĐOÁN (Dựa trên API của bạn)
 # ==========================================
-def predict_side(history):
-    if not history or len(history) < 12:
-        return {"side": random.choice(["Tài","Xỉu"]), "conf": 50, "ready": False}
-    recent = history[-12:]
-    tai_w = xiu_w = 0
-    for i, it in enumerate(recent):
-        w = i + 1
-        if it["side"] == "Tài": tai_w += w
-        else: xiu_w += w
-    total = tai_w + xiu_w
-    if tai_w == xiu_w:
-        side = "Xỉu" if recent[-1]["side"] == "Tài" else "Tài"
-    else:
-        side = "Tài" if tai_w > xiu_w else "Xỉu"
-    edge = abs(tai_w - xiu_w) / total if total else 0
-    sample = min(len(recent)/8, 1)
-    conf = round(min(75, 50 + edge*20*sample))
-    return {"side": side, "conf": conf, "ready": True}
+def get_prediction_from_api():
+    """
+    Hàm này lấy dự đoán trực tiếp từ API của bạn thay vì tự tính toán
+    """
+    try:
+        r = requests.get(API_HISTORY_URL, timeout=5)
+        data = r.json()
+        
+        du_doan = data.get("du_doan") # "Tài" hoặc "Xỉu"
+        do_tin_cay = data.get("do_tin_cay", "0%") # "90,0%"
+        
+        # Xử lý độ tin cậy (bỏ dấu % và đổi dấu phẩy thành dấu chấm)
+        conf = 50
+        if do_tin_cay:
+            try:
+                conf = float(do_tin_cay.replace("%", "").replace(",", "."))
+            except:
+                pass
+
+        if du_doan:
+            return {"side": du_doan, "conf": int(conf), "ready": True}
+    except:
+        pass
+    
+    # Nếu API lỗi, trả về mặc định
+    return {"side": random.choice(["Tài","Xỉu"]), "conf": 50, "ready": False}
 
 # ==========================================
 # LOGIN FLOW
@@ -95,7 +121,6 @@ def login_game(username, password):
         pw = md5_hash(password)
         url = f"{API_LOGIN_URL}?c=3&un={username}&pw={pw}&{COMMON_PARAMS}&at="
         
-        # Sử dụng Session để tối ưu kết nối và tránh lỗi recursion
         sess = requests.Session()
         r = sess.get(url, timeout=12)
         r.raise_for_status()
@@ -174,8 +199,8 @@ def game_socket_worker(sid, jwt_token):
                 cur_bet = st["base_bet_amount"]
         st["current_bet"] = cur_bet
 
-        # Dự đoán
-        pred_res = predict_side(GLOBAL_HISTORY)
+        # LẤY DỰ ĐOÁN TỪ API BÊN NGOÀI
+        pred_res = get_prediction_from_api()
         st["current_prediction"] = pred_res["side"]
         st["last_pred_detail"] = pred_res
 
