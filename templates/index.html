@@ -34,14 +34,23 @@ body{background:linear-gradient(135deg,#eef2f6 0%,#e0e7ff 100%);min-height:100vh
 .dot-green{background:#10b981}
 .dot-red{background:#ef4444}
 .dot-gray{background:#94a3b8}
-.prediction-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
-.pred-left{display:flex;flex-direction:column;gap:5px}
+.prediction-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;position:relative;overflow:hidden}
+.pred-left{display:flex;flex-direction:column;gap:5px;z-index:2}
 .pred-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase}
 .pred-value{font-size:32px;font-weight:800;color:#3b82f6;letter-spacing:1px}
+.pred-algo{font-size:11px;color:#3b82f6;background:#eff6ff;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;font-weight:600}
 .pred-percent{font-size:12px;color:#94a3b8;font-weight:500}
-.pred-right{text-align:right}
+.pred-right{text-align:right;z-index:2}
 .session-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:4px;display:block}
 .session-value{font-size:16px;font-weight:800;color:#1e293b}
+
+/* Hiệu ứng Kết quả tại khung Dự đoán */
+.pred-result-flash{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(16, 185, 129, 0.1);display:none;align-items:center;justify-content:center;font-size:24px;font-weight:800;z-index:1;animation:fadeIn 0.3s}
+.pred-result-flash.lose{background:rgba(239, 68, 68, 0.1);}
+.pred-result-flash .text-win{color:#10b981;text-shadow:0 2px 4px rgba(255,255,255,0.8)}
+.pred-result-flash .text-lose{color:#ef4444;text-shadow:0 2px 4px rgba(255,255,255,0.8)}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
 .info-grid{display:grid;grid-template-columns:1fr 1fr;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:20px;overflow:hidden}
 .info-item{padding:15px 20px;border-bottom:1px solid #e2e8f0}
 .info-item:nth-child(odd){border-right:1px solid #e2e8f0}
@@ -65,6 +74,7 @@ td{padding:12px 10px;border-bottom:1px solid #f1f5f9;font-weight:600;color:#3341
 .val-lose{color:#ef4444}
 .settings-panel{display:none;background:#f8fafc;padding:15px;border-radius:8px;margin-bottom:15px;border:1px dashed #cbd5e1;gap:10px;flex-wrap:wrap}
 .settings-panel input{padding:8px;border:1px solid #cbd5e1;border-radius:6px;width:140px;outline:none}
+.settings-panel label{font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px}
 .btn-settings{background:#f1f5f9;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600;color:#475569;margin-bottom:15px;font-size:12px;margin-right:8px}
 .btn-reset{background:#fef2f2;color:#ef4444;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;float:right}
 .toast-wrap{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:320px}
@@ -118,15 +128,27 @@ td{padding:12px 10px;border-bottom:1px solid #f1f5f9;font-weight:600;color:#3341
     </div>
 
     <div class="settings-panel" id="settingsPanel">
-      <input type="number" id="betAmount" value="10000" placeholder="Tiền cược (VNĐ)">
-      <input type="number" id="x2Limit" value="5" placeholder="Số tay gãy tối đa">
-      <input type="number" id="targetProfit" value="0" placeholder="Target lãi (0=tắt)">
+      <div>
+        <label>Tiền cược cơ bản</label>
+        <input type="number" id="betAmount" value="10000">
+      </div>
+      <div>
+        <label>Giới hạn gấp thếp</label>
+        <input type="number" id="x2Limit" value="5">
+      </div>
+      <div>
+        <label>Chốt lãi (0 = Tắt)</label>
+        <input type="number" id="targetProfit" value="0">
+      </div>
     </div>
 
+    <!-- KHUNG DỰ ĐOÁN AI -->
     <div class="prediction-box">
+      <div class="pred-result-flash" id="predResultFlash"></div>
       <div class="pred-left">
-        <span class="pred-label">DỰ ĐOÁN AI</span>
+        <span class="pred-label">DỰ ĐOÁN </span>
         <div class="pred-value" id="predValue">—</div>
+        <div class="pred-algo">Thuật toán LE MINH</div>
         <div class="pred-percent" id="predPercent">(Đang chờ dữ liệu...)</div>
       </div>
       <div class="pred-right">
@@ -135,18 +157,19 @@ td{padding:12px 10px;border-bottom:1px solid #f1f5f9;font-weight:600;color:#3341
       </div>
     </div>
 
+    <!-- KHU VỰC THÔNG TIN & CHỐT LÃI -->
     <div class="info-grid">
       <div class="info-item"><span class="info-label">NICKNAME</span><div class="info-value" id="nicknameDisplay">—</div></div>
       <div class="info-item"><span class="info-label">SỐ DƯ</span><div class="info-value" id="balanceDisplay">0</div></div>
       <div class="info-item"><span class="info-label">CƯỢC PHIÊN</span><div class="info-value" id="betDisplay">0</div></div>
-      <div class="info-item"><span class="info-label">LÃI/LỖ</span><div class="info-value" id="plDisplay">0</div></div>
+      <div class="info-item" style="background: #f8fafc;"><span class="info-label">LỢI NHUẬN (CHỐT LÃI)</span><div class="info-value" id="plDisplay" style="font-size: 18px;">0</div></div>
       <div class="info-item"><span class="info-label">WIN / LOSE</span><div class="info-value"><span class="val-win" id="winCount">0</span> / <span class="val-lose" id="loseCount">0</span></div></div>
-      <div class="info-item"><span class="info-label">TRẠNG THÁI</span><div class="info-value" id="statusText">Chờ kết nối...</div></div>
+      <div class="info-item"><span class="info-label">TRẠNG THÁI AUTO</span><div class="info-value" id="statusText">Chờ kết nối...</div></div>
     </div>
 
     <div class="action-buttons">
       <button class="btn-action btn-toggle-auto off" id="btnToggleAuto" onclick="toggleAuto()"><span>▶</span> BẬT AUTO</button>
-      <button class="btn-action btn-stop-bot" onclick="stopBot()"><span>⏹</span> NGẮT BOT</button>
+      <button class="btn-action btn-stop-bot" onclick="stopBot()"><span></span> NGẮT BOT</button>
     </div>
 
     <div class="table-title">LỊCH SỬ CƯỢC</div>
@@ -155,7 +178,7 @@ td{padding:12px 10px;border-bottom:1px solid #f1f5f9;font-weight:600;color:#3341
         <thead>
           <tr>
             <th>PHIÊN</th><th>DỰ ĐOÁN</th><th>CƯỢC</th>
-            <th>KẾT QUẢ</th><th>XÚC XẮC</th><th>KẾT QUẢ</th>
+            <th>KẾT QUẢ</th><th>XÚC XẮC</th><th>THẮNG / THUA</th>
           </tr>
         </thead>
         <tbody id="historyBody"></tbody>
@@ -217,10 +240,11 @@ function connectSocket() {
   socket = io(window.location.origin, {transports:['websocket','polling']});
 
   socket.on('connect', () => {
-    document.getElementById('statusText').innerText = 'Đã kết nối server';
+    document.getElementById('statusText').innerText = 'Đã kết nối Server';
+    document.getElementById('statusText').style.color = '#10b981';
   });
   socket.on('disconnect', () => {
-    document.getElementById('statusText').innerText = 'Mất kết nối server';
+    document.getElementById('statusText').innerText = 'Mất kết nối Server';
     document.getElementById('statusText').style.color = '#ef4444';
   });
 
@@ -233,14 +257,35 @@ function connectSocket() {
       el.innerText = d.prediction.toUpperCase();
       el.className = 'pred-value ' + (d.prediction === 'Tài' ? 'val-tai' : 'val-xiu');
       document.getElementById('predPercent').innerText =
-        d.ready ? `(Tin cậy ${d.conf}%)` : `(Đang thu thập: ${d.history_len}/12)`;
+        d.ready ? `(Độ tin cậy: ${d.conf}%)` : `(Đang lấy dữ liệu: ${d.history_len}/12)`;
     } else {
-      document.getElementById('predPercent').innerText = `(Đang thu thập: ${d.history_len}/12)`;
+      document.getElementById('predPercent').innerText = `(Đang lấy dữ liệu: ${d.history_len}/12)`;
     }
     document.getElementById('betDisplay').innerText = Number(d.current_bet).toLocaleString();
   });
 
-  socket.on('result_update', d => renderHistory(d.history));
+  socket.on('result_update', d => {
+    renderHistory(d.history);
+    
+    // HIỆU ỨNG KẾT QUẢ NGAY TẠI KHUNG DỰ ĐOÁN AI
+    if (d.is_win !== null && d.is_win !== undefined) {
+      const flash = document.getElementById('predResultFlash');
+      if (d.is_win) {
+        flash.innerHTML = '<span class="text-win"> THẮNG (Kết quả: ' + d.result + ')</span>';
+        flash.className = 'pred-result-flash';
+      } else {
+        flash.innerHTML = '<span class="text-lose"> THUA (Kết quả: ' + d.result + ')</span>';
+        flash.className = 'pred-result-flash lose';
+      }
+      flash.style.display = 'flex';
+      
+      // Ẩn hiệu ứng sau 2.5 giây
+      setTimeout(() => {
+        flash.style.display = 'none';
+      }, 2500);
+    }
+  });
+
   socket.on('stats_update', s => applyState(s));
 }
 
@@ -257,9 +302,12 @@ function applyState(s) {
   autoOn = s.auto_bet_enabled;
 
   document.getElementById('balanceDisplay').innerText = Number(s.balance).toLocaleString();
+  
+  // Hiển thị Lợi nhuận (Chốt lãi)
   const pl = document.getElementById('plDisplay');
-  pl.innerText = Number(s.profit_loss).toLocaleString();
+  pl.innerText = (s.profit_loss >= 0 ? '+' : '') + Number(s.profit_loss).toLocaleString();
   pl.style.color = s.profit_loss >= 0 ? '#10b981' : '#ef4444';
+  
   document.getElementById('winCount').innerText = s.win_count;
   document.getElementById('loseCount').innerText = s.lose_count;
   document.getElementById('betDisplay').innerText = Number(s.current_bet).toLocaleString();
@@ -271,9 +319,8 @@ function applyState(s) {
     el.className = 'pred-value ' + (s.current_prediction === 'Tài' ? 'val-tai' : 'val-xiu');
   }
 
-  // Socket badge
+  // Cập nhật trạng thái Socket
   const sb = document.getElementById('socketBadge');
-  const sd = document.getElementById('socketDot');
   if (s.socket_connected) {
     sb.className = 'badge badge-online';
     sb.innerHTML = '<div class="dot dot-green"></div> Socket: ON';
@@ -282,19 +329,25 @@ function applyState(s) {
     sb.innerHTML = '<div class="dot dot-red"></div> Socket: OFF';
   }
 
-  // Auto badge
+  // Cập nhật trạng thái Auto
   const badge = document.getElementById('autoStatusBadge');
   const btn = document.getElementById('btnToggleAuto');
+  const statusTxt = document.getElementById('statusText');
+  
   if (autoOn) {
-    btn.innerHTML = '<span>⏸</span> TẮT AUTO';
+    btn.innerHTML = '<span></span> TẮT AUTO';
     btn.classList.remove('off');
     badge.className = 'badge badge-auto';
-    badge.innerHTML = '<div class="dot dot-blue"></div> AUTO: ON';
+    badge.innerHTML = '<div class="dot dot-green"></div> AUTO: ĐANG CHẠY';
+    statusTxt.innerText = 'Đang tự động đặt cược';
+    statusTxt.style.color = '#10b981';
   } else {
     btn.innerHTML = '<span>▶</span> BẬT AUTO';
     btn.classList.add('off');
     badge.className = 'badge badge-auto off';
-    badge.innerHTML = '<div class="dot dot-gray"></div> AUTO: OFF';
+    badge.innerHTML = '<div class="dot dot-gray"></div> AUTO: ĐANG TẮT';
+    statusTxt.innerText = 'Đang chờ lệnh';
+    statusTxt.style.color = '#64748b';
   }
 
   if (s.history) renderHistory(s.history);
@@ -341,7 +394,7 @@ async function toggleAuto() {
       target_profit: target || null,
     })
   });
-  toast(newVal ? '✅ Đã bật AUTO' : '⏸ Đã tắt AUTO', newVal ? 'success' : 'info');
+  toast(newVal ? '✅ Đã bật chế độ Auto Cược' : '⏸ Đã tắt chế độ Auto Cược', newVal ? 'success' : 'info');
   pollStats();
 }
 
@@ -351,16 +404,16 @@ async function stopBot() {
     body: JSON.stringify({auto_bet_enabled: false})
   });
   autoOn = false;
-  document.getElementById('statusText').innerText = 'Đã ngắt Bot';
-  document.getElementById('statusText').style.color = '#ef4444';
-  toast('Đã ngắt bot', 'info');
+  toast('Đã ngắt Bot khẩn cấp', 'error');
   pollStats();
 }
 
 async function resetHistory() {
-  if (!confirm('Xóa toàn bộ lịch sử cược?')) return;
+  if (!confirm('Xóa toàn bộ lịch sử và đưa lợi nhuận về 0?')) return;
   await fetch('/api/reset_history', {method:'POST'});
   toast('Đã xóa lịch sử', 'success');
+  document.getElementById('plDisplay').innerText = '0';
+  document.getElementById('plDisplay').style.color = '#1e293b';
 }
 
 function toggleSettings() {
