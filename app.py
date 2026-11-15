@@ -110,7 +110,6 @@ def login_game(username, password):
         url = f"{API_LOGIN_URL}?c=3&un={username}&pw={pw}&{COMMON_PARAMS}&at="
         
         sess = requests.Session()
-        # Thêm Headers giả lập trình duyệt để tránh bị block
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "application/json, text/plain, */*",
@@ -153,13 +152,10 @@ def login_game(username, password):
 # ==========================================
 def game_socket_worker(sid, jwt_token):
     st = WEB_SESSIONS.get(sid)
-    if not st: 
-        logger.error(f"[{sid}] Không tìm thấy session để kết nối game")
-        return
+    if not st: return
 
     logger.info(f"[{sid}] Đang khởi tạo kết nối tới game socket...")
-    sio = SocketClient(reconnection=True, reconnection_attempts=20,
-                       logger=False, engineio_logger=False)
+    sio = SocketClient(reconnection=True, reconnection_attempts=50, logger=False, engineio_logger=False)
     WS_CLIENTS[sid] = sio
 
     @sio.event(namespace=GAME_WS_NS)
@@ -168,6 +164,11 @@ def game_socket_worker(sid, jwt_token):
         st["socket_connected"] = True
         socketio.emit("toast", {"type":"success","msg":"Đã kết nối socket game"}, to=sid)
         socketio.emit("stats_update", public_state(st), to=sid)
+
+    @sio.event(namespace=GAME_WS_NS)
+    def connect_error(data):
+        logger.error(f"[{sid}] ❌ CONNECT ERROR: {data}")
+        socketio.emit("toast", {"type":"error","msg":f"Lỗi kết nối: {data}"}, to=sid)
 
     @sio.event(namespace=GAME_WS_NS)
     def disconnect():
@@ -180,49 +181,34 @@ def game_socket_worker(sid, jwt_token):
     def on_new_session(data):
         st["has_bet_this_session"] = False
         st["session_id"] = data.get("id", "N/A")
-
-        if st["auto_bet_enabled"] and st["target_profit"]:
-            if st["profit_loss"] >= st["target_profit"]:
-                st["auto_bet_enabled"] = False
-                socketio.emit("toast", {"type":"success", "msg": f"🏆 Chốt lãi! +{st['profit_loss']:,}"}, to=sid)
+        if st["auto_bet_enabled"] and st["target_profit"] and st["profit_loss"] >= st["target_profit"]:
+            st["auto_bet_enabled"] = False
+            socketio.emit("toast", {"type":"success", "msg": f"🏆 Chốt lãi! +{st['profit_loss']:,}"}, to=sid)
 
         cur_bet = st["base_bet_amount"]
         if st["x2_mode"] and st["win_streak"] >= 1:
             cur_bet = st["base_bet_amount"] * 2
         elif st["x2_loss_mode"] and st["loss_streak"] >= 1:
-            if st["loss_streak"] <= st["x2_loss_limit"]:
-                cur_bet = st["base_bet_amount"] * (2 ** st["loss_streak"])
-            else:
-                cur_bet = st["base_bet_amount"]
+            cur_bet = st["base_bet_amount"] * (2 ** st["loss_streak"]) if st["loss_streak"] <= st["x2_loss_limit"] else st["base_bet_amount"]
         st["current_bet"] = cur_bet
 
         pred_res = get_prediction_from_api()
         st["current_prediction"] = pred_res["side"]
-        st["last_pred_detail"] = pred_res
-
         socketio.emit("session_update", {
-            "session_id": st["session_id"],
-            "prediction": pred_res["side"],
-            "conf": pred_res["conf"],
-            "ready": pred_res["ready"],
-            "history_len": len(GLOBAL_HISTORY),
-            "current_bet": cur_bet,
+            "session_id": st["session_id"], "prediction": pred_res["side"],
+            "conf": pred_res["conf"], "ready": pred_res["ready"],
+            "history_len": len(GLOBAL_HISTORY), "current_bet": cur_bet,
             "auto_bet_enabled": st["auto_bet_enabled"],
         }, to=sid)
 
     @sio.on("tick-update", namespace=GAME_WS_NS)
     def on_tick_update(data):
-        if data.get("state") != "BETTING": return
-        if not st["auto_bet_enabled"]: return
-        if not st["current_prediction"]: return
-        if st["has_bet_this_session"]: return
-
+        if data.get("state") != "BETTING" or not st["auto_bet_enabled"] or not st["current_prediction"] or st["has_bet_this_session"]:
+            return
         bet_type = "TAI" if st["current_prediction"] == "Tài" else "XIU"
         sio.emit("bet", {"type": bet_type, "amount": st["current_bet"]}, namespace=GAME_WS_NS)
         st["has_bet_this_session"] = True
         st["waiting_for_result"] = True
-        logger.info(f"[{sid}] Đã gửi lệnh cược: {bet_type} - {st['current_bet']}")
-        
         socketio.emit("toast", {"type":"info", "msg": f"🚀 Cược {st['current_bet']:,} vào {st['current_prediction'].upper()}"}, to=sid)
 
     @sio.on("bet-result", namespace=GAME_WS_NS)
@@ -239,54 +225,49 @@ def game_socket_worker(sid, jwt_token):
         dices = data.get("dices", [0,0,0])
         pred = st.get("current_prediction")
         is_win = None
-
         if pred:
-            pred_tx = "TAI" if pred == "Tài" else "XIU"
-            is_win = (pred_tx == result)
+            is_win = ("TAI" if pred == "Tài" else "XIU") == result
             if st["waiting_for_result"]:
                 if is_win:
-                    win_amt = int(st["current_bet"] * 0.98)
-                    st["profit_loss"] += win_amt
-                    st["win_streak"] += 1
-                    st["loss_streak"] = 0
-                    st["win_count"] += 1
+                    st["profit_loss"] += int(st["current_bet"] * 0.98)
+                    st["win_streak"] += 1; st["loss_streak"] = 0; st["win_count"] += 1
                 else:
                     st["profit_loss"] -= st["current_bet"]
-                    st["win_streak"] = 0
-                    st["loss_streak"] += 1
-                    st["lose_count"] += 1
+                    st["win_streak"] = 0; st["loss_streak"] += 1; st["lose_count"] += 1
                 st["waiting_for_result"] = False
-
+            
             st["history"].insert(0, {
                 "session": data.get("id") or st["session_id"],
-                "pred": pred.upper(),
-                "bet": st["current_bet"],
+                "pred": pred.upper(), "bet": st["current_bet"],
                 "result": "TÀI" if result == "TAI" else ("XỈU" if result == "XIU" else "?"),
-                "dice": dices,
-                "win": is_win,
+                "dice": dices, "win": is_win,
             })
             st["history"] = st["history"][:30]
-
         socketio.emit("result_update", {"result": result, "dices": dices, "is_win": is_win, "history": st["history"]}, to=sid)
         socketio.emit("stats_update", public_state(st), to=sid)
 
+    # ==========================================
+    # KẾT NỐI VỚI TOKEN (CẤU HÌNH ĐẶC BIỆT CHO TELE68)
+    # ==========================================
     try:
-        logger.info(f"[{sid}] Đang gọi sio.connect() với token...")
+        logger.info(f"[{sid}] Đang gọi sio.connect()...")
         
-        # Cấu hình Header giả lập trình duyệt, đính kèm Token
         connect_headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Authorization": f"Bearer {jwt_token}",
             "Origin": "https://tele68.com",
             "Referer": "https://tele68.com/"
         }
         
+        # Đính kèm token vào query string (vì nhiều game yêu cầu điều này ở path websocket)
+        connect_url = f"{GAME_WS_URL}?token={jwt_token}"
+        
         sio.connect(
-            GAME_WS_URL,
+            connect_url,
             socketio_path=GAME_WS_PATH,
             namespaces=[GAME_WS_NS],
             headers=connect_headers,
-            transports=["websocket"], # Bắt buộc dùng websocket
+            auth={"token": jwt_token}, # Vẫn gửi qua auth cho chắc
+            transports=["websocket"],
             wait_timeout=15
         )
         
@@ -370,7 +351,7 @@ def api_login():
         "history": [],
     }
 
-    # Dùng socketio.start_background_task thay vì threading.Thread
+    # Dùng socketio.start_background_task để tránh block server
     socketio.start_background_task(game_socket_worker, sid, res["token"])
 
     return jsonify({
