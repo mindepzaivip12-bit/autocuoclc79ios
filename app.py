@@ -1,4 +1,7 @@
-import os, json, time, base64, hashlib, logging, random
+from gevent import monkey
+monkey.patch_all() # Bắt buộc phải đặt ở đầu file để gevent hoạt động đúng
+
+import os, json, time, base64, hashlib, logging, random, threading
 import requests
 from flask import Flask, render_template, request, jsonify, session
 from flask_socketio import SocketIO
@@ -8,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.urandom(24).hex()
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'lc79-secret-2024')
 # Sử dụng gevent để tương thích với môi trường deploy trên Render
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
@@ -17,7 +20,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 # ==========================================
 API_LOGIN_URL   = "https://apifo88daigia.tele68.com/api"
 API_LOBBY_URL   = "https://wlb.tele68.com/v1/lobby/auth/login"
-API_HISTORY_URL = "https://leminhdzctemd5.onrender.com/lc79md5"  # API mới của bạn
+API_HISTORY_URL = "https://leminhdzctemd5.onrender.com/lc79md5" # API mới của bạn
 GAME_WS_URL     = "https://wtxmd52.tele68.com"
 GAME_WS_PATH    = "txmd5/"
 GAME_WS_NS      = "/txmd5"
@@ -28,8 +31,8 @@ COMMON_PARAMS   = "cp=R&cl=R&pf=web"
 # ==========================================
 GLOBAL_HISTORY = []
 MAX_GLOBAL_HISTORY = 2000
-WEB_SESSIONS = {}
-WS_CLIENTS = {}
+WEB_SESSIONS = {}       
+WS_CLIENTS = {}         
 
 # ==========================================
 # API DATA WORKER (Poll dữ liệu từ API của bạn)
@@ -41,16 +44,13 @@ def api_data_worker():
             url = f"{API_HISTORY_URL}?{COMMON_PARAMS}&at=&_t={int(time.time()*1000)}"
             r = requests.get(url, timeout=5, headers={"Cache-Control":"no-store","User-Agent":"Mozilla/5.0"})
             data = r.json()
-
-            # API mới trả về một dict duy nhất, không phải list
+            
             session_id = data.get("phien")
-            result_str = data.get("ket_qua", "").lower()  # Ví dụ: "tài 4-6-5"
-
+            result_str = data.get("ket_qua", "").lower()
+            
             if session_id and result_str:
-                # Xác định Tài/Xỉu
                 side = "Tài" if "tài" in result_str else ("Xỉu" if "xỉu" in result_str else None)
-
-                # Trích xuất xúc xắc từ chuỗi (nếu có)
+                
                 dices = []
                 try:
                     parts = result_str.split()
@@ -60,7 +60,6 @@ def api_data_worker():
                     pass
 
                 if side:
-                    # Cập nhật lịch sử toàn cục (tránh trùng lặp phiên)
                     if not GLOBAL_HISTORY or GLOBAL_HISTORY[-1]["session"] != session_id:
                         GLOBAL_HISTORY.append({
                             "session": session_id,
@@ -68,34 +67,27 @@ def api_data_worker():
                             "total": sum(dices) if dices else 0,
                             "side": side,
                         })
-                        # Giữ giới hạn bộ nhớ
                         if len(GLOBAL_HISTORY) > MAX_GLOBAL_HISTORY:
                             GLOBAL_HISTORY.pop(0)
 
         except Exception as e:
             logger.error(f"API Worker Error: {e}")
+        
+        socketio.sleep(2) 
 
-        # Sử dụng socketio.sleep thay vì time.sleep để không block gevent
-        socketio.sleep(2)
-
-# Khởi chạy worker bằng socketio.start_background_task
 socketio.start_background_task(api_data_worker)
 
 # ==========================================
-# THUẬT TOÁN DỰ ĐOÁN (Dựa trên API của bạn)
+# THUẬT TOÁN DỰ ĐOÁN
 # ==========================================
 def get_prediction_from_api():
-    """
-    Hàm này lấy dự đoán trực tiếp từ API của bạn thay vì tự tính toán
-    """
     try:
         r = requests.get(API_HISTORY_URL, timeout=5)
         data = r.json()
-
-        du_doan = data.get("du_doan")            # "Tài" hoặc "Xỉu"
-        do_tin_cay = data.get("do_tin_cay", "0%")  # "90,0%"
-
-        # Xử lý độ tin cậy (bỏ dấu % và đổi dấu phẩy thành dấu chấm)
+        
+        du_doan = data.get("du_doan") 
+        do_tin_cay = data.get("do_tin_cay", "0%") 
+        
         conf = 50
         if do_tin_cay:
             try:
@@ -107,8 +99,7 @@ def get_prediction_from_api():
             return {"side": du_doan, "conf": int(conf), "ready": True}
     except:
         pass
-
-    # Nếu API lỗi, trả về mặc định
+    
     return {"side": random.choice(["Tài","Xỉu"]), "conf": 50, "ready": False}
 
 # ==========================================
@@ -120,12 +111,12 @@ def login_game(username, password):
     try:
         pw = md5_hash(password)
         url = f"{API_LOGIN_URL}?c=3&un={username}&pw={pw}&{COMMON_PARAMS}&at="
-
+        
         sess = requests.Session()
         r = sess.get(url, timeout=12)
         r.raise_for_status()
         data = r.json()
-
+        
         if not data.get("success"):
             return {"_error": data.get("message", "Sai thông tin đăng nhập")}
 
@@ -157,21 +148,25 @@ def login_game(username, password):
 # ==========================================
 def game_socket_worker(sid, jwt_token):
     st = WEB_SESSIONS.get(sid)
-    if not st: return
+    if not st: 
+        logger.error(f"[{sid}] Không tìm thấy session để kết nối game")
+        return
 
+    logger.info(f"[{sid}] Đang khởi tạo kết nối tới game socket...")
     sio = SocketClient(reconnection=True, reconnection_attempts=20,
                        logger=False, engineio_logger=False)
     WS_CLIENTS[sid] = sio
 
     @sio.event(namespace=GAME_WS_NS)
     def connect():
-        logger.info(f"[{sid}] game socket connected")
+        logger.info(f"[{sid}] ✅ Game socket CONNECTED")
         st["socket_connected"] = True
         socketio.emit("toast", {"type":"success","msg":"Đã kết nối socket game"}, to=sid)
         socketio.emit("stats_update", public_state(st), to=sid)
 
     @sio.event(namespace=GAME_WS_NS)
     def disconnect():
+        logger.warning(f"[{sid}] ❌ Game socket DISCONNECTED")
         st["socket_connected"] = False
         socketio.emit("toast", {"type":"error","msg":"Mất kết nối socket game"}, to=sid)
         socketio.emit("stats_update", public_state(st), to=sid)
@@ -181,14 +176,12 @@ def game_socket_worker(sid, jwt_token):
         st["has_bet_this_session"] = False
         st["session_id"] = data.get("id", "N/A")
 
-        # Target check
         if st["auto_bet_enabled"] and st["target_profit"]:
             if st["profit_loss"] >= st["target_profit"]:
                 st["auto_bet_enabled"] = False
                 socketio.emit("toast", {"type":"success",
                     "msg": f"🏆 Chốt lãi! +{st['profit_loss']:,}"}, to=sid)
 
-        # Tính tiền cược
         cur_bet = st["base_bet_amount"]
         if st["x2_mode"] and st["win_streak"] >= 1:
             cur_bet = st["base_bet_amount"] * 2
@@ -199,7 +192,6 @@ def game_socket_worker(sid, jwt_token):
                 cur_bet = st["base_bet_amount"]
         st["current_bet"] = cur_bet
 
-        # LẤY DỰ ĐOÁN TỪ API BÊN NGOÀI
         pred_res = get_prediction_from_api()
         st["current_prediction"] = pred_res["side"]
         st["last_pred_detail"] = pred_res
@@ -226,6 +218,8 @@ def game_socket_worker(sid, jwt_token):
                  namespace=GAME_WS_NS)
         st["has_bet_this_session"] = True
         st["waiting_for_result"] = True
+        logger.info(f"[{sid}] Đã gửi lệnh cược: {bet_type} - {st['current_bet']}")
+        
         socketio.emit("toast", {"type":"info",
             "msg": f"🚀 Cược {st['current_bet']:,} vào {st['current_prediction'].upper()}"},
             to=sid)
@@ -287,9 +281,9 @@ def game_socket_worker(sid, jwt_token):
             auth={"token": jwt_token},
             headers={"User-Agent": "Mozilla/5.0"},
         )
-        sio.wait()
+        sio.wait() # Hàm này sẽ block thread hiện tại cho đến khi ngắt kết nối
     except Exception as e:
-        logger.error(f"[{sid}] socket error: {e}")
+        logger.error(f"[{sid}] Lỗi kết nối socket: {e}")
         st["socket_connected"] = False
         socketio.emit("toast", {"type":"error","msg":f"Socket lỗi: {e}"}, to=sid)
         socketio.emit("stats_update", public_state(st), to=sid)
@@ -366,8 +360,8 @@ def api_login():
         "history": [],
     }
 
-    # Khởi chạy worker kết nối game bằng socketio.start_background_task
-    socketio.start_background_task(game_socket_worker, sid, res["token"])
+    # QUAN TRỌNG: Dùng threading.Thread cho socket client để không block gevent
+    threading.Thread(target=game_socket_worker, args=(sid, res["token"]), daemon=True).start()
 
     return jsonify({
         "success": True,
