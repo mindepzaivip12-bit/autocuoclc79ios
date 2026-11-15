@@ -1,17 +1,17 @@
+import eventlet
+eventlet.monkey_patch() # BẮT BUỘC: Phải để ở đầu tiên để tránh lỗi recursion và block I/O
+
 import os, json, time, base64, hashlib, threading, logging, random
 import requests
 from flask import Flask, render_template, request, jsonify, session
 from flask_socketio import SocketIO
-from socketio import Client as SocketClient  # Sửa import cho chuẩn
+from socketio import Client as SocketClient
 
-# Cấu hình logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'lc79-secret-2024')
-
-# Sử dụng eventlet (Đã cài trong requirements)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # ==========================================
@@ -26,7 +26,7 @@ GAME_WS_NS      = "/txmd5"
 COMMON_PARAMS   = "cp=R&cl=R&pf=web"
 
 # ==========================================
-# DỮ LIỆU TOÀN CỤC
+# DỮ LIỆU TOÀN CỤC (dùng chung cho mọi user)
 # ==========================================
 GLOBAL_HISTORY = []
 MAX_GLOBAL_HISTORY = 2000
@@ -34,7 +34,7 @@ WEB_SESSIONS = {}       # sid -> state
 WS_CLIENTS = {}         # sid -> socketio.Client
 
 # ==========================================
-# API DATA WORKER
+# API DATA WORKER (poll lịch sử phiên)
 # ==========================================
 def api_data_worker():
     logger.info("API data worker started")
@@ -94,9 +94,13 @@ def login_game(username, password):
     try:
         pw = md5_hash(password)
         url = f"{API_LOGIN_URL}?c=3&un={username}&pw={pw}&{COMMON_PARAMS}&at="
-        r = requests.get(url, timeout=12)
+        
+        # Sử dụng Session để tối ưu kết nối và tránh lỗi recursion
+        sess = requests.Session()
+        r = sess.get(url, timeout=12)
         r.raise_for_status()
         data = r.json()
+        
         if not data.get("success"):
             return {"_error": data.get("message", "Sai thông tin đăng nhập")}
 
@@ -106,7 +110,7 @@ def login_game(username, password):
         nickname = sk_data.get("nickname") or sk_data.get("nickName")
 
         access_token = data["accessToken"]
-        r2 = requests.post(
+        r2 = sess.post(
             f"{API_LOBBY_URL}?{COMMON_PARAMS}&at=",
             headers={"content-type":"application/json","authority":"wlb.tele68.com"},
             json={"nickName": nickname, "accessToken": access_token},
@@ -120,6 +124,7 @@ def login_game(username, password):
         money = lobby.get("remoteLoginResp", {}).get("money", 0)
         return {"token": jwt, "nickname": nickname, "money": money}
     except Exception as e:
+        logger.error(f"Login error: {e}")
         return {"_error": f"Lỗi kết nối: {e}"}
 
 # ==========================================
@@ -129,7 +134,6 @@ def game_socket_worker(sid, jwt_token):
     st = WEB_SESSIONS.get(sid)
     if not st: return
 
-    # Khởi tạo client socket
     sio = SocketClient(reconnection=True, reconnection_attempts=20,
                        logger=False, engineio_logger=False)
     WS_CLIENTS[sid] = sio
@@ -152,12 +156,14 @@ def game_socket_worker(sid, jwt_token):
         st["has_bet_this_session"] = False
         st["session_id"] = data.get("id", "N/A")
 
+        # Target check
         if st["auto_bet_enabled"] and st["target_profit"]:
             if st["profit_loss"] >= st["target_profit"]:
                 st["auto_bet_enabled"] = False
                 socketio.emit("toast", {"type":"success",
                     "msg": f"🏆 Chốt lãi! +{st['profit_loss']:,}"}, to=sid)
 
+        # Tính tiền cược
         cur_bet = st["base_bet_amount"]
         if st["x2_mode"] and st["win_streak"] >= 1:
             cur_bet = st["base_bet_amount"] * 2
@@ -168,6 +174,7 @@ def game_socket_worker(sid, jwt_token):
                 cur_bet = st["base_bet_amount"]
         st["current_bet"] = cur_bet
 
+        # Dự đoán
         pred_res = predict_side(GLOBAL_HISTORY)
         st["current_prediction"] = pred_res["side"]
         st["last_pred_detail"] = pred_res
@@ -400,7 +407,6 @@ def api_logout():
     session.pop("sid", None)
     return jsonify({"success": True})
 
-# Chạy trực tiếp nếu không dùng Gunicorn
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     socketio.run(app, host="0.0.0.0", port=port)
