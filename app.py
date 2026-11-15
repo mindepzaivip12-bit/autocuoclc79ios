@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'lc79-secret-2024')
+app.config['SECRET_KEY'] = os.urandom(24).hex()
 # Sử dụng gevent để tương thích với môi trường deploy trên Render
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
@@ -17,7 +17,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 # ==========================================
 API_LOGIN_URL   = "https://apifo88daigia.tele68.com/api"
 API_LOBBY_URL   = "https://wlb.tele68.com/v1/lobby/auth/login"
-API_HISTORY_URL = "https://leminhdzctemd5.onrender.com/lc79md5" # API mới của bạn
+API_HISTORY_URL = "https://leminhdzctemd5.onrender.com/lc79md5"  # API mới của bạn
 GAME_WS_URL     = "https://wtxmd52.tele68.com"
 GAME_WS_PATH    = "txmd5/"
 GAME_WS_NS      = "/txmd5"
@@ -28,8 +28,8 @@ COMMON_PARAMS   = "cp=R&cl=R&pf=web"
 # ==========================================
 GLOBAL_HISTORY = []
 MAX_GLOBAL_HISTORY = 2000
-WEB_SESSIONS = {}       
-WS_CLIENTS = {}         
+WEB_SESSIONS = {}
+WS_CLIENTS = {}
 
 # ==========================================
 # API DATA WORKER (Poll dữ liệu từ API của bạn)
@@ -41,15 +41,15 @@ def api_data_worker():
             url = f"{API_HISTORY_URL}?{COMMON_PARAMS}&at=&_t={int(time.time()*1000)}"
             r = requests.get(url, timeout=5, headers={"Cache-Control":"no-store","User-Agent":"Mozilla/5.0"})
             data = r.json()
-            
+
             # API mới trả về một dict duy nhất, không phải list
             session_id = data.get("phien")
-            result_str = data.get("ket_qua", "").lower() # Ví dụ: "tài 4-6-5"
-            
+            result_str = data.get("ket_qua", "").lower()  # Ví dụ: "tài 4-6-5"
+
             if session_id and result_str:
                 # Xác định Tài/Xỉu
                 side = "Tài" if "tài" in result_str else ("Xỉu" if "xỉu" in result_str else None)
-                
+
                 # Trích xuất xúc xắc từ chuỗi (nếu có)
                 dices = []
                 try:
@@ -74,9 +74,9 @@ def api_data_worker():
 
         except Exception as e:
             logger.error(f"API Worker Error: {e}")
-        
+
         # Sử dụng socketio.sleep thay vì time.sleep để không block gevent
-        socketio.sleep(2) 
+        socketio.sleep(2)
 
 # Khởi chạy worker bằng socketio.start_background_task
 socketio.start_background_task(api_data_worker)
@@ -91,10 +91,10 @@ def get_prediction_from_api():
     try:
         r = requests.get(API_HISTORY_URL, timeout=5)
         data = r.json()
-        
-        du_doan = data.get("du_doan") # "Tài" hoặc "Xỉu"
-        do_tin_cay = data.get("do_tin_cay", "0%") # "90,0%"
-        
+
+        du_doan = data.get("du_doan")            # "Tài" hoặc "Xỉu"
+        do_tin_cay = data.get("do_tin_cay", "0%")  # "90,0%"
+
         # Xử lý độ tin cậy (bỏ dấu % và đổi dấu phẩy thành dấu chấm)
         conf = 50
         if do_tin_cay:
@@ -107,7 +107,7 @@ def get_prediction_from_api():
             return {"side": du_doan, "conf": int(conf), "ready": True}
     except:
         pass
-    
+
     # Nếu API lỗi, trả về mặc định
     return {"side": random.choice(["Tài","Xỉu"]), "conf": 50, "ready": False}
 
@@ -120,12 +120,12 @@ def login_game(username, password):
     try:
         pw = md5_hash(password)
         url = f"{API_LOGIN_URL}?c=3&un={username}&pw={pw}&{COMMON_PARAMS}&at="
-        
+
         sess = requests.Session()
         r = sess.get(url, timeout=12)
         r.raise_for_status()
         data = r.json()
-        
+
         if not data.get("success"):
             return {"_error": data.get("message", "Sai thông tin đăng nhập")}
 
