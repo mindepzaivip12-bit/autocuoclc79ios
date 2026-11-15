@@ -1,7 +1,4 @@
-import eventlet
-eventlet.monkey_patch() # Bắt buộc để tránh lỗi recursion
-
-import os, json, time, base64, hashlib, threading, logging, random
+import os, json, time, base64, hashlib, logging, random
 import requests
 from flask import Flask, render_template, request, jsonify, session
 from flask_socketio import SocketIO
@@ -12,7 +9,8 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'lc79-secret-2024')
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+# Sử dụng gevent để tương thích với môi trường deploy trên Render
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 # ==========================================
 # CẤU HÌNH API / ENDPOINT
@@ -77,9 +75,11 @@ def api_data_worker():
         except Exception as e:
             logger.error(f"API Worker Error: {e}")
         
-        time.sleep(2) # Cứ 2 giây gọi API một lần
+        # Sử dụng socketio.sleep thay vì time.sleep để không block gevent
+        socketio.sleep(2) 
 
-threading.Thread(target=api_data_worker, daemon=True).start()
+# Khởi chạy worker bằng socketio.start_background_task
+socketio.start_background_task(api_data_worker)
 
 # ==========================================
 # THUẬT TOÁN DỰ ĐOÁN (Dựa trên API của bạn)
@@ -366,7 +366,8 @@ def api_login():
         "history": [],
     }
 
-    threading.Thread(target=game_socket_worker, args=(sid, res["token"]), daemon=True).start()
+    # Khởi chạy worker kết nối game bằng socketio.start_background_task
+    socketio.start_background_task(game_socket_worker, sid, res["token"])
 
     return jsonify({
         "success": True,
