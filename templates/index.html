@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TOOL AUTO LC79</title>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',sans-serif}
+body{background:linear-gradient(135deg,#eef2f6 0%,#e0e7ff 100%);min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px;color:#334155}
+.login-container{background:#fff;width:100%;max-width:400px;border-radius:16px;padding:30px;box-shadow:0 10px 25px rgba(0,0,0,.05)}
+.login-container h2{text-align:center;color:#2563eb;margin-bottom:20px}
+.form-group{margin-bottom:15px}
+.form-group label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#64748b}
+.form-group input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;outline:none}
+.form-group input:focus{border-color:#2563eb}
+.btn-login{width:100%;padding:12px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer}
+.btn-login:hover{background:#1d4ed8}
+.btn-login:disabled{opacity:.6;cursor:not-allowed}
+.main-wrapper{display:none;width:100%;max-width:900px;flex-direction:column;gap:15px}
+.top-header{background:#fff;border-radius:12px;padding:15px 25px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 6px rgba(0,0,0,.02)}
+.logo-text h1{font-size:20px;color:#1e293b;font-weight:800;letter-spacing:.5px;margin-bottom:4px}
+.logo-text p{font-size:13px;color:#64748b}
+.main-card{background:#fff;border-radius:16px;padding:25px;box-shadow:0 10px 25px rgba(0,0,0,.03)}
+.section-title{font-size:14px;color:#64748b;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:20px}
+.status-badges{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.badge{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.badge-online{background:#ecfdf5;color:#10b981;border:1px solid #d1fae5}
+.badge-online.off{background:#fef2f2;color:#ef4444;border-color:#fee2e2}
+.badge-auto{background:#eff6ff;color:#3b82f6;border:1px solid #dbeafe}
+.badge-auto.off{background:#f1f5f9;color:#94a3b8;border-color:#e2e8f0}
+.dot{width:6px;height:6px;border-radius:50%;background:#3b82f6}
+.dot-green{background:#10b981}
+.dot-red{background:#ef4444}
+.dot-gray{background:#94a3b8}
+.prediction-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+.pred-left{display:flex;flex-direction:column;gap:5px}
+.pred-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase}
+.pred-value{font-size:32px;font-weight:800;color:#3b82f6;letter-spacing:1px}
+.pred-percent{font-size:12px;color:#94a3b8;font-weight:500}
+.pred-right{text-align:right}
+.session-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:4px;display:block}
+.session-value{font-size:16px;font-weight:800;color:#1e293b}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:20px;overflow:hidden}
+.info-item{padding:15px 20px;border-bottom:1px solid #e2e8f0}
+.info-item:nth-child(odd){border-right:1px solid #e2e8f0}
+.info-item:nth-last-child(-n+2){border-bottom:none}
+.info-label{font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:6px;display:block}
+.info-value{font-size:15px;font-weight:700;color:#1e293b}
+.action-buttons{display:flex;gap:12px;margin-bottom:25px;flex-wrap:wrap}
+.btn-action{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;color:#fff;transition:.2s}
+.btn-toggle-auto{background:#10b981}
+.btn-toggle-auto.off{background:#3b82f6}
+.btn-stop-bot{background:#ef4444}
+.btn-action:hover{transform:translateY(-2px)}
+.table-title{font-size:13px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:15px}
+.table-wrapper{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:12px 10px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0;font-size:11px;text-transform:uppercase}
+td{padding:12px 10px;border-bottom:1px solid #f1f5f9;font-weight:600;color:#334155}
+.val-tai{color:#3b82f6}
+.val-xiu{color:#ef4444}
+.val-win{color:#10b981}
+.val-lose{color:#ef4444}
+.settings-panel{display:none;background:#f8fafc;padding:15px;border-radius:8px;margin-bottom:15px;border:1px dashed #cbd5e1;gap:10px;flex-wrap:wrap}
+.settings-panel input{padding:8px;border:1px solid #cbd5e1;border-radius:6px;width:140px;outline:none}
+.btn-settings{background:#f1f5f9;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600;color:#475569;margin-bottom:15px;font-size:12px;margin-right:8px}
+.btn-reset{background:#fef2f2;color:#ef4444;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;float:right}
+.toast-wrap{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:320px}
+.toast{padding:12px 16px;border-radius:8px;color:#fff;font-weight:600;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,.15);animation:slideIn .3s}
+.toast.success{background:#10b981}
+.toast.error{background:#ef4444}
+.toast.info{background:#3b82f6}
+@keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<!-- LOGIN -->
+<div class="login-container" id="loginView">
+  <h2>ĐĂNG NHẬP HỆ THỐNG</h2>
+  <div class="form-group">
+    <label>Tài khoản</label>
+    <input type="text" id="username" placeholder="Nhập tài khoản game...">
+  </div>
+  <div class="form-group">
+    <label>Mật khẩu</label>
+    <input type="password" id="password" placeholder="Nhập mật khẩu..." onkeydown="if(event.key==='Enter')handleLogin()">
+  </div>
+  <button class="btn-login" id="btnLogin" onclick="handleLogin()">ĐĂNG NHẬP</button>
+</div>
+
+<!-- MAIN -->
+<div class="main-wrapper" id="mainView">
+  <div class="top-header">
+    <div class="logo-text">
+      <h1>TOOL AUTO LC79</h1>
+      <p>Hệ thống phân tích cầu & dự đoán Tài Xỉu tự động</p>
+    </div>
+  </div>
+
+  <div class="main-card">
+    <div class="section-title"><span>📊</span> BẢNG ĐIỀU KHIỂN</div>
+
+    <div class="status-badges">
+      <div class="badge badge-online off" id="socketBadge"><div class="dot dot-gray" id="socketDot"></div> Socket: OFF</div>
+      <div class="badge badge-auto off" id="autoStatusBadge"><div class="dot dot-gray"></div> AUTO: OFF</div>
+    </div>
+
+    <div>
+      <button class="btn-settings" onclick="toggleSettings()">⚙️ Cài đặt cược</button>
+      <button class="btn-reset" onclick="resetHistory()">🗑 Xóa Lịch Sử</button>
+    </div>
+
+    <div class="settings-panel" id="settingsPanel">
+      <input type="number" id="betAmount" value="10000" placeholder="Tiền cược (VNĐ)">
+      <input type="number" id="x2Limit" value="5" placeholder="Số tay gãy tối đa">
+      <input type="number" id="targetProfit" value="0" placeholder="Target lãi (0=tắt)">
+    </div>
+
+    <div class="prediction-box">
+      <div class="pred-left">
+        <span class="pred-label">DỰ ĐOÁN AI</span>
+        <div class="pred-value" id="predValue">—</div>
+        <div class="pred-percent" id="predPercent">(Đang chờ dữ liệu...)</div>
+      </div>
+      <div class="pred-right">
+        <span class="session-label">PHIÊN</span>
+        <span class="session-value" id="sessionValue">#—</span>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-item"><span class="info-label">NICKNAME</span><div class="info-value" id="nicknameDisplay">—</div></div>
+      <div class="info-item"><span class="info-label">SỐ DƯ</span><div class="info-value" id="balanceDisplay">0</div></div>
+      <div class="info-item"><span class="info-label">CƯỢC PHIÊN</span><div class="info-value" id="betDisplay">0</div></div>
+      <div class="info-item"><span class="info-label">LÃI/LỖ</span><div class="info-value" id="plDisplay">0</div></div>
+      <div class="info-item"><span class="info-label">WIN / LOSE</span><div class="info-value"><span class="val-win" id="winCount">0</span> / <span class="val-lose" id="loseCount">0</span></div></div>
+      <div class="info-item"><span class="info-label">TRẠNG THÁI</span><div class="info-value" id="statusText">Chờ kết nối...</div></div>
+    </div>
+
+    <div class="action-buttons">
+      <button class="btn-action btn-toggle-auto off" id="btnToggleAuto" onclick="toggleAuto()"><span>▶</span> BẬT AUTO</button>
+      <button class="btn-action btn-stop-bot" onclick="stopBot()"><span>⏹</span> NGẮT BOT</button>
+    </div>
+
+    <div class="table-title">LỊCH SỬ CƯỢC</div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>PHIÊN</th><th>DỰ ĐOÁN</th><th>CƯỢC</th>
+            <th>KẾT QUẢ</th><th>XÚC XẮC</th><th>KẾT QUẢ</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+let socket = null;
+let autoOn = false;
+let curState = null;
+
+function toast(msg, type='info') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerText = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+async function handleLogin() {
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value.trim();
+  if (!u || !p) return toast('Nhập đủ tài khoản/mật khẩu', 'error');
+
+  const btn = document.getElementById('btnLogin');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Đang đăng nhập...';
+
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username: u, password: p})
+    });
+    const d = await r.json();
+    if (!d.success) {
+      toast(d.error || 'Lỗi đăng nhập', 'error');
+      btn.disabled = false;
+      btn.innerText = 'ĐĂNG NHẬP';
+      return;
+    }
+    document.getElementById('loginView').style.display = 'none';
+    document.getElementById('mainView').style.display = 'flex';
+    document.getElementById('nicknameDisplay').innerText = d.nickname;
+    document.getElementById('balanceDisplay').innerText = Number(d.balance).toLocaleString();
+    connectSocket();
+    toast('Đăng nhập thành công!', 'success');
+    setTimeout(pollStats, 500);
+  } catch(e) {
+    toast('Lỗi kết nối server: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.innerText = 'ĐĂNG NHẬP';
+  }
+}
+
+function connectSocket() {
+  socket = io(window.location.origin, {transports:['websocket','polling']});
+
+  socket.on('connect', () => {
+    document.getElementById('statusText').innerText = 'Đã kết nối server';
+  });
+  socket.on('disconnect', () => {
+    document.getElementById('statusText').innerText = 'Mất kết nối server';
+    document.getElementById('statusText').style.color = '#ef4444';
+  });
+
+  socket.on('toast', d => toast(d.msg, d.type));
+
+  socket.on('session_update', d => {
+    document.getElementById('sessionValue').innerText = '#' + d.session_id;
+    if (d.prediction) {
+      const el = document.getElementById('predValue');
+      el.innerText = d.prediction.toUpperCase();
+      el.className = 'pred-value ' + (d.prediction === 'Tài' ? 'val-tai' : 'val-xiu');
+      document.getElementById('predPercent').innerText =
+        d.ready ? `(Tin cậy ${d.conf}%)` : `(Đang thu thập: ${d.history_len}/12)`;
+    } else {
+      document.getElementById('predPercent').innerText = `(Đang thu thập: ${d.history_len}/12)`;
+    }
+    document.getElementById('betDisplay').innerText = Number(d.current_bet).toLocaleString();
+  });
+
+  socket.on('result_update', d => renderHistory(d.history));
+  socket.on('stats_update', s => applyState(s));
+}
+
+async function pollStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+    if (d.success) applyState(d.state);
+  } catch(e) {}
+}
+
+function applyState(s) {
+  curState = s;
+  autoOn = s.auto_bet_enabled;
+
+  document.getElementById('balanceDisplay').innerText = Number(s.balance).toLocaleString();
+  const pl = document.getElementById('plDisplay');
+  pl.innerText = Number(s.profit_loss).toLocaleString();
+  pl.style.color = s.profit_loss >= 0 ? '#10b981' : '#ef4444';
+  document.getElementById('winCount').innerText = s.win_count;
+  document.getElementById('loseCount').innerText = s.lose_count;
+  document.getElementById('betDisplay').innerText = Number(s.current_bet).toLocaleString();
+  if (s.session_id) document.getElementById('sessionValue').innerText = '#' + s.session_id;
+
+  if (s.current_prediction) {
+    const el = document.getElementById('predValue');
+    el.innerText = s.current_prediction.toUpperCase();
+    el.className = 'pred-value ' + (s.current_prediction === 'Tài' ? 'val-tai' : 'val-xiu');
+  }
+
+  // Socket badge
+  const sb = document.getElementById('socketBadge');
+  const sd = document.getElementById('socketDot');
+  if (s.socket_connected) {
+    sb.className = 'badge badge-online';
+    sb.innerHTML = '<div class="dot dot-green"></div> Socket: ON';
+  } else {
+    sb.className = 'badge badge-online off';
+    sb.innerHTML = '<div class="dot dot-red"></div> Socket: OFF';
+  }
+
+  // Auto badge
+  const badge = document.getElementById('autoStatusBadge');
+  const btn = document.getElementById('btnToggleAuto');
+  if (autoOn) {
+    btn.innerHTML = '<span>⏸</span> TẮT AUTO';
+    btn.classList.remove('off');
+    badge.className = 'badge badge-auto';
+    badge.innerHTML = '<div class="dot dot-blue"></div> AUTO: ON';
+  } else {
+    btn.innerHTML = '<span>▶</span> BẬT AUTO';
+    btn.classList.add('off');
+    badge.className = 'badge badge-auto off';
+    badge.innerHTML = '<div class="dot dot-gray"></div> AUTO: OFF';
+  }
+
+  if (s.history) renderHistory(s.history);
+}
+
+function renderHistory(rows) {
+  const tb = document.getElementById('historyBody');
+  tb.innerHTML = '';
+  if (!rows || !rows.length) {
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:20px">Chưa có lịch sử</td></tr>';
+    return;
+  }
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    const predClass = r.pred === 'TÀI' ? 'val-tai' : 'val-xiu';
+    const resClass = r.result === 'TÀI' ? 'val-tai' : 'val-xiu';
+    const wl = r.win === true ? '<span class="val-win">THẮNG</span>'
+             : r.win === false ? '<span class="val-lose">THUA</span>' : '—';
+    const dice = Array.isArray(r.dice) ? r.dice.slice(0,3).join(' - ') : '—';
+    tr.innerHTML = `
+      <td>#${r.session}</td>
+      <td class="${predClass}">${r.pred}</td>
+      <td>${Number(r.bet).toLocaleString()}</td>
+      <td class="${resClass}">${r.result}</td>
+      <td>${dice}</td>
+      <td>${wl}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+async function toggleAuto() {
+  const newVal = !autoOn;
+  const betAmount = parseInt(document.getElementById('betAmount').value) || 10000;
+  const x2Limit = parseInt(document.getElementById('x2Limit').value) || 5;
+  const target = parseInt(document.getElementById('targetProfit').value) || 0;
+
+  await fetch('/api/config', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      auto_bet_enabled: newVal,
+      betAmount: betAmount,
+      x2_loss_mode: true,
+      x2_loss_limit: x2Limit,
+      target_profit: target || null,
+    })
+  });
+  toast(newVal ? '✅ Đã bật AUTO' : '⏸ Đã tắt AUTO', newVal ? 'success' : 'info');
+  pollStats();
+}
+
+async function stopBot() {
+  await fetch('/api/config', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({auto_bet_enabled: false})
+  });
+  autoOn = false;
+  document.getElementById('statusText').innerText = 'Đã ngắt Bot';
+  document.getElementById('statusText').style.color = '#ef4444';
+  toast('Đã ngắt bot', 'info');
+  pollStats();
+}
+
+async function resetHistory() {
+  if (!confirm('Xóa toàn bộ lịch sử cược?')) return;
+  await fetch('/api/reset_history', {method:'POST'});
+  toast('Đã xóa lịch sử', 'success');
+}
+
+function toggleSettings() {
+  const p = document.getElementById('settingsPanel');
+  p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+  if (curState) {
+    document.getElementById('betAmount').value = curState.base_bet_amount;
+    document.getElementById('x2Limit').value = curState.x2_loss_limit;
+    document.getElementById('targetProfit').value = curState.target_profit || 0;
+  }
+}
+</script>
+</body>
+</html>
