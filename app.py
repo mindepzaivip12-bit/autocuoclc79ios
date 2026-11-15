@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24).hex()
-# Đổi async_mode sang eventlet
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # ==========================================
@@ -20,7 +19,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 # ==========================================
 API_LOGIN_URL   = "https://apifo88daigia.tele68.com/api"
 API_LOBBY_URL   = "https://wlb.tele68.com/v1/lobby/auth/login"
-API_HISTORY_URL = "https://leminhdzctemd5.onrender.com/lc79md5" # API mới của bạn
+API_HISTORY_URL = "https://leminhdzctemd5.onrender.com/lc79md5" 
 GAME_WS_URL     = "https://wtxmd52.tele68.com"
 GAME_WS_PATH    = "txmd5/"
 GAME_WS_NS      = "/txmd5"
@@ -35,7 +34,7 @@ WEB_SESSIONS = {}
 WS_CLIENTS = {}         
 
 # ==========================================
-# API DATA WORKER (Poll dữ liệu từ API của bạn)
+# API DATA WORKER
 # ==========================================
 def api_data_worker():
     logger.info("API data worker started")
@@ -50,7 +49,6 @@ def api_data_worker():
             
             if session_id and result_str:
                 side = "Tài" if "tài" in result_str else ("Xỉu" if "xỉu" in result_str else None)
-                
                 dices = []
                 try:
                     parts = result_str.split()
@@ -84,7 +82,6 @@ def get_prediction_from_api():
     try:
         r = requests.get(API_HISTORY_URL, timeout=5)
         data = r.json()
-        
         du_doan = data.get("du_doan") 
         do_tin_cay = data.get("do_tin_cay", "0%") 
         
@@ -113,7 +110,15 @@ def login_game(username, password):
         url = f"{API_LOGIN_URL}?c=3&un={username}&pw={pw}&{COMMON_PARAMS}&at="
         
         sess = requests.Session()
-        r = sess.get(url, timeout=12)
+        # Thêm Headers giả lập trình duyệt để tránh bị block
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Origin": "https://tele68.com",
+            "Referer": "https://tele68.com/"
+        }
+        
+        r = sess.get(url, timeout=12, headers=headers)
         r.raise_for_status()
         data = r.json()
         
@@ -128,7 +133,7 @@ def login_game(username, password):
         access_token = data["accessToken"]
         r2 = sess.post(
             f"{API_LOBBY_URL}?{COMMON_PARAMS}&at=",
-            headers={"content-type":"application/json","authority":"wlb.tele68.com"},
+            headers={"content-type":"application/json","authority":"wlb.tele68.com", **headers},
             json={"nickName": nickname, "accessToken": access_token},
             timeout=12,
         )
@@ -179,8 +184,7 @@ def game_socket_worker(sid, jwt_token):
         if st["auto_bet_enabled"] and st["target_profit"]:
             if st["profit_loss"] >= st["target_profit"]:
                 st["auto_bet_enabled"] = False
-                socketio.emit("toast", {"type":"success",
-                    "msg": f"🏆 Chốt lãi! +{st['profit_loss']:,}"}, to=sid)
+                socketio.emit("toast", {"type":"success", "msg": f"🏆 Chốt lãi! +{st['profit_loss']:,}"}, to=sid)
 
         cur_bet = st["base_bet_amount"]
         if st["x2_mode"] and st["win_streak"] >= 1:
@@ -214,15 +218,12 @@ def game_socket_worker(sid, jwt_token):
         if st["has_bet_this_session"]: return
 
         bet_type = "TAI" if st["current_prediction"] == "Tài" else "XIU"
-        sio.emit("bet", {"type": bet_type, "amount": st["current_bet"]},
-                 namespace=GAME_WS_NS)
+        sio.emit("bet", {"type": bet_type, "amount": st["current_bet"]}, namespace=GAME_WS_NS)
         st["has_bet_this_session"] = True
         st["waiting_for_result"] = True
         logger.info(f"[{sid}] Đã gửi lệnh cược: {bet_type} - {st['current_bet']}")
         
-        socketio.emit("toast", {"type":"info",
-            "msg": f"🚀 Cược {st['current_bet']:,} vào {st['current_prediction'].upper()}"},
-            to=sid)
+        socketio.emit("toast", {"type":"info", "msg": f"🚀 Cược {st['current_bet']:,} vào {st['current_prediction'].upper()}"}, to=sid)
 
     @sio.on("bet-result", namespace=GAME_WS_NS)
     def on_bet_result(data):
@@ -266,22 +267,29 @@ def game_socket_worker(sid, jwt_token):
             })
             st["history"] = st["history"][:30]
 
-        socketio.emit("result_update", {
-            "result": result, "dices": dices,
-            "is_win": is_win, "history": st["history"],
-        }, to=sid)
+        socketio.emit("result_update", {"result": result, "dices": dices, "is_win": is_win, "history": st["history"]}, to=sid)
         socketio.emit("stats_update", public_state(st), to=sid)
 
     try:
-        logger.info(f"[{sid}] Đang gọi sio.connect() với token: {jwt_token[:20]}...")
+        logger.info(f"[{sid}] Đang gọi sio.connect() với token...")
+        
+        # Cấu hình Header giả lập trình duyệt, đính kèm Token
+        connect_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Authorization": f"Bearer {jwt_token}",
+            "Origin": "https://tele68.com",
+            "Referer": "https://tele68.com/"
+        }
+        
         sio.connect(
             GAME_WS_URL,
             socketio_path=GAME_WS_PATH,
             namespaces=[GAME_WS_NS],
-            auth={"token": jwt_token},
-            headers={"User-Agent": "Mozilla/5.0"},
+            headers=connect_headers,
+            transports=["websocket"], # Bắt buộc dùng websocket
             wait_timeout=15
         )
+        
         logger.info(f"[{sid}] Đã gọi xong sio.connect, đang chờ sio.wait()...")
         sio.wait()
     except Exception as e:
@@ -361,8 +369,6 @@ def api_login():
         "socket_connected": False,
         "history": [],
     }
-
-    logger.info(f"[{sid}] Token JWT nhận được: {res['token'][:30]}...") 
 
     # Dùng socketio.start_background_task thay vì threading.Thread
     socketio.start_background_task(game_socket_worker, sid, res["token"])
