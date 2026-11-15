@@ -2,13 +2,16 @@ import os, json, time, base64, hashlib, threading, logging, random
 import requests
 from flask import Flask, render_template, request, jsonify, session
 from flask_socketio import SocketIO
-import socketio as sio_client
+from socketio import Client as SocketClient  # Sửa import cho chuẩn
 
+# Cấu hình logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'lc79-secret-2024')
+
+# Sử dụng eventlet (Đã cài trong requirements)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # ==========================================
@@ -23,7 +26,7 @@ GAME_WS_NS      = "/txmd5"
 COMMON_PARAMS   = "cp=R&cl=R&pf=web"
 
 # ==========================================
-# DỮ LIỆU TOÀN CỤC (dùng chung cho mọi user)
+# DỮ LIỆU TOÀN CỤC
 # ==========================================
 GLOBAL_HISTORY = []
 MAX_GLOBAL_HISTORY = 2000
@@ -31,7 +34,7 @@ WEB_SESSIONS = {}       # sid -> state
 WS_CLIENTS = {}         # sid -> socketio.Client
 
 # ==========================================
-# API DATA WORKER (poll lịch sử phiên)
+# API DATA WORKER
 # ==========================================
 def api_data_worker():
     logger.info("API data worker started")
@@ -54,7 +57,7 @@ def api_data_worker():
             if new_history:
                 GLOBAL_HISTORY.clear()
                 GLOBAL_HISTORY.extend(new_history[-MAX_GLOBAL_HISTORY:])
-        except Exception as e:
+        except Exception:
             pass
         time.sleep(1.5)
 
@@ -126,8 +129,9 @@ def game_socket_worker(sid, jwt_token):
     st = WEB_SESSIONS.get(sid)
     if not st: return
 
-    sio = sio_client.Client(reconnection=True, reconnection_attempts=20,
-                            logger=False, engineio_logger=False)
+    # Khởi tạo client socket
+    sio = SocketClient(reconnection=True, reconnection_attempts=20,
+                       logger=False, engineio_logger=False)
     WS_CLIENTS[sid] = sio
 
     @sio.event(namespace=GAME_WS_NS)
@@ -148,14 +152,12 @@ def game_socket_worker(sid, jwt_token):
         st["has_bet_this_session"] = False
         st["session_id"] = data.get("id", "N/A")
 
-        # Target check
         if st["auto_bet_enabled"] and st["target_profit"]:
             if st["profit_loss"] >= st["target_profit"]:
                 st["auto_bet_enabled"] = False
                 socketio.emit("toast", {"type":"success",
                     "msg": f"🏆 Chốt lãi! +{st['profit_loss']:,}"}, to=sid)
 
-        # Tính tiền cược
         cur_bet = st["base_bet_amount"]
         if st["x2_mode"] and st["win_streak"] >= 1:
             cur_bet = st["base_bet_amount"] * 2
@@ -166,7 +168,6 @@ def game_socket_worker(sid, jwt_token):
                 cur_bet = st["base_bet_amount"]
         st["current_bet"] = cur_bet
 
-        # Dự đoán
         pred_res = predict_side(GLOBAL_HISTORY)
         st["current_prediction"] = pred_res["side"]
         st["last_pred_detail"] = pred_res
@@ -399,6 +400,7 @@ def api_logout():
     session.pop("sid", None)
     return jsonify({"success": True})
 
+# Chạy trực tiếp nếu không dùng Gunicorn
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     socketio.run(app, host="0.0.0.0", port=port)
