@@ -1,7 +1,7 @@
 import eventlet
 eventlet.monkey_patch()
 
-import os, json, time, base64, hashlib, logging, random, threading
+import os, json, time, base64, hashlib, logging, threading
 import requests
 from flask import Flask, render_template, request, jsonify, session
 from flask_socketio import SocketIO
@@ -36,14 +36,129 @@ GLOBAL_HISTORY_LOCK = threading.Lock()
 WEB_SESSIONS = {}
 WS_CLIENTS   = {}
 
-PREDICTION_CACHE = {"data": None, "ts": 0}
-PREDICTION_CACHE_TTL = 3
+# Cache NGUYÊN VĂN response API
+API_LAST_RAW = {
+    "data": None,      # raw dict
+    "ts": 0,
+    "error": None,
+}
 
 # ==========================================
-# PARSE RESULT — chấp nhận nhiều format
+# GỌI API — trả nguyên văn, KHÔNG chế biến
+# ==========================================
+def fetch_api_raw():
+    """Gọi API, trả NGUYÊN VĂN response (dict). Không đoán, không fallback."""
+    try:
+        url = f"{API_HISTORY_URL}?{COMMON_PARAMS}&at=&_t={int(time.time()*1000)}"
+        r = requests.get(url, timeout=5,
+                         headers={"Cache-Control": "no-store",
+                                  "User-Agent": "Mozilla/5.0"})
+        r.raise_for_status()
+        data = r.json()
+        API_LAST_RAW["data"] = data
+        API_LAST_RAW["ts"] = time.time()
+        API_LAST_RAW["error"] = None
+        return data
+    except Exception as e:
+        API_LAST_RAW["error"] = str(e)
+        logger.error(f"[API] Fetch fail: {e}")
+        return None
+
+# ==========================================
+# API DATA WORKER — chỉ cache nguyên văn
+# ==========================================
+def api_data_worker():
+    logger.info("[API Worker] started")
+    last_session_logged = None
+
+    while True:
+        data = fetch_api_raw()
+        if data:
+            session_id = data.get("phien")
+            result_str = data.get("ket_qua") or ""
+            du_doan    = data.get("du_doan")
+            do_tin_cay = data.get("do_tin_cay")
+
+            # Ghi history (chỉ để đối chiếu, không dùng thay prediction)
+            if session_id and result_str and session_id != last_session_logged:
+                side = None
+                if "tài" in result_str.lower() or "tai" in result_str.lower():
+                    side = "Tài"
+                elif "xỉu" in result_str.lower() or "xiu" in result_str.lower():
+                    side = "Xỉu"
+
+                dices = []
+                try:
+                    parts = result_str.split()
+                    if len(parts) > 1:
+                        dices = [int(x) for x in parts[1].split("-")]
+                except Exception:
+                    pass
+
+                if side:
+                    with GLOBAL_HISTORY_LOCK:
+                        if not any(h["session"] == session_id for h in GLOBAL_HISTORY[-5:]):
+                            GLOBAL_HISTORY.append({
+                                "session": session_id,
+                                "dice": dices,
+                                "side": side,
+                                "ts": time.time(),
+                            })
+                            if len(GLOBAL_HISTORY) > MAX_GLOBAL_HISTORY:
+                                GLOBAL_HISTORY.pop(0)
+                            logger.info(f"[API] 📥 {session_id}: {side} {dices} | "
+                                        f"du_doan={du_doan} | conf={do_tin_cay}")
+                    last_session_logged = session_id
+
+        socketio.sleep(1.5)  # poll 1.5s để bám sát API
+
+socketio.start_background_task(api_data_worker)
+
+# ==========================================
+# DỰ ĐOÁN — CHỈ lấy từ API, KHÔNG fallback random
+# ==========================================
+def get_prediction():
+    """
+    Trả về dict:
+      {"side": <giá trị API trả>, "conf": <giá trị API trả>, "ready": bool,
+       "api_ok": bool, "api_error": str|None}
+    Nếu API lỗi → side=None, frontend tự hiện "—"
+    """
+    # Dùng cache nếu còn mới (< 1.5s)
+    if API_LAST_RAW["data"] and (time.time() - API_LAST_RAW["ts"]) < 1.5:
+        data = API_LAST_RAW["data"]
+    else:
+        data = fetch_api_raw()
+
+    if not data:
+        return {
+            "side": None,
+            "conf": None,
+            "ready": False,
+            "api_ok": False,
+            "api_error": API_LAST_RAW.get("error") or "API không phản hồi",
+        }
+
+    du_doan = data.get("du_doan")
+    do_tin_cay = data.get("do_tin_cay")
+
+    # KHÔNG capitalize, KHÔNG ép int — giữ NGUYÊN những gì API trả
+    side_out = du_doan if du_doan else None
+    conf_out = do_tin_cay if do_tin_cay is not None else None
+
+    return {
+        "side": side_out,
+        "conf": conf_out,
+        "ready": side_out is not None,
+        "api_ok": True,
+        "api_error": None,
+        "raw": data,  # cho debug
+    }
+
+# ==========================================
+# PARSE RESULT — chỉ dùng để so thắng/thua, KHÔNG thay thế API
 # ==========================================
 def parse_result_side(result_raw):
-    """Trả về 'TAI' / 'XIU' / None từ nhiều format khác nhau"""
     if not result_raw:
         return None
     s = str(result_raw).strip().upper()
@@ -58,123 +173,10 @@ def parse_result_side(result_raw):
     try:
         nums = [int(x) for x in s.replace("-", " ").replace(",", " ").split() if x.isdigit()]
         if len(nums) >= 3:
-            total = sum(nums[:3])
-            return "TAI" if total >= 11 else "XIU"
+            return "TAI" if sum(nums[:3]) >= 11 else "XIU"
     except Exception:
         pass
     return None
-
-# ==========================================
-# API DATA WORKER
-# ==========================================
-def api_data_worker():
-    logger.info("[API Worker] started")
-    last_session = None
-    while True:
-        try:
-            url = f"{API_HISTORY_URL}?{COMMON_PARAMS}&at=&_t={int(time.time()*1000)}"
-            r = requests.get(url, timeout=5,
-                             headers={"Cache-Control": "no-store",
-                                      "User-Agent": "Mozilla/5.0"})
-            data = r.json()
-
-            session_id = data.get("phien")
-            result_str = (data.get("ket_qua") or "").lower()
-            du_doan    = data.get("du_doan")
-            do_tin_cay = data.get("do_tin_cay", "0%")
-
-            conf = 50
-            try:
-                conf = float(str(do_tin_cay).replace("%", "").replace(",", "."))
-            except Exception:
-                pass
-
-            if du_doan:
-                PREDICTION_CACHE["data"] = {
-                    "side": du_doan.strip().capitalize(),
-                    "conf": int(conf),
-                    "ready": True,
-                }
-                PREDICTION_CACHE["ts"] = time.time()
-
-            if session_id and result_str:
-                side = None
-                if "tài" in result_str or "tai" in result_str:
-                    side = "Tài"
-                elif "xỉu" in result_str or "xiu" in result_str:
-                    side = "Xỉu"
-
-                dices = []
-                try:
-                    parts = result_str.split()
-                    if len(parts) > 1:
-                        dices = [int(x) for x in parts[1].split("-")]
-                except Exception:
-                    pass
-
-                if side and session_id != last_session:
-                    with GLOBAL_HISTORY_LOCK:
-                        exists = any(h["session"] == session_id for h in GLOBAL_HISTORY[-5:])
-                        if not exists:
-                            GLOBAL_HISTORY.append({
-                                "session": session_id,
-                                "dice": dices,
-                                "total": sum(dices) if dices else 0,
-                                "side": side,
-                                "ts": time.time(),
-                            })
-                            if len(GLOBAL_HISTORY) > MAX_GLOBAL_HISTORY:
-                                GLOBAL_HISTORY.pop(0)
-                            logger.info(f"[API Worker] New session {session_id}: {side} {dices}")
-                    last_session = session_id
-
-        except Exception as e:
-            logger.error(f"[API Worker] {e}")
-
-        socketio.sleep(2)
-
-socketio.start_background_task(api_data_worker)
-
-# ==========================================
-# DỰ ĐOÁN
-# ==========================================
-def get_prediction():
-    if PREDICTION_CACHE["data"] and (time.time() - PREDICTION_CACHE["ts"]) < PREDICTION_CACHE_TTL:
-        return PREDICTION_CACHE["data"]
-
-    try:
-        r = requests.get(API_HISTORY_URL, timeout=4,
-                         headers={"User-Agent": "Mozilla/5.0"})
-        data = r.json()
-        du_doan = data.get("du_doan")
-        do_tin_cay = data.get("do_tin_cay", "50%")
-        if du_doan:
-            conf = 50
-            try:
-                conf = float(str(do_tin_cay).replace("%", "").replace(",", "."))
-            except Exception:
-                pass
-            result = {"side": du_doan.strip().capitalize(), "conf": int(conf), "ready": True}
-            PREDICTION_CACHE["data"] = result
-            PREDICTION_CACHE["ts"] = time.time()
-            return result
-    except Exception as e:
-        logger.warning(f"[Prediction] API fail: {e}")
-
-    with GLOBAL_HISTORY_LOCK:
-        recent = GLOBAL_HISTORY[-10:]
-
-    if len(recent) >= 5:
-        sides = [h["side"] for h in recent]
-        tai_cnt = sides.count("Tài")
-        xiu_cnt = sides.count("Xỉu")
-        if len(sides) >= 4 and sides[-1] == sides[-2] == sides[-3] == sides[-4]:
-            side = "Xỉu" if sides[-1] == "Tài" else "Tài"
-        else:
-            side = "Tài" if tai_cnt < xiu_cnt else "Xỉu"
-        return {"side": side, "conf": 55, "ready": True}
-
-    return {"side": random.choice(["Tài", "Xỉu"]), "conf": 50, "ready": False}
 
 # ==========================================
 # LOGIN
@@ -222,7 +224,7 @@ def login_game(username, password):
         return {"_error": f"Lỗi kết nối: {e}"}
 
 # ==========================================
-# TÍNH TIỀN CƯỢC — KHÔNG reset về 1k
+# TÍNH CƯỢC
 # ==========================================
 def calc_next_bet(st):
     base = int(st["base_bet_amount"])
@@ -259,7 +261,6 @@ def game_socket_worker(sid, jwt_token):
             return True
         return False
 
-    # ---- CONNECT ----
     @sio.event(namespace=GAME_WS_NS)
     def connect():
         logger.info(f"[{sid}] ✅ Game socket CONNECTED")
@@ -279,7 +280,6 @@ def game_socket_worker(sid, jwt_token):
         st["socket_connected"] = False
         socketio.emit("stats_update", public_state(st), to=sid)
 
-    # ---- NEW SESSION ----
     @sio.on("new-session", namespace=GAME_WS_NS)
     def on_new_session(data):
         new_id = data.get("id") or data.get("sessionId") or "N/A"
@@ -293,21 +293,25 @@ def game_socket_worker(sid, jwt_token):
             return
 
         st["current_bet"] = calc_next_bet(st)
+
+        # Lấy dự đoán NGUYÊN VĂN từ API
         pred = get_prediction()
-        st["current_prediction"] = pred["side"]
+        st["current_prediction"] = pred["side"]  # có thể None nếu API lỗi
+        st["last_api_raw"] = pred.get("raw")
 
         socketio.emit("session_update", {
             "session_id": new_id,
-            "prediction": pred["side"],
-            "conf": pred["conf"],
+            "prediction": pred["side"],          # None nếu API không trả
+            "conf": pred["conf"],                # nguyên văn API
             "ready": pred["ready"],
+            "api_ok": pred["api_ok"],
+            "api_error": pred["api_error"],
             "history_len": len(GLOBAL_HISTORY),
             "current_bet": st["current_bet"],
             "auto_bet_enabled": st["auto_bet_enabled"],
         }, to=sid)
         socketio.emit("stats_update", public_state(st), to=sid)
 
-    # ---- TICK UPDATE ----
     @sio.on("tick-update", namespace=GAME_WS_NS)
     def on_tick_update(data):
         if data.get("state") != "BETTING":
@@ -317,25 +321,35 @@ def game_socket_worker(sid, jwt_token):
         if st["has_bet_this_session"]:
             return
         if not st["current_prediction"]:
+            logger.warning(f"[{sid}] ⚠ Không có dự đoán từ API → bỏ qua đặt cược")
             return
         if not st["session_id"]:
             return
 
-        bet_type = "TAI" if st["current_prediction"] == "Tài" else "XIU"
+        # So khớp "Tài"/"Xỉu" linh hoạt
+        pred_str = str(st["current_prediction"]).strip().upper()
+        if pred_str.startswith("T"):
+            bet_type = "TAI"
+        elif pred_str.startswith("X"):
+            bet_type = "XIU"
+        else:
+            logger.warning(f"[{sid}] ⚠ Dự đoán không hợp lệ: {st['current_prediction']}")
+            return
+
         try:
             sio.emit("bet", {"type": bet_type, "amount": st["current_bet"]},
                      namespace=GAME_WS_NS)
             st["has_bet_this_session"] = True
             st["waiting_for_result"] = True
-            logger.info(f"[{sid}] 🚀 BET {st['current_bet']:,} → {bet_type} (session {st['session_id']})")
+            logger.info(f"[{sid}] 🚀 BET {st['current_bet']:,} → {bet_type} "
+                        f"(session {st['session_id']}, pred API={st['current_prediction']})")
             socketio.emit("toast", {
                 "type": "info",
-                "msg": f"🚀 Cược {st['current_bet']:,}đ vào {st['current_prediction'].upper()}"
+                "msg": f"🚀 Cược {st['current_bet']:,}đ vào {pred_str}"
             }, to=sid)
         except Exception as e:
             logger.error(f"[{sid}] Bet error: {e}")
 
-    # ---- BET RESULT ----
     @sio.on("bet-result", namespace=GAME_WS_NS)
     def on_bet_result(data):
         if "postBalance" in data:
@@ -346,7 +360,6 @@ def game_socket_worker(sid, jwt_token):
         except Exception:
             pass
 
-    # ---- SESSION RESULT — nhận diện thắng thua NGAY ----
     @sio.on("session-result", namespace=GAME_WS_NS)
     def on_session_result(data):
         result_raw = (data.get("resultTruyenThong")
@@ -357,55 +370,50 @@ def game_socket_worker(sid, jwt_token):
 
         result_side = parse_result_side(result_raw)
 
-        if result_side is None and dices and len(dices) >= 3:
-            try:
-                total = sum(int(x) for x in dices[:3])
-                result_side = "TAI" if total >= 11 else "XIU"
-            except Exception:
-                pass
-
         pred = st.get("current_prediction")
         is_win = None
         profit_delta = 0
 
         if pred and result_side:
-            pred_key = "TAI" if pred == "Tài" else "XIU"
-            is_win = (pred_key == result_side)
+            pred_str = str(pred).strip().upper()
+            pred_key = "TAI" if pred_str.startswith("T") else ("XIU" if pred_str.startswith("X") else None)
+            if pred_key:
+                is_win = (pred_key == result_side)
 
-            if st["waiting_for_result"]:
-                bet_amt = int(st["current_bet"])
-                if is_win:
-                    profit_delta = int(bet_amt * 0.98)
-                    st["profit_loss"] += profit_delta
-                    st["win_streak"] += 1
-                    st["loss_streak"] = 0
-                    st["win_count"] += 1
-                else:
-                    profit_delta = -bet_amt
-                    st["profit_loss"] += profit_delta
-                    st["win_streak"] = 0
-                    st["loss_streak"] += 1
-                    st["lose_count"] += 1
-                st["waiting_for_result"] = False
-                st["balance"] = st["balance"] + profit_delta
+                if st["waiting_for_result"]:
+                    bet_amt = int(st["current_bet"])
+                    if is_win:
+                        profit_delta = int(bet_amt * 0.98)
+                        st["profit_loss"] += profit_delta
+                        st["win_streak"] += 1
+                        st["loss_streak"] = 0
+                        st["win_count"] += 1
+                    else:
+                        profit_delta = -bet_amt
+                        st["profit_loss"] += profit_delta
+                        st["win_streak"] = 0
+                        st["loss_streak"] += 1
+                        st["lose_count"] += 1
+                    st["waiting_for_result"] = False
+                    st["balance"] = st["balance"] + profit_delta
 
-            st["history"].insert(0, {
-                "session": session_of_result,
-                "pred": pred.upper(),
-                "bet": st["current_bet"],
-                "result": result_side,
-                "dice": dices,
-                "win": is_win,
-            })
-            st["history"] = st["history"][:30]
+                st["history"].insert(0, {
+                    "session": session_of_result,
+                    "pred": pred,                      # NGUYÊN VĂN
+                    "bet": st["current_bet"],
+                    "result": result_side,
+                    "dice": dices,
+                    "win": is_win,
+                })
+                st["history"] = st["history"][:30]
 
         logger.info(f"[{sid}] 📊 Result {session_of_result}: {result_side} "
                     f"| pred={pred} | win={is_win} | profit={st['profit_loss']:,}")
 
         socketio.emit("result_update", {
             "session": session_of_result,
-            "pred": pred.upper() if pred else None,
-            "result": result_side or "?",
+            "pred": pred,                                # nguyên văn
+            "result": result_side or result_raw,         # nguyên văn nếu không parse được
             "dices": dices,
             "is_win": is_win,
             "bet": st["current_bet"],
@@ -418,7 +426,6 @@ def game_socket_worker(sid, jwt_token):
         socketio.emit("stats_update", public_state(st), to=sid)
         check_target_profit()
 
-    # ---- CONNECT ----
     try:
         logger.info(f"[{sid}] Calling sio.connect()...")
         connect_headers = {
@@ -470,7 +477,7 @@ def public_state(st):
     }
 
 # ==========================================
-# BACKGROUND: đồng bộ stats định kỳ
+# STATS BROADCAST
 # ==========================================
 def stats_broadcast_worker():
     while True:
@@ -530,6 +537,7 @@ def api_login():
         "lose_count": 0,
         "socket_connected": False,
         "history": [],
+        "last_api_raw": None,
     }
 
     socketio.start_background_task(game_socket_worker, sid, res["token"])
@@ -549,7 +557,6 @@ def api_config():
     st = WEB_SESSIONS[sid]
     data = request.json or {}
 
-    # === FIX: giữ nguyên số tiền user nhập ===
     if "betAmount" in data:
         try:
             new_amt = int(data["betAmount"])
@@ -561,7 +568,6 @@ def api_config():
 
     if "auto_bet_enabled" in data:
         st["auto_bet_enabled"] = bool(data["auto_bet_enabled"])
-        logger.info(f"[{sid}] Auto: {st['auto_bet_enabled']}")
     if "x2_mode" in data:
         st["x2_mode"] = bool(data["x2_mode"])
         if st["x2_mode"]:
@@ -585,6 +591,20 @@ def api_stats():
     if not sid or sid not in WEB_SESSIONS:
         return jsonify({"success": False})
     return jsonify({"success": True, "state": public_state(WEB_SESSIONS[sid])})
+
+# ==========================================
+# API DEBUG — xem API trả gì NGUYÊN VĂN
+# ==========================================
+@app.route("/api/debug_api")
+def api_debug_api():
+    """Trả NGUYÊN VĂN response API để đối chiếu với UI."""
+    data = fetch_api_raw()
+    return jsonify({
+        "ok": data is not None,
+        "error": API_LAST_RAW.get("error"),
+        "ts": API_LAST_RAW.get("ts"),
+        "raw": API_LAST_RAW.get("data"),
+    })
 
 @app.route("/api/reset_history", methods=["POST"])
 def api_reset_history():
