@@ -1,7 +1,7 @@
-from gevent import monkey
-monkey.patch_all() # Bắt buộc phải đặt ở đầu file để gevent hoạt động đúng
+import eventlet
+eventlet.monkey_patch() # Bắt buộc phải có ở đầu file khi dùng eventlet
 
-import os, json, time, base64, hashlib, logging, random, threading
+import os, json, time, base64, hashlib, logging, random
 import requests
 from flask import Flask, render_template, request, jsonify, session
 from flask_socketio import SocketIO
@@ -11,8 +11,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'lc79-secret-2024')
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
+app.config['SECRET_KEY'] = os.urandom(24).hex()
+# Đổi async_mode sang eventlet
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # ==========================================
 # CẤU HÌNH API / ENDPOINT
@@ -273,19 +274,17 @@ def game_socket_worker(sid, jwt_token):
 
     try:
         logger.info(f"[{sid}] Đang gọi sio.connect() với token: {jwt_token[:20]}...")
-        # Bỏ transports=["websocket"] để tự động fallback sang polling nếu cần
         sio.connect(
             GAME_WS_URL,
             socketio_path=GAME_WS_PATH,
             namespaces=[GAME_WS_NS],
             auth={"token": jwt_token},
             headers={"User-Agent": "Mozilla/5.0"},
-            wait_timeout=15  # Thêm timeout để tránh treo vô hạn
+            wait_timeout=15
         )
         logger.info(f"[{sid}] Đã gọi xong sio.connect, đang chờ sio.wait()...")
         sio.wait()
     except Exception as e:
-        # IN RÕ LOẠI LỖI RA LOG (Rất quan trọng để debug)
         logger.error(f"[{sid}] ❌ LỖI KẾT NỐI SOCKET: {type(e).__name__} - {e}") 
         st["socket_connected"] = False
         socketio.emit("toast", {"type":"error","msg":f"Socket lỗi: {e}"}, to=sid)
@@ -363,10 +362,10 @@ def api_login():
         "history": [],
     }
 
-    logger.info(f"[{sid}] Token JWT nhận được: {res['token'][:30]}...") # Log token
+    logger.info(f"[{sid}] Token JWT nhận được: {res['token'][:30]}...") 
 
-    # Dùng threading.Thread để tránh block gevent
-    threading.Thread(target=game_socket_worker, args=(sid, res["token"]), daemon=True).start()
+    # Dùng socketio.start_background_task thay vì threading.Thread
+    socketio.start_background_task(game_socket_worker, sid, res["token"])
 
     return jsonify({
         "success": True,
