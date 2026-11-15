@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'lc79-secret-2024')
-# Sử dụng gevent để tương thích với môi trường deploy trên Render
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 # ==========================================
@@ -159,7 +158,7 @@ def game_socket_worker(sid, jwt_token):
 
     @sio.event(namespace=GAME_WS_NS)
     def connect():
-        logger.info(f"[{sid}] ✅ Game socket CONNECTED")
+        logger.info(f"[{sid}] ✅ Game socket CONNECTED THÀNH CÔNG!")
         st["socket_connected"] = True
         socketio.emit("toast", {"type":"success","msg":"Đã kết nối socket game"}, to=sid)
         socketio.emit("stats_update", public_state(st), to=sid)
@@ -273,17 +272,21 @@ def game_socket_worker(sid, jwt_token):
         socketio.emit("stats_update", public_state(st), to=sid)
 
     try:
+        logger.info(f"[{sid}] Đang gọi sio.connect() với token: {jwt_token[:20]}...")
+        # Bỏ transports=["websocket"] để tự động fallback sang polling nếu cần
         sio.connect(
             GAME_WS_URL,
             socketio_path=GAME_WS_PATH,
             namespaces=[GAME_WS_NS],
-            transports=["websocket"],
             auth={"token": jwt_token},
             headers={"User-Agent": "Mozilla/5.0"},
+            wait_timeout=15  # Thêm timeout để tránh treo vô hạn
         )
-        sio.wait() # Hàm này sẽ block thread hiện tại cho đến khi ngắt kết nối
+        logger.info(f"[{sid}] Đã gọi xong sio.connect, đang chờ sio.wait()...")
+        sio.wait()
     except Exception as e:
-        logger.error(f"[{sid}] Lỗi kết nối socket: {e}")
+        # IN RÕ LOẠI LỖI RA LOG (Rất quan trọng để debug)
+        logger.error(f"[{sid}] ❌ LỖI KẾT NỐI SOCKET: {type(e).__name__} - {e}") 
         st["socket_connected"] = False
         socketio.emit("toast", {"type":"error","msg":f"Socket lỗi: {e}"}, to=sid)
         socketio.emit("stats_update", public_state(st), to=sid)
@@ -360,7 +363,9 @@ def api_login():
         "history": [],
     }
 
-    # QUAN TRỌNG: Dùng threading.Thread cho socket client để không block gevent
+    logger.info(f"[{sid}] Token JWT nhận được: {res['token'][:30]}...") # Log token
+
+    # Dùng threading.Thread để tránh block gevent
     threading.Thread(target=game_socket_worker, args=(sid, res["token"]), daemon=True).start()
 
     return jsonify({
