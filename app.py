@@ -47,17 +47,8 @@
             max-width: 480px;
         }
 
-        /* Hiệu ứng nháy sáng khi có kết quả mới */
-        @keyframes flashWin {
-            0% { background-color: rgba(0, 200, 81, 0.4); }
-            100% { background-color: rgba(0, 200, 81, 0.05); }
-        }
-        @keyframes flashLose {
-            0% { background-color: rgba(255, 68, 68, 0.4); }
-            100% { background-color: rgba(255, 68, 68, 0.05); }
-        }
-
-        /* Hiệu ứng viền */
+        /* ===== HIỆU ỨNG GIAO DIỆN ĐẸP ===== */
+        /* 1. Viền phát sáng cho các khối */
         @keyframes borderGlow {
             0% { box-shadow: 0 0 5px rgba(90, 95, 224, 0.2); }
             50% { box-shadow: 0 0 15px rgba(90, 95, 224, 0.6); }
@@ -70,24 +61,47 @@
             animation: borderGlow 2.5s infinite alternate;
         }
 
+        /* 2. Hiệu ứng dòng mới chèn vào (Trượt nhẹ và hiện ra) */
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .new-row {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        /* 3. Hiệu ứng nền nháy sáng khi thắng/thua */
+        @keyframes flashWin {
+            0% { background-color: rgba(0, 200, 81, 0.3); }
+            100% { background-color: rgba(0, 200, 81, 0.05); }
+        }
+        @keyframes flashLose {
+            0% { background-color: rgba(255, 68, 68, 0.3); }
+            100% { background-color: rgba(255, 68, 68, 0.05); }
+        }
+        .row-win { animation: flashWin 1s ease-out; background-color: rgba(0, 200, 81, 0.05); }
+        .row-lose { animation: flashLose 1s ease-out; background-color: rgba(255, 68, 68, 0.05); }
+
+        /* 4. Hiệu ứng Pulse cho nút Auto */
+        @keyframes pulseGreen {
+            0% { box-shadow: 0 0 0 0 rgba(0, 200, 81, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 200, 81, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 200, 81, 0); }
+        }
+        .btn-auto-off { background: var(--success); animation: pulseGreen 2s infinite; }
+        .btn-auto-on { background: var(--danger); box-shadow: 0 0 10px rgba(255, 68, 68, 0.4); }
+
         /* ===== HEADER ===== */
         .header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 12px;
-            background: var(--card-bg);
-            padding: 10px 14px;
-            border-radius: 12px;
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 12px; background: var(--card-bg);
+            padding: 10px 14px; border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-            position: relative;
-            z-index: 10;
         }
         .logo {
             width: 36px; height: 36px;
             background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
-            border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
+            border-radius: 8px; display: flex; align-items: center; justify-content: center;
             font-weight: 800; color: #c0392b; font-size: 13px;
         }
         .header-text h1 { font-size: 15px; color: var(--primary); font-weight: 800; }
@@ -96,59 +110,44 @@
 
         /* ===== CARDS ===== */
         .card {
-            background: var(--card-bg);
-            border-radius: 14px;
-            padding: 14px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-            margin-bottom: 10px;
+            background: var(--card-bg); border-radius: 14px; padding: 14px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 10px;
         }
 
         /* Form */
         .form-group { margin-bottom: 10px; }
         .form-group label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
         .form-control {
-            width: 100%; padding: 10px 14px;
-            border: 1px solid var(--border); border-radius: 8px;
+            width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
             font-size: 13px; outline: none; background: #FAFAFA;
         }
         .form-control:focus { border-color: var(--primary); background: #fff; }
 
         .btn {
-            width: 100%; padding: 12px;
-            border: none; border-radius: 8px;
-            background: var(--primary); color: white;
-            font-size: 13px; font-weight: 700; cursor: pointer;
+            width: 100%; padding: 12px; border: none; border-radius: 8px;
+            color: white; font-size: 13px; font-weight: 700; cursor: pointer;
             display: flex; align-items: center; justify-content: center; gap: 6px;
         }
         .btn:active { transform: scale(0.98); }
         
-        .btn-auto-off { background: var(--success); box-shadow: 0 0 10px rgba(0, 200, 81, 0.4); }
-        .btn-auto-on { background: var(--danger); box-shadow: 0 0 10px rgba(255, 68, 68, 0.4); }
-
         /* ===== DASHBOARD ===== */
         #dashboard { display: none; }
 
         .top-bar {
             display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 10px; background: var(--card-bg);
-            padding: 8px 12px; border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+            margin-bottom: 10px; background: var(--card-bg); padding: 8px 12px; border-radius: 10px;
         }
         .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); display: inline-block; margin-right: 4px; }
         .status-dot.online { background: var(--success); }
-        .badge {
-            font-size: 9px; padding: 3px 6px; border-radius: 20px;
-            font-weight: 600; text-transform: uppercase;
-        }
+        .badge { font-size: 9px; padding: 3px 6px; border-radius: 20px; font-weight: 600; text-transform: uppercase; }
         .badge-green { background: var(--green-light); color: var(--success); }
         .badge-gray { background: #f0f0f0; color: #888; }
         
         /* Prediction Box */
         .pred-box {
-            background: var(--purple-light); border-radius: 10px;
-            padding: 12px; display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 10px; opacity: 0.6; transition: opacity 0.3s;
-            border: 1px solid #e0d4ff;
+            background: var(--purple-light); border-radius: 10px; padding: 12px;
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; opacity: 0.6; transition: opacity 0.3s; border: 1px solid #e0d4ff;
         }
         .pred-box.active { opacity: 1; box-shadow: 0 0 15px rgba(90, 95, 224, 0.15); }
         .pred-box .label { font-size: 10px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px; }
@@ -156,10 +155,7 @@
         .pred-box .session { font-size: 11px; color: var(--text-muted); font-weight: 600; text-align: right; }
 
         /* Stats Grid */
-        .stats-grid {
-            display: grid; grid-template-columns: 1fr 1fr;
-            gap: 8px; margin-bottom: 10px;
-        }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
         .stat-box { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
         .stat-box .label { font-size: 9px; color: var(--text-muted); margin-bottom: 2px; font-weight: 600;}
         .stat-box .value { font-size: 13px; font-weight: 700; }
@@ -168,39 +164,29 @@
         .action-btns { display: flex; gap: 8px; margin-top: 10px; }
         
         /* LỊCH SỬ CƯỢC */
-        .history-table {
-            width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 11px;
-            table-layout: fixed;
-        }
+        .history-table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 11px; table-layout: fixed; }
         .history-table th {
-            text-align: left; padding: 6px 2px; color: var(--text-muted);
-            font-weight: 600; border-bottom: 1px solid var(--border);
-            font-size: 10px; white-space: nowrap;
+            text-align: left; padding: 6px 2px; color: var(--text-muted); font-weight: 600;
+            border-bottom: 1px solid var(--border); font-size: 10px; white-space: nowrap;
         }
         .history-table td {
-            padding: 8px 2px; border-bottom: 1px solid #f9f9f9;
-            font-weight: 500; white-space: nowrap;
-            overflow: hidden; text-overflow: ellipsis;
+            padding: 8px 2px; border-bottom: 1px solid #f9f9f9; font-weight: 500;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;
         }
         
         .text-success { color: var(--success); font-weight: 800; font-size: 12px; }
         .text-danger { color: var(--danger); font-weight: 800; font-size: 12px; }
         .text-primary { color: var(--primary); font-weight: 700; }
         .text-muted { color: var(--text-muted); }
-        
-        /* Class cho hiệu ứng nháy */
-        .result-win { animation: flashWin 1.5s ease-out; }
-        .result-lose { animation: flashLose 1.5s ease-out; }
 
         .empty-history { text-align: center; padding: 15px; color: var(--text-muted); font-style: italic; }
 
         /* ===== SIDEBAR ===== */
         .sidebar {
             position: fixed; top: 0; right: -300px; width: 280px; height: 100vh;
-            background: var(--sidebar-bg); z-index: 1000;
-            transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: 20px; box-shadow: -5px 0 20px rgba(0,0,0,0.2);
-            color: var(--sidebar-text); display: flex; flex-direction: column;
+            background: var(--sidebar-bg); z-index: 1000; transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 20px; box-shadow: -5px 0 20px rgba(0,0,0,0.2); color: var(--sidebar-text);
+            display: flex; flex-direction: column;
         }
         .sidebar.active { right: 0; }
         .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; color: white; }
@@ -215,7 +201,6 @@
         .sidebar-item:last-child { margin-bottom: 0; }
         .sidebar-item .label { font-size: 11px; }
         .sidebar-item .value { font-size: 13px; font-weight: 700; color: white; }
-        
         .sidebar-item.profit .value { color: var(--success); text-shadow: 0 0 8px rgba(0,200,81,0.3); }
         .sidebar-item.loss .value { color: var(--danger); text-shadow: 0 0 8px rgba(255,68,68,0.3); }
 
@@ -225,25 +210,22 @@
             background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1);
             color: white; padding: 10px; width: 100%; border-radius: 8px; outline: none; font-size: 13px;
         }
-        .sidebar-form input:focus { border-color: var(--primary); }
 
         .overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.4); backdrop-filter: blur(2px);
-            z-index: 999; display: none; opacity: 0; transition: opacity 0.3s;
+            background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); z-index: 999;
+            display: none; opacity: 0; transition: opacity 0.3s;
         }
         .overlay.active { display: block; opacity: 1; }
 
         /* ===== TOAST ===== */
         #toast-container {
-            position: fixed; top: 15px; left: 50%; transform: translateX(-50%);
-            z-index: 9999; display: flex; flex-direction: column; gap: 8px;
-            width: 90%; max-width: 350px; pointer-events: none;
+            position: fixed; top: 15px; left: 50%; transform: translateX(-50%); z-index: 9999;
+            display: flex; flex-direction: column; gap: 8px; width: 90%; max-width: 350px; pointer-events: none;
         }
         .toast {
-            padding: 10px 16px; border-radius: 8px; color: white;
-            font-size: 13px; font-weight: 500; text-align: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: slideDown 0.3s;
+            padding: 10px 16px; border-radius: 8px; color: white; font-size: 13px; font-weight: 500;
+            text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: slideDown 0.3s;
         }
         .toast.success { background: var(--success); }
         .toast.error { background: var(--danger); }
@@ -255,7 +237,7 @@
 
     <div id="toast-container"></div>
 
-    <!-- SIDEBAR (Đã xoá nút Đăng Xuất ở đây) -->
+    <!-- SIDEBAR -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <h3><i class="fa-solid fa-gear"></i> CÀI ĐẶT & THỐNG KÊ</h3>
@@ -282,8 +264,6 @@
             <input type="number" id="bet_amount" class="form-control" value="10000" step="1000" min="1000">
             <small style="color: #888; font-size: 10px; margin-top: 4px; display: block;">*Áp dụng cho phiên tới.</small>
         </div>
-        
-        <!-- Đã xoá nút Đăng Xuất tại đây theo yêu cầu -->
     </div>
     <div class="overlay" id="overlay"></div>
 
@@ -320,7 +300,7 @@
                     <input type="text" id="license_key" class="form-control" placeholder="Dán key vào đây...">
                 </div>
 
-                <button id="btn_login" class="btn">ĐĂNG NHẬP</button>
+                <button id="btn_login" class="btn" style="background: var(--primary);">ĐĂNG NHẬP</button>
             </div>
         </div>
 
@@ -370,7 +350,7 @@
 
                 <div class="action-btns">
                     <button id="btn_auto" class="btn btn-auto-off"><i class="fa-solid fa-play"></i> BẬT AUTO</button>
-                    <button id="btn_logout" class="btn btn-red" style="background: #555;"><i class="fa-solid fa-ban"></i> NGẮT BOT</button>
+                    <button id="btn_logout" class="btn" style="background: #555;"><i class="fa-solid fa-ban"></i> NGẮT BOT</button>
                 </div>
             </div>
 
@@ -412,7 +392,7 @@
             setTimeout(() => {
                 toast.style.opacity = '0';
                 setTimeout(() => toast.remove(), 300);
-            }, 2000); // Giảm thời gian hiện toast xuống 2s cho nhanh gọn
+            }, 2000);
         }
 
         async function getDeviceFingerprint() {
@@ -422,6 +402,7 @@
             return 'DEV-' + Math.abs(h).toString(16);
         }
 
+        // LOGIC MỞ/ĐÓNG SIDEBAR
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('overlay');
         
@@ -438,6 +419,7 @@
         document.getElementById('close-sidebar').addEventListener('click', closeSidebar);
         overlay.addEventListener('click', closeSidebar);
 
+        // ĐĂNG NHẬP
         document.getElementById('btn_login').addEventListener('click', async function() {
             const btn = this;
             const username = document.getElementById('username').value.trim();
@@ -481,6 +463,7 @@
             }
         });
 
+        // CẬP NHẬT SỐ DƯ & TÍNH LÃI LỖ
         let currentBalance = 0;
         let initialBalance = 0;
         
@@ -507,6 +490,7 @@
             }
         }
 
+        // CÀI ĐẶT CƯỢC (TỪ SIDEBAR)
         const betInput = document.getElementById('bet_amount');
         const betDisplay = document.getElementById('bet-display');
         
@@ -527,6 +511,7 @@
             });
         });
 
+        // BẬT/TẮT AUTO
         const btnAuto = document.getElementById('btn_auto');
         const statusBadge = document.getElementById('status-auto-badge');
         const statusText = document.getElementById('status-text');
@@ -573,13 +558,15 @@
             toggleAutoUI(!isAutoRunning);
         });
 
-        // Chỉ giữ lại nút Ngắt Bot / Đăng xuất trên giao diện chính
+        // ĐĂNG XUẤT
         document.getElementById('btn_logout').addEventListener('click', async function() {
             if (!confirm('Bạn có chắc muốn ngắt bot và đăng xuất?')) return;
             await fetch('/api/logout', { method: 'POST' });
             location.reload();
         });
 
+        // ================= LẮNG NGHE SOCKET (API) =================
+        
         socket.on('force_logout', (data) => {
             showToast('🔒 ' + data.reason, 'error');
             setTimeout(() => location.reload(), 2000);
@@ -587,11 +574,12 @@
 
         socket.on('toast', (data) => showToast(data.msg, data.type || 'info'));
 
-        // Cập nhật số dư tự động ngay khi có biến động
+        // Cập nhật số dư thời gian thực
         socket.on('stats_update', (st) => {
             updateBalance(st.balance || 0);
         });
 
+        // Cập nhật thông tin phiên mới (Khi Auto chạy)
         socket.on('session_update', (data) => {
             if (!isAutoRunning) return;
 
@@ -603,12 +591,13 @@
             }
         });
 
-        // CẬP NHẬT LỊCH SỬ - NHẬN DIỆN ĐÚNG SAI NHANH VỚI HIỆU ỨNG NHÁY SÁNG
+        // NHẬN KẾT QUẢ TỰ ĐỘNG TỪ API - HIỆU ỨNG ĐẸP
         socket.on('result_update', (data) => {
             if (!isAutoRunning) return;
 
             const tr = document.createElement('tr');
             
+            // Xác định Thắng/Thua dựa trên API báo
             const isWin = data.result === 'WIN';
             const resultClass = isWin ? 'text-success' : 'text-danger';
             const resultText = isWin ? 'THẮNG' : 'THUA';
@@ -618,14 +607,17 @@
             
             const sessionId = data.session_id || '???';
             const betAmount = data.bet_amount || parseInt(betInput.value) || 0;
-            const winAmount = isWin ? betAmount : 0;
+            
+            // API trả về tiền thắng hoặc tính toán dựa trên kết quả
+            // Nếu API có trả data.win_amount thì dùng, không thì tự tính (isWin thì +bet, thua thì 0)
+            const winAmount = data.win_amount !== undefined ? data.win_amount : (isWin ? betAmount : 0);
             
             const winDisplay = isWin 
                 ? `<span class="text-success">+${winAmount.toLocaleString()}</span>` 
                 : `<span class="text-muted">0</span>`;
 
-            // Thêm hiệu ứng nháy sáng tương ứng (Đỏ hoặc Xanh)
-            tr.className = isWin ? 'result-win' : 'result-lose';
+            // Gắn hiệu ứng nháy sáng + trượt vào dòng
+            tr.className = `${isWin ? 'row-win' : 'row-lose'} new-row`;
 
             tr.innerHTML = `
                 <td class="text-muted" style="font-size: 10px;">#${sessionId}</td>
@@ -637,17 +629,18 @@
             
             historyBody.insertBefore(tr, historyBody.firstChild);
             
+            // Cập nhật tỷ lệ Win/Lose
             let winLoseDisplay = document.getElementById('winlose-display');
             let currentWin = parseInt(winLoseDisplay.innerText.split('/')[0]) || 0;
             let currentLose = parseInt(winLoseDisplay.innerText.split('/')[1]) || 0;
             if (isWin) currentWin++; else currentLose++;
             winLoseDisplay.innerText = `${currentWin} / ${currentLose}`;
             
-            // Cập nhật số dư tự động ngay tại client cho mượt (nếu server có độ trễ)
-            // Giả sử tỷ lệ 1:1, nếu thắng cộng tiền, thua trừ tiền
-            let simulatedBalance = currentBalance + (isWin ? betAmount : -betAmount);
+            // Tự động cập nhật số dư ngay lập tức (nếu API stats_update đến chậm)
+            let simulatedBalance = currentBalance + (isWin ? winAmount : -betAmount);
             updateBalance(simulatedBalance);
 
+            // Giới hạn 10 dòng
             if (historyBody.children.length > 10) {
                 historyBody.removeChild(historyBody.lastChild);
             }
