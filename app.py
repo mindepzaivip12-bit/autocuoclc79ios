@@ -1,725 +1,657 @@
-import eventlet
-eventlet.monkey_patch()
-
-import os, json, time, base64, hashlib, logging, threading
-import requests
-from flask import Flask, render_template, request, jsonify, session
-from flask_socketio import SocketIO
-from socketio import Client as SocketClient
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
-logger = logging.getLogger(__name__)
-
-app = Flask(__name__)
-app.config['SECRET_KEY'] = os.urandom(24).hex()
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet',
-                    ping_timeout=60, ping_interval=25)
-
-# ==========================================
-# CẤU HÌNH
-# ==========================================
-API_LOGIN_URL   = "https://apifo88daigia.tele68.com/api"
-API_LOBBY_URL   = "https://wlb.tele68.com/v1/lobby/auth/login"
-API_HISTORY_URL = "https://leminhapidz.onrender.com/lc79md5"
-GAME_WS_URL     = "https://wtxmd52.tele68.com"
-GAME_WS_PATH    = "txmd5/"
-GAME_WS_NS      = "/txmd5"
-COMMON_PARAMS   = "cp=R&cl=R&pf=web"
-
-# ===== KEY SERVER =====
-# Thay đúng link Render của bạn ở đây (không có dấu / ở cuối)
-KEY_SERVER_URL     = "https://leminhadminios.onrender.com" 
-KEY_CHECK_INTERVAL = 30   # giây — kiểm tra lại key định kỳ
-
-# ==========================================
-# GLOBAL DATA
-# ==========================================
-GLOBAL_HISTORY = []
-MAX_GLOBAL_HISTORY = 2000
-GLOBAL_HISTORY_LOCK = threading.Lock()
-
-WEB_SESSIONS = {}
-WS_CLIENTS   = {}
-
-API_LAST_RAW = {"data": None, "ts": 0, "error": None}
-
-# ==========================================
-# KEY SERVER HELPERS (ĐÃ ĐỒNG BỘ VỚI SERVER.JS)
-# ==========================================
-def key_server_verify(key, device):
-    """
-    Hàm này dùng để kích hoạt key.
-    Gọi tới API /api/activate của Server Node.js bên kia.
-    """
-    try:
-        # Gửi dữ liệu lên Server
-        payload = {"key": key}
-        r = requests.post(
-            f"{KEY_SERVER_URL}/api/activate",
-            json=payload,
-            timeout=15,
-        )
-        data = r.json()
-        
-        # Server Node.js trả về { success: true, msg: "..." }
-        if data.get("success"):
-            return {"success": True, "msg": data.get("msg")}
-        else:
-            return {"success": False, "error": data.get("msg", "Key không hợp lệ")}
-            
-    except Exception as e:
-        logger.error(f"[KeyServer] verify fail: {e}")
-        return {"success": False, "error": f"Không kết nối được server key: {e}"}
-
-def key_server_check(key, device):
-    """
-    Hàm này chạy ngầm định kỳ 30s/lần để check xem Admin có Reset IP hoặc Xóa Key không.
-    Gọi lại /api/activate lần nữa để check trạng thái mới nhất.
-    """
-    try:
-        payload = {"key": key}
-        r = requests.post(
-            f"{KEY_SERVER_URL}/api/activate",
-            json=payload,
-            timeout=15,
-        )
-        data = r.json()
-        
-        if data.get("success"):
-            return {"success": True}
-        else:
-            # Nếu server báo false (hết hạn, bị khóa IP, hoặc bảo trì)
-            return {"success": False, "error": data.get("msg", "Key bị từ chối")}
-            
-    except Exception as e:
-        logger.error(f"[KeyServer] check fail: {e}")
-        # Grace: tránh logout nhầm khi server key tạm down (mất mạng)
-        return {"success": True, "grace": True, "error": str(e)}
-
-# ==========================================
-# FORCE LOGOUT
-# ==========================================
-def force_logout(sid, reason, expired=False):
-    logger.warning(f"[{sid}] 🔒 FORCE LOGOUT: {reason}")
-    try:
-        socketio.emit("force_logout", {
-            "reason": reason,
-            "expired": expired,
-        }, to=sid)
-    except Exception:
-        pass
-    if sid in WS_CLIENTS:
-        try:
-            WS_CLIENTS[sid].disconnect()
-        except Exception:
-            pass
-        del WS_CLIENTS[sid]
-    if sid in WEB_SESSIONS:
-        del WEB_SESSIONS[sid]
-
-# ==========================================
-# KEY MONITOR WORKER
-# ==========================================
-def key_monitor_worker(sid):
-    st = WEB_SESSIONS.get(sid)
-    if not st:
-        return
-    logger.info(f"[{sid}] Key monitor started ({st['key'][:12]}...)")
-
-    while True:
-        socketio.sleep(KEY_CHECK_INTERVAL)
-        if sid not in WEB_SESSIONS:
-            break
-
-        st = WEB_SESSIONS[sid]
-        key        = st.get("key")
-        device     = st.get("device")
-
-        if not key or not device:
-            break
-
-        # Server check (bắt trường hợp admin xóa key, reset IP, hoặc bật bảo trì)
-        result = key_server_check(key, device)
-        if not result.get("success") and not result.get("grace"):
-            force_logout(
-                sid,
-                result.get("error", "Key không hợp lệ hoặc đã bị Admin Reset IP"),
-                expired=True,
-            )
-            break
-
-# ==========================================
-# API LỊCH SỬ
-# ==========================================
-def fetch_api_raw():
-    try:
-        url = f"{API_HISTORY_URL}?{COMMON_PARAMS}&at=&_t={int(time.time()*1000)}"
-        r = requests.get(url, timeout=5,
-                         headers={"Cache-Control": "no-store",
-                                  "User-Agent": "Mozilla/5.0"})
-        r.raise_for_status()
-        data = r.json()
-        API_LAST_RAW["data"]  = data
-        API_LAST_RAW["ts"]    = time.time()
-        API_LAST_RAW["error"] = None
-        return data
-    except Exception as e:
-        API_LAST_RAW["error"] = str(e)
-        logger.error(f"[API] Fetch fail: {e}")
-        return None
-
-def api_data_worker():
-    logger.info("[API Worker] started")
-    last_session_logged = None
-
-    while True:
-        data = fetch_api_raw()
-        if data:
-            session_id = data.get("phien")
-            result_str = data.get("ket_qua") or ""
-            du_doan    = data.get("du_doan")
-            do_tin_cay = data.get("do_tin_cay")
-
-            if session_id and result_str and session_id != last_session_logged:
-                side = None
-                low = result_str.lower()
-                if "tài" in low or "tai" in low:
-                    side = "Tài"
-                elif "xỉu" in low or "xiu" in low:
-                    side = "Xỉu"
-
-                dices = []
-                try:
-                    parts = result_str.split()
-                    if len(parts) > 1:
-                        dices = [int(x) for x in parts[1].split("-")]
-                except Exception:
-                    pass
-
-                if side:
-                    with GLOBAL_HISTORY_LOCK:
-                        if not any(h["session"] == session_id for h in GLOBAL_HISTORY[-5:]):
-                            GLOBAL_HISTORY.append({
-                                "session": session_id, "dice": dices,
-                                "side": side, "ts": time.time(),
-                            })
-                            if len(GLOBAL_HISTORY) > MAX_GLOBAL_HISTORY:
-                                GLOBAL_HISTORY.pop(0)
-                            logger.info(f"[API] 📥 {session_id}: {side} {dices} | "
-                                        f"du_doan={du_doan} | conf={do_tin_cay}")
-                    last_session_logged = session_id
-
-        socketio.sleep(1.5)
-
-socketio.start_background_task(api_data_worker)
-
-# ==========================================
-# DỰ ĐOÁN
-# ==========================================
-def get_prediction():
-    if API_LAST_RAW["data"] and (time.time() - API_LAST_RAW["ts"]) < 1.5:
-        data = API_LAST_RAW["data"]
-    else:
-        data = fetch_api_raw()
-
-    if not data:
-        return {"side": None, "conf": None, "ready": False,
-                "api_ok": False,
-                "api_error": API_LAST_RAW.get("error") or "API không phản hồi"}
-
-    du_doan    = data.get("du_doan")
-    do_tin_cay = data.get("do_tin_cay")
-    side_out = du_doan if du_doan else None
-    conf_out = do_tin_cay if do_tin_cay is not None else None
-
-    return {
-        "side": side_out, "conf": conf_out,
-        "ready": side_out is not None,
-        "api_ok": True, "api_error": None, "raw": data,
-    }
-
-# ==========================================
-# PARSE RESULT
-# ==========================================
-def parse_result_side(result_raw):
-    if not result_raw:
-        return None
-    s = str(result_raw).strip().upper()
-    if s in ("TAI", "TÀI", "T"):   return "TAI"
-    if s in ("XIU", "XỈU", "X"):   return "XIU"
-    if "TÀI" in s or "TAI" in s:   return "TAI"
-    if "XỈU" in s or "XIU" in s:   return "XIU"
-    try:
-        nums = [int(x) for x in s.replace("-", " ").replace(",", " ").split() if x.isdigit()]
-        if len(nums) >= 3:
-            return "TAI" if sum(nums[:3]) >= 11 else "XIU"
-    except Exception:
-        pass
-    return None
-
-# ==========================================
-# LOGIN GAME
-# ==========================================
-def md5_hash(t): return hashlib.md5(t.encode()).hexdigest()
-
-def login_game(username, password):
-    try:
-        pw  = md5_hash(password)
-        url = f"{API_LOGIN_URL}?c=3&un={username}&pw={pw}&{COMMON_PARAMS}&at="
-        sess = requests.Session()
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json, text/plain, */*",
-            "Origin": "https://tele68.com",
-            "Referer": "https://tele68.com/",
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TOOL AUTO LC79 - LEMINH</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        :root {
+            --primary: #5A5FE0;
+            --bg-color: #E8EDF9;
+            --card-bg: #ffffff;
+            --text-main: #333333;
+            --text-muted: #888888;
+            --border: #EAEAEA;
+            --success: #00C851;
+            --danger: #ff4444;
+            --green-light: #E6F9F0;
+            --purple-light: #F3F0FF;
+            --sidebar-bg: #1E1E2D;
+            --sidebar-text: #B5B5C3;
         }
-        r = sess.get(url, timeout=12, headers=headers)
-        r.raise_for_status()
-        data = r.json()
-        if not data.get("success"):
-            return {"_error": data.get("message", "Sai thông tin đăng nhập")}
 
-        sk = data["sessionKey"]
-        sk += "=" * ((4 - len(sk) % 4) % 4)
-        sk_data  = json.loads(base64.b64decode(sk).decode("utf-8"))
-        nickname = sk_data.get("nickname") or sk_data.get("nickName")
-
-        access_token = data["accessToken"]
-        r2 = sess.post(
-            f"{API_LOBBY_URL}?{COMMON_PARAMS}&at=",
-            headers={"content-type": "application/json",
-                     "authority": "wlb.tele68.com", **headers},
-            json={"nickName": nickname, "accessToken": access_token},
-            timeout=12,
-        )
-        lobby = r2.json()
-        jwt = lobby.get("token")
-        if not jwt:
-            return {"_error": "Lobby không trả về token"}
-        money = lobby.get("remoteLoginResp", {}).get("money", 0)
-        return {"token": jwt, "nickname": nickname, "money": money}
-    except Exception as e:
-        logger.error(f"[Login] {e}")
-        return {"_error": f"Lỗi kết nối: {e}"}
-
-# ==========================================
-# TÍNH CƯỢC
-# ==========================================
-def calc_next_bet(st):
-    base = int(st["base_bet_amount"])
-    if st["x2_mode"] and st["win_streak"] >= 1:
-        return base * (2 ** min(st["win_streak"], 10))
-    if st["x2_loss_mode"] and st["loss_streak"] >= 1:
-        if st["loss_streak"] <= st["x2_loss_limit"]:
-            return base * (2 ** st["loss_streak"])
-        return base
-    return base
-
-# ==========================================
-# GAME SOCKET WORKER
-# ==========================================
-def game_socket_worker(sid, jwt_token):
-    st = WEB_SESSIONS.get(sid)
-    if not st:
-        return
-
-    logger.info(f"[{sid}] Initializing game socket...")
-    sio = SocketClient(reconnection=True, reconnection_attempts=100,
-                       reconnection_delay=2, logger=False, engineio_logger=False)
-    WS_CLIENTS[sid] = sio
-
-    def check_target_profit():
-        if (st["auto_bet_enabled"] and st["target_profit"]
-                and st["profit_loss"] >= st["target_profit"]):
-            st["auto_bet_enabled"] = False
-            socketio.emit("toast", {
-                "type": "success",
-                "msg": f"🏆 CHỐT LÃI! +{st['profit_loss']:,}đ — Auto đã tắt"
-            }, to=sid)
-            socketio.emit("stats_update", public_state(st), to=sid)
-            return True
-        return False
-
-    @sio.event(namespace=GAME_WS_NS)
-    def connect():
-        logger.info(f"[{sid}] ✅ Game socket CONNECTED")
-        st["socket_connected"] = True
-        socketio.emit("toast", {"type": "success", "msg": "Đã kết nối socket game"}, to=sid)
-        socketio.emit("stats_update", public_state(st), to=sid)
-
-    @sio.event(namespace=GAME_WS_NS)
-    def connect_error(data):
-        logger.error(f"[{sid}] ❌ CONNECT ERROR: {data}")
-        st["socket_connected"] = False
-        socketio.emit("toast", {"type": "error", "msg": f"Lỗi kết nối: {data}"}, to=sid)
-
-    @sio.event(namespace=GAME_WS_NS)
-    def disconnect():
-        logger.warning(f"[{sid}] ❌ DISCONNECTED")
-        st["socket_connected"] = False
-        socketio.emit("stats_update", public_state(st), to=sid)
-
-    @sio.on("new-session", namespace=GAME_WS_NS)
-    def on_new_session(data):
-        new_id = data.get("id") or data.get("sessionId") or "N/A"
-        logger.info(f"[{sid}] 🆕 New session: {new_id}")
-
-        st["session_id"] = new_id
-        st["has_bet_this_session"] = False
-        st["waiting_for_result"]    = False
-
-        if check_target_profit():
-            return
-
-        st["current_bet"] = calc_next_bet(st)
-
-        pred = get_prediction()
-        st["current_prediction"] = pred["side"]
-        st["last_api_raw"]       = pred.get("raw")
-
-        socketio.emit("session_update", {
-            "session_id": new_id,
-            "prediction": pred["side"],
-            "conf": pred["conf"],
-            "ready": pred["ready"],
-            "api_ok": pred["api_ok"],
-            "api_error": pred["api_error"],
-            "history_len": len(GLOBAL_HISTORY),
-            "current_bet": st["current_bet"],
-            "auto_bet_enabled": st["auto_bet_enabled"],
-        }, to=sid)
-        socketio.emit("stats_update", public_state(st), to=sid)
-
-    @sio.on("tick-update", namespace=GAME_WS_NS)
-    def on_tick_update(data):
-        if data.get("state") != "BETTING":
-            return
-        if not st["auto_bet_enabled"]:
-            return
-        if st["has_bet_this_session"]:
-            return
-        if not st["current_prediction"]:
-            logger.warning(f"[{sid}] ⚠ Không có dự đoán → bỏ qua")
-            return
-        if not st["session_id"]:
-            return
-
-        pred_str = str(st["current_prediction"]).strip().upper()
-        if pred_str.startswith("T"):   bet_type = "TAI"
-        elif pred_str.startswith("X"): bet_type = "XIU"
-        else:
-            logger.warning(f"[{sid}] ⚠ Dự đoán lạ: {st['current_prediction']}")
-            return
-
-        try:
-            sio.emit("bet", {"type": bet_type, "amount": st["current_bet"]},
-                     namespace=GAME_WS_NS)
-            st["has_bet_this_session"] = True
-            st["waiting_for_result"]   = True
-            logger.info(f"[{sid}] 🚀 BET {st['current_bet']:,} → {bet_type} "
-                        f"(pred={st['current_prediction']})")
-            socketio.emit("toast", {
-                "type": "info",
-                "msg": f"🚀 Cược {st['current_bet']:,}đ vào {pred_str}"
-            }, to=sid)
-        except Exception as e:
-            logger.error(f"[{sid}] Bet error: {e}")
-
-    @sio.on("bet-result", namespace=GAME_WS_NS)
-    def on_bet_result(data):
-        if "postBalance" in data:
-            st["balance"] = data["postBalance"]
-            socketio.emit("stats_update", public_state(st), to=sid)
-        try:
-            sio.emit("get-current-my-info", None, namespace=GAME_WS_NS)
-        except Exception:
-            pass
-
-    @sio.on("session-result", namespace=GAME_WS_NS)
-    def on_session_result(data):
-        result_raw = (data.get("resultTruyenThong")
-                      or data.get("result")
-                      or data.get("resultString"))
-        dices = data.get("dices") or data.get("dice") or [0, 0, 0]
-        session_of_result = data.get("id") or st.get("session_id")
-
-        result_side = parse_result_side(result_raw)
-        pred = st.get("current_prediction")
-        is_win = None
-        profit_delta = 0
-
-        if pred and result_side:
-            pred_str = str(pred).strip().upper()
-            pred_key = "TAI" if pred_str.startswith("T") else ("XIU" if pred_str.startswith("X") else None)
-            if pred_key:
-                is_win = (pred_key == result_side)
-                if st["waiting_for_result"]:
-                    bet_amt = int(st["current_bet"])
-                    if is_win:
-                        profit_delta = int(bet_amt * 0.98)
-                        st["profit_loss"] += profit_delta
-                        st["win_streak"]  += 1
-                        st["loss_streak"]  = 0
-                        st["win_count"]   += 1
-                    else:
-                        profit_delta = -bet_amt
-                        st["profit_loss"] += profit_delta
-                        st["win_streak"]   = 0
-                        st["loss_streak"] += 1
-                        st["lose_count"]  += 1
-                    st["waiting_for_result"] = False
-                    st["balance"] += profit_delta
-
-                st["history"].insert(0, {
-                    "session": session_of_result, "pred": pred,
-                    "bet": st["current_bet"], "result": result_side,
-                    "dice": dices, "win": is_win,
-                })
-                st["history"] = st["history"][:30]
-
-        logger.info(f"[{sid}] 📊 {session_of_result}: {result_side} "
-                    f"| pred={pred} | win={is_win} | profit={st['profit_loss']:,}")
-
-        socketio.emit("result_update", {
-            "session": session_of_result,
-            "pred": pred, "result": result_side or result_raw,
-            "dices": dices, "is_win": is_win,
-            "bet": st["current_bet"], "balance": st["balance"],
-            "profit_loss": st["profit_loss"], "profit_delta": profit_delta,
-            "history": st["history"][:15],
-        }, to=sid)
-        socketio.emit("stats_update", public_state(st), to=sid)
-        check_target_profit()
-
-    try:
-        logger.info(f"[{sid}] Connecting game socket...")
-        connect_headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Origin": "https://tele68.com",
-            "Referer": "https://tele68.com/",
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
-        sio.connect(
-            f"{GAME_WS_URL}?token={jwt_token}",
-            socketio_path=GAME_WS_PATH,
-            namespaces=[GAME_WS_NS],
-            headers=connect_headers,
-            auth={"token": jwt_token},
-            transports=["websocket"],
-            wait_timeout=15,
-        )
-        sio.wait()
-    except Exception as e:
-        logger.error(f"[{sid}] ❌ SOCKET ERROR: {type(e).__name__} - {e}")
-        st["socket_connected"] = False
-        socketio.emit("toast", {"type": "error", "msg": f"Socket lỗi: {e}"}, to=sid)
-        socketio.emit("stats_update", public_state(st), to=sid)
 
-# ==========================================
-# PUBLIC STATE
-# ==========================================
-def public_state(st):
-    return {
-        "nickname": st["nickname"],
-        "balance": st["balance"],
-        "profit_loss": st["profit_loss"],
-        "auto_bet_enabled": st["auto_bet_enabled"],
-        "x2_mode": st["x2_mode"],
-        "x2_loss_mode": st["x2_loss_mode"],
-        "x2_loss_limit": st["x2_loss_limit"],
-        "base_bet_amount": st["base_bet_amount"],
-        "current_bet": st["current_bet"],
-        "target_profit": st["target_profit"],
-        "current_prediction": st["current_prediction"],
-        "session_id": st["session_id"],
-        "win_count": st["win_count"],
-        "lose_count": st["lose_count"],
-        "win_streak": st["win_streak"],
-        "loss_streak": st["loss_streak"],
-        "socket_connected": st["socket_connected"],
-        "history": st["history"][:15],
-    }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 12px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
 
-# ==========================================
-# STATS BROADCAST
-# ==========================================
-def stats_broadcast_worker():
-    while True:
-        try:
-            for sid, st in list(WEB_SESSIONS.items()):
-                try:
-                    socketio.emit("stats_update", public_state(st), to=sid)
-                except Exception:
-                    pass
-        except Exception as e:
-            logger.error(f"[Stats Worker] {e}")
-        socketio.sleep(5)
+        .container {
+            width: 100%;
+            max-width: 480px;
+        }
 
-socketio.start_background_task(stats_broadcast_worker)
+        /* Hiệu ứng nháy sáng khi có kết quả mới */
+        @keyframes flashWin {
+            0% { background-color: rgba(0, 200, 81, 0.4); }
+            100% { background-color: rgba(0, 200, 81, 0.05); }
+        }
+        @keyframes flashLose {
+            0% { background-color: rgba(255, 68, 68, 0.4); }
+            100% { background-color: rgba(255, 68, 68, 0.05); }
+        }
 
-# ==========================================
-# SOCKET JOIN
-# ==========================================
-@socketio.on("join_session")
-def on_join_session(data):
-    custom_sid = (data or {}).get("sid")
-    if custom_sid and custom_sid in WEB_SESSIONS:
-        from flask_socketio import join_room
-        join_room(custom_sid)
-        logger.info(f"WS join room: {custom_sid}")
+        /* Hiệu ứng viền */
+        @keyframes borderGlow {
+            0% { box-shadow: 0 0 5px rgba(90, 95, 224, 0.2); }
+            50% { box-shadow: 0 0 15px rgba(90, 95, 224, 0.6); }
+            100% { box-shadow: 0 0 5px rgba(90, 95, 224, 0.2); }
+        }
+        .glow-border {
+            border: 1px solid transparent;
+            background-clip: padding-box;
+            position: relative;
+            animation: borderGlow 2.5s infinite alternate;
+        }
 
-# ==========================================
-# ROUTES
-# ==========================================
-@app.route("/")
-def index():
-    return render_template("index.html")
+        /* ===== HEADER ===== */
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            background: var(--card-bg);
+            padding: 10px 14px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+            position: relative;
+            z-index: 10;
+        }
+        .logo {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; color: #c0392b; font-size: 13px;
+        }
+        .header-text h1 { font-size: 15px; color: var(--primary); font-weight: 800; }
+        .header-text p { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+        .menu-icon { margin-left: auto; font-size: 18px; cursor: pointer; padding: 6px; }
 
-@app.route("/api/login", methods=["POST"])
-def api_login():
-    data     = request.json or {}
-    username = (data.get("username") or "").strip()
-    password = (data.get("password") or "").strip()
-    key      = (data.get("key") or "").strip().upper()
-    device   = (data.get("device") or "").strip()
+        /* ===== CARDS ===== */
+        .card {
+            background: var(--card-bg);
+            border-radius: 14px;
+            padding: 14px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+            margin-bottom: 10px;
+        }
 
-    if not username or not password:
-        return jsonify({"success": False, "error": "Thiếu tài khoản/mật khẩu"})
-    if not key:
-        return jsonify({"success": False, "error": "Thiếu key bản quyền"})
-    if not device:
-        return jsonify({"success": False, "error": "Thiếu mã thiết bị"})
+        /* Form */
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
+        .form-control {
+            width: 100%; padding: 10px 14px;
+            border: 1px solid var(--border); border-radius: 8px;
+            font-size: 13px; outline: none; background: #FAFAFA;
+        }
+        .form-control:focus { border-color: var(--primary); background: #fff; }
 
-    # Verify key với server key trước
-    kr = key_server_verify(key, device)
-    if not kr.get("success"):
-        return jsonify({
-            "success": False,
-            "error": kr.get("error", "Key không hợp lệ"),
-        })
+        .btn {
+            width: 100%; padding: 12px;
+            border: none; border-radius: 8px;
+            background: var(--primary); color: white;
+            font-size: 13px; font-weight: 700; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .btn:active { transform: scale(0.98); }
+        
+        .btn-auto-off { background: var(--success); box-shadow: 0 0 10px rgba(0, 200, 81, 0.4); }
+        .btn-auto-on { background: var(--danger); box-shadow: 0 0 10px rgba(255, 68, 68, 0.4); }
 
-    # Login game
-    res = login_game(username, password)
-    if "_error" in res:
-        return jsonify({"success": False, "error": res["_error"]})
+        /* ===== DASHBOARD ===== */
+        #dashboard { display: none; }
 
-    sid = os.urandom(8).hex()
-    session["sid"] = sid
-    WEB_SESSIONS[sid] = {
-        "nickname": res["nickname"],
-        "balance": res["money"],
-        "token": res["token"],
-        "username": username,
-        "key": key,
-        "device": device,
-        "profit_loss": 0,
-        "auto_bet_enabled": False,
-        "x2_mode": False,
-        "x2_loss_mode": True,
-        "x2_loss_limit": 5,
-        "win_streak": 0,
-        "loss_streak": 0,
-        "base_bet_amount": 10000,
-        "current_bet": 10000,
-        "target_profit": None,
-        "current_prediction": None,
-        "waiting_for_result": False,
-        "has_bet_this_session": False,
-        "session_id": None,
-        "win_count": 0,
-        "lose_count": 0,
-        "socket_connected": False,
-        "history": [],
-        "last_api_raw": None,
-    }
+        .top-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 10px; background: var(--card-bg);
+            padding: 8px 12px; border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+        }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); display: inline-block; margin-right: 4px; }
+        .status-dot.online { background: var(--success); }
+        .badge {
+            font-size: 9px; padding: 3px 6px; border-radius: 20px;
+            font-weight: 600; text-transform: uppercase;
+        }
+        .badge-green { background: var(--green-light); color: var(--success); }
+        .badge-gray { background: #f0f0f0; color: #888; }
+        
+        /* Prediction Box */
+        .pred-box {
+            background: var(--purple-light); border-radius: 10px;
+            padding: 12px; display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; opacity: 0.6; transition: opacity 0.3s;
+            border: 1px solid #e0d4ff;
+        }
+        .pred-box.active { opacity: 1; box-shadow: 0 0 15px rgba(90, 95, 224, 0.15); }
+        .pred-box .label { font-size: 10px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px; }
+        .pred-box .value { font-size: 24px; font-weight: 800; color: var(--primary); }
+        .pred-box .session { font-size: 11px; color: var(--text-muted); font-weight: 600; text-align: right; }
 
-    socketio.start_background_task(game_socket_worker, sid, res["token"])
-    socketio.start_background_task(key_monitor_worker, sid)
+        /* Stats Grid */
+        .stats-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 8px; margin-bottom: 10px;
+        }
+        .stat-box { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+        .stat-box .label { font-size: 9px; color: var(--text-muted); margin-bottom: 2px; font-weight: 600;}
+        .stat-box .value { font-size: 13px; font-weight: 700; }
 
-    return jsonify({
-        "success": True,
-        "sid": sid,
-        "nickname": res["nickname"],
-        "balance": res["money"],
-    })
+        /* Action Buttons */
+        .action-btns { display: flex; gap: 8px; margin-top: 10px; }
+        
+        /* LỊCH SỬ CƯỢC */
+        .history-table {
+            width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 11px;
+            table-layout: fixed;
+        }
+        .history-table th {
+            text-align: left; padding: 6px 2px; color: var(--text-muted);
+            font-weight: 600; border-bottom: 1px solid var(--border);
+            font-size: 10px; white-space: nowrap;
+        }
+        .history-table td {
+            padding: 8px 2px; border-bottom: 1px solid #f9f9f9;
+            font-weight: 500; white-space: nowrap;
+            overflow: hidden; text-overflow: ellipsis;
+        }
+        
+        .text-success { color: var(--success); font-weight: 800; font-size: 12px; }
+        .text-danger { color: var(--danger); font-weight: 800; font-size: 12px; }
+        .text-primary { color: var(--primary); font-weight: 700; }
+        .text-muted { color: var(--text-muted); }
+        
+        /* Class cho hiệu ứng nháy */
+        .result-win { animation: flashWin 1.5s ease-out; }
+        .result-lose { animation: flashLose 1.5s ease-out; }
 
-@app.route("/api/config", methods=["POST"])
-def api_config():
-    sid = session.get("sid")
-    if not sid or sid not in WEB_SESSIONS:
-        return jsonify({"success": False, "error": "Chưa login"})
-    st   = WEB_SESSIONS[sid]
-    data = request.json or {}
+        .empty-history { text-align: center; padding: 15px; color: var(--text-muted); font-style: italic; }
 
-    if "betAmount" in data:
-        try:
-            new_amt = int(data["betAmount"])
-            if new_amt >= 1000:
-                st["base_bet_amount"] = new_amt
-                st["current_bet"]     = new_amt
-        except (TypeError, ValueError):
-            pass
-    if "auto_bet_enabled" in data:
-        st["auto_bet_enabled"] = bool(data["auto_bet_enabled"])
-    if "x2_mode" in data:
-        st["x2_mode"] = bool(data["x2_mode"])
-        if st["x2_mode"]:
-            st["x2_loss_mode"] = False
-    if "x2_loss_mode" in data:
-        st["x2_loss_mode"] = bool(data["x2_loss_mode"])
-        if st["x2_loss_mode"]:
-            st["x2_mode"] = False
-    if "x2_loss_limit" in data and data["x2_loss_limit"]:
-        st["x2_loss_limit"] = int(data["x2_loss_limit"])
-    if "target_profit" in data:
-        tp = data["target_profit"]
-        st["target_profit"] = int(tp) if tp else None
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            position: fixed; top: 0; right: -300px; width: 280px; height: 100vh;
+            background: var(--sidebar-bg); z-index: 1000;
+            transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 20px; box-shadow: -5px 0 20px rgba(0,0,0,0.2);
+            color: var(--sidebar-text); display: flex; flex-direction: column;
+        }
+        .sidebar.active { right: 0; }
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; color: white; }
+        .sidebar-header h3 { font-size: 14px; }
+        .close-btn { font-size: 18px; cursor: pointer; color: var(--sidebar-text); }
+        
+        .sidebar-stats {
+            background: rgba(255,255,255,0.05); border-radius: 10px;
+            padding: 12px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.05);
+        }
+        .sidebar-item { display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center; }
+        .sidebar-item:last-child { margin-bottom: 0; }
+        .sidebar-item .label { font-size: 11px; }
+        .sidebar-item .value { font-size: 13px; font-weight: 700; color: white; }
+        
+        .sidebar-item.profit .value { color: var(--success); text-shadow: 0 0 8px rgba(0,200,81,0.3); }
+        .sidebar-item.loss .value { color: var(--danger); text-shadow: 0 0 8px rgba(255,68,68,0.3); }
 
-    socketio.emit("stats_update", public_state(st), to=sid)
-    return jsonify({"success": True, "state": public_state(st)})
+        .sidebar-form { margin-bottom: 20px; }
+        .sidebar-form label { color: var(--sidebar-text); font-size: 11px; margin-bottom: 6px; display: block; }
+        .sidebar-form input {
+            background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1);
+            color: white; padding: 10px; width: 100%; border-radius: 8px; outline: none; font-size: 13px;
+        }
+        .sidebar-form input:focus { border-color: var(--primary); }
 
-@app.route("/api/stats")
-def api_stats():
-    sid = session.get("sid")
-    if not sid or sid not in WEB_SESSIONS:
-        return jsonify({"success": False})
-    return jsonify({"success": True, "state": public_state(WEB_SESSIONS[sid])})
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4); backdrop-filter: blur(2px);
+            z-index: 999; display: none; opacity: 0; transition: opacity 0.3s;
+        }
+        .overlay.active { display: block; opacity: 1; }
 
-@app.route("/api/debug_api")
-def api_debug_api():
-    data = fetch_api_raw()
-    return jsonify({
-        "ok": data is not None,
-        "error": API_LAST_RAW.get("error"),
-        "ts": API_LAST_RAW.get("ts"),
-        "raw": API_LAST_RAW.get("data"),
-    })
+        /* ===== TOAST ===== */
+        #toast-container {
+            position: fixed; top: 15px; left: 50%; transform: translateX(-50%);
+            z-index: 9999; display: flex; flex-direction: column; gap: 8px;
+            width: 90%; max-width: 350px; pointer-events: none;
+        }
+        .toast {
+            padding: 10px 16px; border-radius: 8px; color: white;
+            font-size: 13px; font-weight: 500; text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: slideDown 0.3s;
+        }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        .toast.info { background: var(--primary); }
+        @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    </style>
+</head>
+<body>
 
-@app.route("/api/reset_history", methods=["POST"])
-def api_reset_history():
-    sid = session.get("sid")
-    if sid and sid in WEB_SESSIONS:
-        st = WEB_SESSIONS[sid]
-        st["history"]    = []
-        st["win_count"]  = 0
-        st["lose_count"] = 0
-        st["profit_loss"] = 0
-        socketio.emit("stats_update", public_state(st), to=sid)
-    return jsonify({"success": True})
+    <div id="toast-container"></div>
 
-@app.route("/api/logout", methods=["POST"])
-def api_logout():
-    sid = session.get("sid")
-    if sid in WS_CLIENTS:
-        try:
-            WS_CLIENTS[sid].disconnect()
-        except Exception:
-            pass
-        del WS_CLIENTS[sid]
-    if sid in WEB_SESSIONS:
-        del WEB_SESSIONS[sid]
-    session.pop("sid", None)
-    return jsonify({"success": True})
+    <!-- SIDEBAR (Đã xoá nút Đăng Xuất ở đây) -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fa-solid fa-gear"></i> CÀI ĐẶT & THỐNG KÊ</h3>
+            <i class="fa-solid fa-xmark close-btn" id="close-sidebar"></i>
+        </div>
+        
+        <div class="sidebar-stats">
+            <div class="sidebar-item">
+                <span class="label">Số dư hiện tại:</span>
+                <span class="value" id="sidebar-balance">0</span>
+            </div>
+            <div class="sidebar-item profit">
+                <span class="label">Số dư chốt lãi:</span>
+                <span class="value" id="sidebar-profit">+0</span>
+            </div>
+            <div class="sidebar-item loss">
+                <span class="label">Số dư thua lỗ:</span>
+                <span class="value" id="sidebar-loss">-0</span>
+            </div>
+        </div>
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    socketio.run(app, host="0.0.0.0", port=port)
+        <div class="sidebar-form">
+            <label><i class="fa-solid fa-money-bill-wave"></i> Mức cược cố định (VNĐ)</label>
+            <input type="number" id="bet_amount" class="form-control" value="10000" step="1000" min="1000">
+            <small style="color: #888; font-size: 10px; margin-top: 4px; display: block;">*Áp dụng cho phiên tới.</small>
+        </div>
+        
+        <!-- Đã xoá nút Đăng Xuất tại đây theo yêu cầu -->
+    </div>
+    <div class="overlay" id="overlay"></div>
+
+    <!-- MAIN -->
+    <div class="container">
+        <div class="header">
+            <div class="logo">LC79</div>
+            <div class="header-text">
+                <h1>TOOL AUTO LC79</h1>
+                <p>Hệ thống phân tích cầu & dự đoán Tài Xỉu</p>
+            </div>
+            <i class="fa-solid fa-bars menu-icon" id="open-sidebar"></i>
+        </div>
+
+        <!-- LOGIN -->
+        <div id="login-screen">
+            <div class="card glow-border">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #555; margin-bottom: 12px; font-size: 12px;">
+                    <i class="fa-solid fa-sliders" style="color: var(--primary);"></i> BẢNG ĐIỀU KHIỂN
+                </div>
+                
+                <div class="form-group">
+                    <label>Tài khoản</label>
+                    <input type="text" id="username" class="form-control" placeholder="Nhập tài khoản game">
+                </div>
+                
+                <div class="form-group">
+                    <label>Mật khẩu</label>
+                    <input type="password" id="password" class="form-control" placeholder="Nhập mật khẩu">
+                </div>
+                
+                <div class="form-group">
+                    <label>Nhập Key Bản Quyền</label>
+                    <input type="text" id="license_key" class="form-control" placeholder="Dán key vào đây...">
+                </div>
+
+                <button id="btn_login" class="btn">ĐĂNG NHẬP</button>
+            </div>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div id="dashboard">
+            <div class="top-bar">
+                <div>
+                    <span class="badge badge-green" style="margin-right: 4px;"><span class="status-dot online"></span> Online</span>
+                    <span class="badge badge-gray" id="status-auto-badge">AUTO - OFF</span>
+                </div>
+            </div>
+
+            <div class="card glow-border">
+                <div class="pred-box" id="pred-box">
+                    <div>
+                        <div class="label">DỰ ĐOÁN AI</div>
+                        <div class="value" id="pred-display">--</div>
+                    </div>
+                    <div>
+                        <div class="label">PHIÊN</div>
+                        <div class="session" id="current-session">#------</div>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="label">NICKNAME</div>
+                        <div class="value text-primary" id="nickname-display">---</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">SỐ DƯ</div>
+                        <div class="value" id="balance-display">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">CƯỢC PHIÊN</div>
+                        <div class="value" id="bet-display">10,000</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">WIN / LOSE</div>
+                        <div class="value" id="winlose-display">0 / 0</div>
+                    </div>
+                    <div class="stat-box" style="grid-column: span 2;">
+                        <div class="label">TRẠNG THÁI</div>
+                        <div class="value" id="status-text" style="color: var(--text-muted);">Chờ lệnh</div>
+                    </div>
+                </div>
+
+                <div class="action-btns">
+                    <button id="btn_auto" class="btn btn-auto-off"><i class="fa-solid fa-play"></i> BẬT AUTO</button>
+                    <button id="btn_logout" class="btn btn-red" style="background: #555;"><i class="fa-solid fa-ban"></i> NGẮT BOT</button>
+                </div>
+            </div>
+
+            <!-- BẢNG LỊCH SỬ -->
+            <div class="card">
+                <div style="font-size: 12px; font-weight: 700; color: #555; margin-bottom: 8px; text-transform: uppercase;">LỊCH SỬ CƯỢC</div>
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 20%;">PHIÊN</th>
+                            <th style="width: 20%;">D.ĐOÁN</th>
+                            <th style="width: 20%;">CƯỢC</th>
+                            <th style="width: 20%;">KẾT QUẢ</th>
+                            <th style="width: 20%;">LÃI</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body">
+                        <tr>
+                            <td colspan="5" class="empty-history">
+                                <i class="fa-solid fa-power-off"></i> Bấm BẬT AUTO để chạy...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let isAutoRunning = false; 
+
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerText = msg;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 2000); // Giảm thời gian hiện toast xuống 2s cho nhanh gọn
+        }
+
+        async function getDeviceFingerprint() {
+            const raw = navigator.platform + screen.width + screen.height + navigator.language;
+            let h = 0;
+            for (let i = 0; i < raw.length; i++) h = ((h << 5) - h + raw.charCodeAt(i)) | 0;
+            return 'DEV-' + Math.abs(h).toString(16);
+        }
+
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        
+        document.getElementById('open-sidebar').addEventListener('click', () => {
+            sidebar.classList.add('active');
+            overlay.classList.add('active');
+        });
+
+        function closeSidebar() {
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
+        }
+        
+        document.getElementById('close-sidebar').addEventListener('click', closeSidebar);
+        overlay.addEventListener('click', closeSidebar);
+
+        document.getElementById('btn_login').addEventListener('click', async function() {
+            const btn = this;
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const key = document.getElementById('license_key').value.trim();
+
+            if (!username || !password || !key) {
+                showToast('Vui lòng nhập đủ thông tin!', 'warning'); return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = 'ĐANG KIỂM TRA...';
+
+            try {
+                const device = await getDeviceFingerprint();
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ username, password, key, device })
+                });
+                const data = await response.json();
+
+                if (!data.success) {
+                    showToast('❌ ' + data.error, 'error');
+                    btn.disabled = false; btn.innerHTML = 'ĐĂNG NHẬP'; return;
+                }
+
+                showToast('✅ Đăng nhập thành công!', 'success');
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                
+                document.getElementById('nickname-display').innerText = data.nickname || 'Thành viên';
+                updateBalance(data.balance || 0);
+                
+                toggleAutoUI(false);
+                socket.emit('join_session', { sid: data.sid });
+
+            } catch (err) {
+                showToast('❌ Lỗi kết nối!', 'error');
+                btn.disabled = false; btn.innerHTML = 'ĐĂNG NHẬP';
+            }
+        });
+
+        let currentBalance = 0;
+        let initialBalance = 0;
+        
+        function updateBalance(newBalance) {
+            currentBalance = newBalance;
+            if (initialBalance === 0) initialBalance = newBalance; 
+            
+            document.getElementById('balance-display').innerText = newBalance.toLocaleString();
+            document.getElementById('sidebar-balance').innerText = newBalance.toLocaleString();
+            
+            const diff = newBalance - initialBalance;
+            const profitEl = document.getElementById('sidebar-profit');
+            const lossEl = document.getElementById('sidebar-loss');
+            
+            if (diff > 0) {
+                profitEl.innerText = '+' + diff.toLocaleString();
+                lossEl.innerText = '-0';
+            } else if (diff < 0) {
+                profitEl.innerText = '+0';
+                lossEl.innerText = diff.toLocaleString();
+            } else {
+                profitEl.innerText = '+0';
+                lossEl.innerText = '-0';
+            }
+        }
+
+        const betInput = document.getElementById('bet_amount');
+        const betDisplay = document.getElementById('bet-display');
+        
+        const savedBet = localStorage.getItem('lc79_bet_amount');
+        if (savedBet) {
+            betInput.value = savedBet;
+            betDisplay.innerText = parseInt(savedBet).toLocaleString();
+        }
+
+        betInput.addEventListener('input', function() {
+            const val = this.value;
+            localStorage.setItem('lc79_bet_amount', val);
+            betDisplay.innerText = parseInt(val || 0).toLocaleString();
+            fetch('/api/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ betAmount: val })
+            });
+        });
+
+        const btnAuto = document.getElementById('btn_auto');
+        const statusBadge = document.getElementById('status-auto-badge');
+        const statusText = document.getElementById('status-text');
+        const predBox = document.getElementById('pred-box');
+        const predDisplay = document.getElementById('pred-display');
+        const sessionDisplay = document.getElementById('current-session');
+        const historyBody = document.getElementById('history-body');
+
+        function toggleAutoUI(isRunning) {
+            isAutoRunning = isRunning;
+            
+            if (isRunning) {
+                btnAuto.className = 'btn btn-auto-on';
+                btnAuto.innerHTML = '<i class="fa-solid fa-stop"></i> TẮT AUTO';
+                statusBadge.className = 'badge badge-green';
+                statusBadge.innerText = 'AUTO - ON';
+                statusText.innerText = 'Đang chạy';
+                statusText.style.color = 'var(--success)';
+                predBox.classList.add('active');
+                
+                if (historyBody.querySelector('.empty-history')) {
+                    historyBody.innerHTML = '';
+                }
+                
+                showToast('🚀 Đã bật chế độ Auto!', 'success');
+                socket.emit('toggle_auto', { status: true });
+            } else {
+                btnAuto.className = 'btn btn-auto-off';
+                btnAuto.innerHTML = '<i class="fa-solid fa-play"></i> BẬT AUTO';
+                statusBadge.className = 'badge badge-gray';
+                statusBadge.innerText = 'AUTO - OFF';
+                statusText.innerText = 'Chờ lệnh';
+                statusText.style.color = 'var(--text-muted)';
+                predBox.classList.remove('active');
+                predDisplay.innerText = '--';
+                sessionDisplay.innerText = '#------';
+                
+                showToast('🛑 Đã tắt chế độ Auto!', 'info');
+                socket.emit('toggle_auto', { status: false });
+            }
+        }
+
+        btnAuto.addEventListener('click', () => {
+            toggleAutoUI(!isAutoRunning);
+        });
+
+        // Chỉ giữ lại nút Ngắt Bot / Đăng xuất trên giao diện chính
+        document.getElementById('btn_logout').addEventListener('click', async function() {
+            if (!confirm('Bạn có chắc muốn ngắt bot và đăng xuất?')) return;
+            await fetch('/api/logout', { method: 'POST' });
+            location.reload();
+        });
+
+        socket.on('force_logout', (data) => {
+            showToast('🔒 ' + data.reason, 'error');
+            setTimeout(() => location.reload(), 2000);
+        });
+
+        socket.on('toast', (data) => showToast(data.msg, data.type || 'info'));
+
+        // Cập nhật số dư tự động ngay khi có biến động
+        socket.on('stats_update', (st) => {
+            updateBalance(st.balance || 0);
+        });
+
+        socket.on('session_update', (data) => {
+            if (!isAutoRunning) return;
+
+            if (data.session_id) sessionDisplay.innerText = '#' + data.session_id;
+            
+            if (data.prediction) {
+                predDisplay.innerText = data.prediction.toUpperCase();
+                predDisplay.style.color = data.prediction.toUpperCase().includes('T') ? 'var(--primary)' : 'var(--danger)';
+            }
+        });
+
+        // CẬP NHẬT LỊCH SỬ - NHẬN DIỆN ĐÚNG SAI NHANH VỚI HIỆU ỨNG NHÁY SÁNG
+        socket.on('result_update', (data) => {
+            if (!isAutoRunning) return;
+
+            const tr = document.createElement('tr');
+            
+            const isWin = data.result === 'WIN';
+            const resultClass = isWin ? 'text-success' : 'text-danger';
+            const resultText = isWin ? 'THẮNG' : 'THUA';
+            
+            const prediction = data.prediction ? data.prediction.toUpperCase() : '---';
+            const predColor = prediction === 'TÀI' ? 'text-primary' : 'text-danger';
+            
+            const sessionId = data.session_id || '???';
+            const betAmount = data.bet_amount || parseInt(betInput.value) || 0;
+            const winAmount = isWin ? betAmount : 0;
+            
+            const winDisplay = isWin 
+                ? `<span class="text-success">+${winAmount.toLocaleString()}</span>` 
+                : `<span class="text-muted">0</span>`;
+
+            // Thêm hiệu ứng nháy sáng tương ứng (Đỏ hoặc Xanh)
+            tr.className = isWin ? 'result-win' : 'result-lose';
+
+            tr.innerHTML = `
+                <td class="text-muted" style="font-size: 10px;">#${sessionId}</td>
+                <td class="${predColor}" style="font-size: 11px;">${prediction}</td>
+                <td style="font-size: 11px;">${betAmount.toLocaleString()}</td>
+                <td class="${resultClass}">${resultText}</td>
+                <td>${winDisplay}</td>
+            `;
+            
+            historyBody.insertBefore(tr, historyBody.firstChild);
+            
+            let winLoseDisplay = document.getElementById('winlose-display');
+            let currentWin = parseInt(winLoseDisplay.innerText.split('/')[0]) || 0;
+            let currentLose = parseInt(winLoseDisplay.innerText.split('/')[1]) || 0;
+            if (isWin) currentWin++; else currentLose++;
+            winLoseDisplay.innerText = `${currentWin} / ${currentLose}`;
+            
+            // Cập nhật số dư tự động ngay tại client cho mượt (nếu server có độ trễ)
+            // Giả sử tỷ lệ 1:1, nếu thắng cộng tiền, thua trừ tiền
+            let simulatedBalance = currentBalance + (isWin ? betAmount : -betAmount);
+            updateBalance(simulatedBalance);
+
+            if (historyBody.children.length > 10) {
+                historyBody.removeChild(historyBody.lastChild);
+            }
+        });
+    </script>
+</body>
+</html>
