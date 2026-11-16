@@ -43,31 +43,63 @@ WS_CLIENTS   = {}
 API_LAST_RAW = {"data": None, "ts": 0, "error": None}
 
 # ==========================================
-# KEY SERVER HELPERS
+# KEY SERVER HELPERS (ĐÃ FIX LỖI)
 # ==========================================
 def key_server_verify(key, device):
-    try:
-        r = requests.post(
-            f"{KEY_SERVER_URL}/api/verify_key",
-            json={"key": key, "device": device},
-            timeout=15,
-        )
-        return r.json()
-    except Exception as e:
-        logger.error(f"[KeyServer] verify fail: {e}")
-        return {"success": False, "error": f"Không kết nối được server key: {e}"}
+    """Gọi API verify key, có retry nếu server Render đang ngủ."""
+    url = f"{KEY_SERVER_URL}/api/verify_key"
+    payload = {"key": key, "device": device}
+    
+    # Thử tối đa 2 lần (lần 1 đánh thức Render, lần 2 lấy dữ liệu thật)
+    for attempt in range(2):
+        try:
+            r = requests.post(url, json=payload, timeout=20) # Tăng timeout lên 20s
+            
+            # Nếu server trả về HTML (lỗi 502/504 hoặc trang Loading của Render)
+            if r.status_code in (502, 503, 504):
+                logger.warning(f"[KeyServer] Đang đánh thức server... (Status {r.status_code})")
+                time.sleep(3) # Chờ Render khởi động
+                continue
+                
+            # Bắt lỗi nếu không phải JSON
+            try:
+                return r.json()
+            except ValueError:
+                logger.error(f"[KeyServer] Response không phải JSON (Status {r.status_code}): {r.text[:100]}")
+                if attempt == 0:
+                    time.sleep(3)
+                    continue
+                return {"success": False, "error": "Server key phản hồi sai định dạng (Vui lòng thử lại)"}
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"[KeyServer] Lỗi mạng (lần {attempt+1}): {e}")
+            if attempt == 0:
+                time.sleep(3)
+                continue
+            return {"success": False, "error": "Không thể kết nối tới Server Key (Vui lòng thử lại sau)"}
+            
+    return {"success": False, "error": "Server Key đang bảo trì hoặc quá tải"}
 
 def key_server_check(key, device):
+    """Check key định kỳ, không chặn nếu server sập."""
     try:
         r = requests.post(
             f"{KEY_SERVER_URL}/api/check_key",
             json={"key": key, "device": device},
             timeout=15,
         )
-        return r.json()
+        if r.status_code in (502, 503, 504):
+            return {"success": True, "grace": True, "error": "Server key đang bảo trì"}
+            
+        try:
+            return r.json()
+        except ValueError:
+            logger.error(f"[KeyServer] Check không phải JSON")
+            return {"success": True, "grace": True, "error": "Server key bảo trì"}
+            
     except Exception as e:
-        logger.error(f"[KeyServer] check fail: {e}")
-        # Grace: tránh logout nhầm khi server key tạm down
+        logger.error(f"[KeyServer] Check fail: {e}")
+        # Bỏ qua nếu mất mạng, không đá user ra ngoài
         return {"success": True, "grace": True, "error": str(e)}
 
 # ==========================================
@@ -113,12 +145,12 @@ def key_monitor_worker(sid):
         if not key or not device:
             break
 
-        # 1) Local expiry check (nhanh, không phụ thuộc server)
+        # 1) Local expiry check
         if expires_at and time.time() > expires_at:
             force_logout(sid, "Key đã hết hạn", expired=True)
             break
 
-        # 2) Server check (bắt trường hợp admin revoke)
+        # 2) Server check
         result = key_server_check(key, device)
         if not result.get("success") and not result.get("grace"):
             force_logout(
