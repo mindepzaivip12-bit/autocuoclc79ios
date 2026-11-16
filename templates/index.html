@@ -4,21 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>TOOL AUTO LC79 - LEMINH</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         :root {
-            --primary: #6c5ce7;
-            --primary-hover: #5a4bcf;
-            --bg-color: #f4f6f9;
+            --primary: #5A5FE0;
+            --primary-hover: #4a4fc7;
+            --bg-color: #E8EDF9;
             --card-bg: #ffffff;
-            --text-main: #2d3436;
-            --text-muted: #636e72;
-            --border: #dfe6e9;
-            --success: #00b894;
-            --danger: #ff7675;
-            --warning: #fdcb6e;
+            --text-main: #333333;
+            --text-muted: #888888;
+            --border: #EAEAEA;
+            --success: #00C851;
+            --danger: #ff4444;
+            --green-light: #E6F9F0;
+            --red-light: #FFEBEB;
+            --purple-light: #F3F0FF;
         }
 
         * {
@@ -41,7 +43,7 @@
 
         .container {
             width: 100%;
-            max-width: 480px;
+            max-width: 500px;
         }
 
         /* ===== HEADER LOGO ===== */
@@ -49,35 +51,39 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             background: var(--card-bg);
-            padding: 16px;
-            border-radius: 16px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            padding: 12px 16px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
         }
         .logo {
-            width: 60px;
-            height: 60px;
+            width: 40px;
+            height: 40px;
             background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
-            border-radius: 12px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 800;
             color: #c0392b;
-            font-size: 16px;
-            font-style: italic;
-            box-shadow: 0 4px 8px rgba(253, 160, 133, 0.4);
+            font-size: 14px;
         }
         .header-text h1 {
-            font-size: 18px;
+            font-size: 16px;
             color: var(--primary);
-            font-weight: 700;
+            font-weight: 800;
         }
         .header-text p {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-muted);
-            margin-top: 4px;
+            margin-top: 2px;
+        }
+        .menu-icon {
+            margin-left: auto;
+            font-size: 20px;
+            color: var(--text-main);
+            cursor: pointer;
         }
 
         /* ===== CARDS ===== */
@@ -85,7 +91,7 @@
             background: var(--card-bg);
             border-radius: 16px;
             padding: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
             margin-bottom: 16px;
         }
 
@@ -93,85 +99,110 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 700;
+            color: #555;
             margin-bottom: 16px;
-            text-transform: uppercase;
         }
 
-        /* ===== FORM ===== */
+        /* ===== LOGIN FORM ===== */
         .form-group {
             margin-bottom: 16px;
         }
         .form-group label {
             display: block;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             color: var(--text-muted);
             margin-bottom: 8px;
-            text-transform: uppercase;
         }
         .form-control {
             width: 100%;
-            padding: 14px 16px;
+            padding: 12px 16px;
             border: 1px solid var(--border);
-            border-radius: 10px;
-            font-size: 15px;
+            border-radius: 8px;
+            font-size: 14px;
             outline: none;
             transition: all 0.2s;
-            background: #fafbfc;
+            background: #FAFAFA;
         }
         .form-control:focus {
             border-color: var(--primary);
             background: #fff;
-            box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.1);
         }
 
         .btn {
             width: 100%;
-            padding: 16px;
+            padding: 14px;
             border: none;
-            border-radius: 12px;
+            border-radius: 8px;
             background: var(--primary);
             color: white;
-            font-size: 16px;
-            font-weight: 600;
+            font-size: 14px;
+            font-weight: 700;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
             transition: all 0.2s;
-            box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
         }
-        .btn:active {
-            transform: scale(0.98);
-        }
-        .btn:disabled {
-            background: #b2bec3;
-            box-shadow: none;
-            cursor: not-allowed;
-        }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { background: #b2bec3; cursor: not-allowed; }
 
         .link-tele {
             text-align: center;
-            margin-top: 24px;
-            font-size: 14px;
+            margin-top: 16px;
+            font-size: 13px;
             color: var(--text-muted);
         }
         .link-tele a {
             color: var(--primary);
             font-weight: 600;
             text-decoration: none;
-            background: #f0efff;
-            padding: 4px 8px;
-            border-radius: 6px;
         }
 
-        /* ===== DASHBOARD (ẨN BAN ĐẦU) ===== */
+        /* ===== DASHBOARD UI ===== */
         #dashboard { display: none; }
 
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            background: var(--card-bg);
+            padding: 12px 16px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+        }
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--danger); display: inline-block;
+            margin-right: 6px;
+        }
+        .status-dot.online { background: var(--success); }
+        .badge {
+            font-size: 10px; padding: 4px 8px; border-radius: 20px;
+            font-weight: 600; text-transform: uppercase;
+        }
+        .badge-green { background: var(--green-light); color: var(--success); }
+        .badge-purple { background: var(--purple-light); color: var(--primary); }
+        
+        /* Prediction Box */
+        .pred-box {
+            background: var(--purple-light);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .pred-box .label { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 4px; }
+        .pred-box .value { font-size: 28px; font-weight: 800; color: var(--primary); }
+        .pred-box .session { font-size: 12px; color: var(--text-muted); font-weight: 600; text-align: right; }
+
+        /* Stats Grid */
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -179,133 +210,84 @@
             margin-bottom: 16px;
         }
         .stat-box {
-            background: #f8f9fa;
             padding: 12px;
-            border-radius: 10px;
-            text-align: center;
+            border: 1px solid var(--border);
+            border-radius: 8px;
         }
-        .stat-box .label {
+        .stat-box .label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600;}
+        .stat-box .value { font-size: 16px; font-weight: 700; }
+
+        /* Action Buttons */
+        .action-btns {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .btn-green { background: var(--success); }
+        .btn-red { background: var(--danger); }
+        
+        /* History Table */
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
             font-size: 12px;
-            color: var(--text-muted);
-            margin-bottom: 4px;
         }
-        .stat-box .value {
-            font-size: 18px;
-            font-weight: 700;
+        .history-table th {
+            text-align: left;
+            padding: 8px 0;
+            color: var(--text-muted);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+        }
+        .history-table td {
+            padding: 10px 0;
+            border-bottom: 1px solid #f9f9f9;
+            font-weight: 500;
         }
         .text-success { color: var(--success); }
         .text-danger { color: var(--danger); }
-
-        .status-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            margin-bottom: 16px;
-            font-size: 14px;
-            font-weight: 500;
-        }
-        .dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 6px;
-            background: var(--danger);
-        }
-        .dot.online { background: var(--success); }
-
-        .prediction-box {
-            text-align: center;
-            padding: 24px;
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4efe9 100%);
-            border-radius: 12px;
-            margin-bottom: 16px;
-        }
-        .prediction-box .pred {
-            font-size: 36px;
-            font-weight: 800;
-            letter-spacing: 2px;
-        }
-        .prediction-box .conf {
-            font-size: 14px;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
+        .text-primary { color: var(--primary); }
 
         /* ===== TOAST ===== */
         #toast-container {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            width: 90%;
-            max-width: 400px;
-            pointer-events: none;
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 9999; display: flex; flex-direction: column; gap: 8px;
+            width: 90%; max-width: 400px; pointer-events: none;
         }
         .toast {
-            padding: 12px 20px;
-            border-radius: 8px;
-            color: white;
-            font-size: 14px;
-            font-weight: 500;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            animation: slideDown 0.3s ease;
-            text-align: center;
+            padding: 12px 20px; border-radius: 8px; color: white;
+            font-size: 14px; font-weight: 500; text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: slideDown 0.3s;
         }
         .toast.success { background: var(--success); }
         .toast.error { background: var(--danger); }
         .toast.info { background: var(--primary); }
-        .toast.warning { background: var(--warning); color: #333; }
-
-        @keyframes slideDown {
-            from { transform: translateY(-20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        /* ===== KEY COUNTDOWN ===== */
-        .key-countdown {
-            position: absolute;
-            top: -10px;
-            right: 20px;
-            background: var(--primary);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 700;
-            box-shadow: 0 2px 8px rgba(108, 92, 231, 0.4);
-        }
+        @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <!-- TOAST CONTAINER -->
     <div id="toast-container"></div>
 
     <div class="container">
         <!-- HEADER -->
         <div class="header">
-            <div class="logo">LEMINH</div>
+            <div class="logo">LC79</div>
             <div class="header-text">
                 <h1>TOOL AUTO LC79</h1>
                 <p>Hệ thống phân tích cầu & dự đoán Tài Xỉu tự động</p>
             </div>
+            <i class="fa-solid fa-bars menu-icon"></i>
         </div>
 
         <!-- ================= MÀN HÌNH ĐĂNG NHẬP ================= -->
         <div id="login-screen">
             <div class="card">
                 <div class="card-title">
-                    <i class="fa-solid fa-paw"></i> ĐĂNG NHẬP GAME
+                    <i class="fa-solid fa-sliders"></i> BẢNG ĐIỀU KHIỂN
                 </div>
                 
                 <div class="form-group">
@@ -320,93 +302,101 @@
                 
                 <div class="form-group">
                     <label>Nhập Key Bản Quyền</label>
-                    <input type="text" id="license_key" class="form-control" placeholder="Dán key vào đây..." style="text-transform: uppercase;">
+                    <input type="text" id="license_key" class="form-control" placeholder="Dán key vào đây...">
                 </div>
 
                 <button id="btn_login" class="btn">
-                    <i class="fa-solid fa-lock"></i> ĐĂNG NHẬP
+                    ĐĂNG NHẬP
                 </button>
-            </div>
-
-            <div class="link-tele">
-                Mua key ib <a href="https://t.me/cskhleminh" target="_blank">tele</a>
             </div>
         </div>
 
-        <!-- ================= MÀN HÌNH DASHBOARD (SAU KHI LOGIN) ================= -->
-        <div id="dashboard" style="position: relative;">
-            
-            <div class="key-countdown" id="key-countdown">
-                <i class="fa-solid fa-clock"></i> <span id="time-left">00:00:00</span>
+        <!-- ================= MÀN HÌNH DASHBOARD ================= -->
+        <div id="dashboard">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <div>
+                    <span class="badge badge-green" style="margin-right: 8px;"><span class="status-dot online"></span> Online</span>
+                    <span class="badge badge-green">AUTO - ON</span>
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted);">
+                    <i class="fa-regular fa-clock"></i> <span id="time-left">--:--:--</span>
+                </div>
             </div>
 
-            <div class="card" style="margin-top: 16px;">
-                <div class="status-bar">
+            <div class="card">
+                <!-- Box Dự đoán -->
+                <div class="pred-box">
                     <div>
-                        <span class="dot" id="ws-status-dot"></span>
-                        <span id="ws-status-text">Socket: Đang kết nối...</span>
+                        <div class="label">DỰ ĐOÁN AI</div>
+                        <div class="value" id="pred-display">TÀI</div>
                     </div>
-                    <div style="font-weight: 700; color: var(--primary);" id="nickname-display">--</div>
+                    <div>
+                        <div class="label">PHIÊN</div>
+                        <div class="session" id="current-session">#7123493</div>
+                    </div>
                 </div>
 
+                <!-- Thông số -->
                 <div class="stats-grid">
                     <div class="stat-box">
-                        <div class="label">Số dư</div>
-                        <div class="value" id="balance-display">0 đ</div>
+                        <div class="label">NICKNAME</div>
+                        <div class="value text-primary" id="nickname-display">tuonglaiatmgiau</div>
                     </div>
                     <div class="stat-box">
-                        <div class="label">Lợi nhuận</div>
-                        <div class="value" id="profit-display">0 đ</div>
+                        <div class="label">SỐ DƯ</div>
+                        <div class="value" id="balance-display">0</div>
                     </div>
                     <div class="stat-box">
-                        <div class="label">Thắng / Thua</div>
-                        <div class="value"><span class="text-success" id="win-count">0</span> / <span class="text-danger" id="lose-count">0</span></div>
+                        <div class="label">CƯỢC PHIÊN</div>
+                        <div class="value" id="bet-display">10,000</div>
                     </div>
                     <div class="stat-box">
-                        <div class="label">Chuỗi T/W</div>
-                        <div class="value"><span class="text-success" id="win-streak">0</span> / <span class="text-danger" id="loss-streak">0</span></div>
+                        <div class="label">TRẠNG THÁI</div>
+                        <div class="value" style="color: var(--success);">Đang chạy</div>
                     </div>
                 </div>
 
-                <div class="prediction-box">
-                    <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 8px;">DỰ ĐOÁN PHIÊN NÀY</div>
-                    <div class="pred" id="pred-display" style="color: var(--text-muted);">--</div>
-                    <div class="conf" id="conf-display">Độ tin cậy: --%</div>
-                </div>
-
-                <div class="form-group">
-                    <label>Cấu hình cược (VNĐ)</label>
+                <!-- Cài đặt Cược (Đã bỏ X2 khi thua) -->
+                <div class="form-group" style="margin-top: 16px;">
+                    <label>Cài đặt cược cố định (VNĐ)</label>
                     <input type="number" id="bet_amount" class="form-control" value="10000" step="1000" min="1000">
                 </div>
 
-                <div style="display: flex; gap: 12px; margin-bottom: 16px;">
-                    <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500;">
-                        <input type="checkbox" id="auto_bet" style="width: 18px; height: 18px; accent-color: var(--primary);">
-                        Bật Auto Cược
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500;">
-                        <input type="checkbox" id="x2_loss" checked style="width: 18px; height: 18px; accent-color: var(--primary);">
-                        X2 khi Thua
-                    </label>
+                <!-- Nút điều khiển -->
+                <div class="action-btns">
+                    <button id="btn_auto" class="btn btn-green">TẮT AUTO</button>
+                    <button id="btn_logout" class="btn btn-red">NGẮT BOT</button>
                 </div>
+            </div>
 
-                <button id="btn_logout" class="btn" style="background: var(--danger); box-shadow: 0 4px 12px rgba(255, 118, 117, 0.3);">
-                    <i class="fa-solid fa-right-from-bracket"></i> ĐĂNG XUẤT
-                </button>
+            <!-- Lịch sử cược -->
+            <div class="card">
+                <div class="card-title">LỊCH SỬ CƯỢC</div>
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>PHIÊN</th>
+                            <th>DỰ ĐOÁN</th>
+                            <th>CƯỢC</th>
+                            <th>KẾT QUẢ</th>
+                            <th>XÚC XẮC</th>
+                            <th>KẾT QUẢ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body">
+                        <!-- Dữ liệu sẽ được JS đổ vào đây -->
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
     <!-- ================= SCRIPTS ================= -->
     <script>
-        // ==========================================
-        // KHỞI TẠO SOCKET IO
-        // ==========================================
         const socket = io();
 
-        // ==========================================
-        // HIỂN THỊ TOAST THÔNG BÁO
-        // ==========================================
+        // Hàm hiển thị thông báo
         function showToast(msg, type = 'info') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -415,54 +405,19 @@
             container.appendChild(toast);
             setTimeout(() => {
                 toast.style.opacity = '0';
-                toast.style.transform = 'translateY(-20px)';
-                toast.style.transition = 'all 0.3s';
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
         }
 
-        // ==========================================
-        // TẠO MÃ THIẾT BỊ (DEVICE FINGERPRINT)
-        // ==========================================
+        // Tạo mã thiết bị
         async function getDeviceFingerprint() {
-            const parts = [
-                navigator.platform || 'unknown',
-                navigator.hardwareConcurrency || 0,
-                screen.width + 'x' + screen.height,
-                screen.colorDepth || 0,
-                Intl.DateTimeFormat().resolvedOptions().timeZone || '',
-                navigator.language || '',
-                Math.round(window.devicePixelRatio * 100),
-            ];
-            const raw = parts.join('|');
-
-            if (window.crypto && crypto.subtle) {
-                try {
-                    const buf = new TextEncoder().encode(raw);
-                    const hash = await crypto.subtle.digest('SHA-256', buf);
-                    const hex = Array.from(new Uint8Array(hash))
-                        .map(b => b.toString(16).padStart(2, '0')).join('');
-                    return 'DEV-' + hex.slice(0, 32);
-                } catch(e) {}
-            }
-            
+            const raw = navigator.platform + screen.width + screen.height + navigator.language;
             let h = 0;
             for (let i = 0; i < raw.length; i++) h = ((h << 5) - h + raw.charCodeAt(i)) | 0;
-            return 'DEV-' + Math.abs(h).toString(16) + '-' + raw.length;
+            return 'DEV-' + Math.abs(h).toString(16);
         }
 
-        async function getStableDeviceId() {
-            let id = localStorage.getItem('lm_device_id');
-            if (!id || id === 'undefined') {
-                id = await getDeviceFingerprint();
-                localStorage.setItem('lm_device_id', id);
-            }
-            return id;
-        }
-
-        // ==========================================
-        // XỬ LÝ ĐĂNG NHẬP
-        // ==========================================
+        // Xử lý đăng nhập
         document.getElementById('btn_login').addEventListener('click', async function() {
             const btn = this;
             const username = document.getElementById('username').value.trim();
@@ -470,192 +425,149 @@
             const key = document.getElementById('license_key').value.trim();
 
             if (!username || !password || !key) {
-                showToast('Vui lòng nhập đủ Tài khoản, Mật khẩu và Key!', 'warning');
-                return;
+                showToast('Vui lòng nhập đủ thông tin!', 'warning'); return;
             }
 
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ĐANG KIỂM TRA...';
+            btn.innerHTML = 'ĐANG KIỂM TRA...';
 
             try {
-                const device = await getStableDeviceId();
-
+                const device = await getDeviceFingerprint();
                 const response = await fetch('/api/login', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ username, password, key, device })
                 });
-
                 const data = await response.json();
 
                 if (!data.success) {
                     showToast('❌ ' + data.error, 'error');
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fa-solid fa-lock"></i> ĐĂNG NHẬP';
-                    return;
+                    btn.disabled = false; btn.innerHTML = 'ĐĂNG NHẬP'; return;
                 }
 
                 showToast('✅ Đăng nhập thành công!', 'success');
-                
-                // Chuyển sang giao diện Dashboard
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('dashboard').style.display = 'block';
                 
-                // Cập nhật tên
+                // Hiển thị dữ liệu ban đầu
                 document.getElementById('nickname-display').innerText = data.nickname;
-                document.getElementById('balance-display').innerText = data.balance.toLocaleString() + ' đ';
-
-                // Join room socket để nhận event
+                document.getElementById('balance-display').innerText = data.balance.toLocaleString();
+                
                 socket.emit('join_session', { sid: data.sid });
 
-                // Bắt đầu đếm ngược key
-                if (data.key_expires_at) {
-                    startKeyCountdown(data.key_expires_at);
-                }
+                if (data.key_expires_at) startKeyCountdown(data.key_expires_at);
 
             } catch (err) {
-                showToast('❌ Lỗi kết nối mạng!', 'error');
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-lock"></i> ĐĂNG NHẬP';
+                showToast('❌ Lỗi kết nối!', 'error');
+                btn.disabled = false; btn.innerHTML = 'ĐĂNG NHẬP';
             }
         });
 
-        // ==========================================
-        // ĐỒNG HỒ ĐẾM NGƯỢC KEY
-        // ==========================================
+        // Đếm ngược thời gian Key
         let countdownInterval = null;
         function startKeyCountdown(expiresAt) {
             if (countdownInterval) clearInterval(countdownInterval);
             const el = document.getElementById('time-left');
-            
             function tick() {
-                const now = Math.floor(Date.now() / 1000);
-                const remaining = Math.max(0, expiresAt - now);
-                
+                const remaining = Math.max(0, expiresAt - Math.floor(Date.now() / 1000));
                 if (remaining <= 0) {
                     clearInterval(countdownInterval);
-                    el.innerText = 'HẾT HẠN';
-                    el.parentElement.style.background = 'var(--danger)';
-                    return;
+                    el.innerText = 'HẾT HẠN'; return;
                 }
-
-                const d = Math.floor(remaining / 86400);
-                const h = Math.floor((remaining % 86400) / 3600);
+                const h = Math.floor(remaining / 3600);
                 const m = Math.floor((remaining % 3600) / 60);
                 const s = remaining % 60;
-                
-                let str = '';
-                if (d > 0) str += `${d}ng `;
-                str += `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-                el.innerText = str;
+                el.innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
             }
-            
-            tick();
-            countdownInterval = setInterval(tick, 1000);
+            tick(); countdownInterval = setInterval(tick, 1000);
         }
 
-        // ==========================================
-        // XỬ LÝ CẤU HÌNH
-        // ==========================================
-        document.getElementById('bet_amount').addEventListener('change', function() {
+        // XỬ LÝ LƯU TIỀN CƯỢC TỰ ĐỘNG (LOCAL STORAGE)
+        const betInput = document.getElementById('bet_amount');
+        
+        // Khi mở trang, lấy số tiền đã lưu trước đó (nếu có)
+        const savedBet = localStorage.getItem('lc79_bet_amount');
+        if (savedBet) {
+            betInput.value = savedBet;
+            document.getElementById('bet-display').innerText = parseInt(savedBet).toLocaleString();
+        }
+
+        // Lắng nghe thay đổi, lưu vào máy và gửi lên server
+        betInput.addEventListener('input', function() {
+            const val = this.value;
+            localStorage.setItem('lc79_bet_amount', val); // Lưu tự động
+            document.getElementById('bet-display').innerText = parseInt(val || 0).toLocaleString();
+            
             fetch('/api/config', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ betAmount: this.value })
+                body: JSON.stringify({ betAmount: val }) // Chỉ gửi số tiền, không gửi X2
             });
         });
 
-        document.getElementById('auto_bet').addEventListener('change', function() {
-            fetch('/api/config', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ auto_bet_enabled: this.checked })
-            });
-            showToast(this.checked ? 'Đã bật Auto Cược' : 'Đã tắt Auto Cược', this.checked ? 'success' : 'info');
-        });
-
-        document.getElementById('x2_loss').addEventListener('change', function() {
-            fetch('/api/config', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ x2_loss_mode: this.checked })
-            });
-        });
-
-        // ==========================================
-        // NÚT ĐĂNG XUẤT
-        // ==========================================
+        // Nút ngắt bot / đăng xuất
         document.getElementById('btn_logout').addEventListener('click', async function() {
-            if (!confirm('Bạn có chắc muốn đăng xuất?')) return;
+            if (!confirm('Bạn có chắc muốn ngắt bot và đăng xuất?')) return;
             await fetch('/api/logout', { method: 'POST' });
             location.reload();
         });
 
-        // ==========================================
-        // LẮNG NGHE SỰ KIỆN TỪ SOCKET
-        // ==========================================
+        // ================= LẮNG NGHE SOCKET =================
         
-        // Bị đá văng do hết hạn key
         socket.on('force_logout', (data) => {
             showToast('🔒 ' + data.reason, 'error');
             setTimeout(() => location.reload(), 2000);
         });
 
-        // Thông báo chung (Toast)
-        socket.on('toast', (data) => {
-            showToast(data.msg, data.type || 'info');
-        });
+        socket.on('toast', (data) => showToast(data.msg, data.type || 'info'));
 
-        // Cập nhật thông số liên tục
+        // Cập nhật số dư, trạng thái
         socket.on('stats_update', (st) => {
-            document.getElementById('balance-display').innerText = st.balance.toLocaleString() + ' đ';
-            
-            const profitEl = document.getElementById('profit-display');
-            profitEl.innerText = (st.profit_loss > 0 ? '+' : '') + st.profit_loss.toLocaleString() + ' đ';
-            profitEl.className = 'value ' + (st.profit_loss > 0 ? 'text-success' : (st.profit_loss < 0 ? 'text-danger' : ''));
-
-            document.getElementById('win-count').innerText = st.win_count;
-            document.getElementById('lose-count').innerText = st.lose_count;
-            document.getElementById('win-streak').innerText = st.win_streak;
-            document.getElementById('loss-streak').innerText = st.loss_streak;
-
-            // Socket Status
-            const dot = document.getElementById('ws-status-dot');
-            const txt = document.getElementById('ws-status-text');
-            if (st.socket_connected) {
-                dot.classList.add('online');
-                txt.innerText = 'Socket: Online';
-            } else {
-                dot.classList.remove('online');
-                txt.innerText = 'Socket: Offline';
-            }
-
-            // Cập nhật lại key nếu server đẩy về
-            if (st.key_expires_at && st.key_expires_at !== window._lastKeyExp) {
-                window._lastKeyExp = st.key_expires_at;
-                startKeyCountdown(st.key_expires_at);
-            }
+            document.getElementById('balance-display').innerText = st.balance.toLocaleString();
+            if (st.key_expires_at) startKeyCountdown(st.key_expires_at);
         });
 
-        // Cập nhật dự đoán phiên mới
+        // Cập nhật phiên và dự đoán mới
         socket.on('session_update', (data) => {
             const predEl = document.getElementById('pred-display');
-            const confEl = document.getElementById('conf-display');
+            if (data.session_id) document.getElementById('current-session').innerText = '#' + data.session_id;
             
             if (data.prediction) {
                 predEl.innerText = data.prediction.toUpperCase();
-                predEl.style.color = data.prediction.toUpperCase().includes('T') ? 'var(--success)' : 'var(--danger)';
-                confEl.innerText = 'Độ tin cậy: ' + (data.conf || '--') + '%';
-            } else {
-                predEl.innerText = '--';
-                predEl.style.color = 'var(--text-muted)';
-                confEl.innerText = data.api_error || 'Đang phân tích...';
+                predEl.style.color = data.prediction.toUpperCase().includes('T') ? 'var(--primary)' : 'var(--danger)';
             }
         });
 
-        // Cập nhật kết quả phiên
+        // Cập nhật lịch sử cược (Bảng)
         socket.on('result_update', (data) => {
-            // Có thể thêm âm thanh hoặc hiệu ứng ở đây
+            const tbody = document.getElementById('history-body');
+            const tr = document.createElement('tr');
+            
+            const isWin = data.result === 'WIN';
+            const statusColor = isWin ? 'text-success' : 'text-danger';
+            const statusText = isWin ? 'THẮNG CƯỢC' : 'THUA CƯỢC';
+            const predColor = data.prediction === 'TÀI' ? 'text-primary' : 'text-danger';
+            const resColor = data.actual === 'TÀI' ? 'text-primary' : 'text-danger';
+            
+            // Format xúc xắc
+            const dice = data.dice ? data.dice.join(' - ') : '? - ? - ?';
+
+            tr.innerHTML = `
+                <td class="text-muted">#${data.session_id}</td>
+                <td class="${predColor}" style="font-weight:700;">${data.prediction}</td>
+                <td>${data.bet_amount.toLocaleString()}</td>
+                <td class="${resColor}" style="font-weight:700;">${data.actual}</td>
+                <td>${dice}</td>
+                <td class="${statusColor}" style="font-weight:700;">${statusText}</td>
+            `;
+            
+            // Thêm vào đầu bảng
+            tbody.insertBefore(tr, tbody.firstChild);
+            
+            // Giới hạn hiển thị 10 dòng
+            if (tbody.children.length > 10) {
+                tbody.removeChild(tbody.lastChild);
+            }
         });
     </script>
 </body>
