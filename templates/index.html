@@ -312,7 +312,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
 <div class="force-modal" id="forceModal">
   <div class="force-modal-box">
     <h2 id="forceTitle">🔒 Phiên đã kết thúc</h2>
-    <p id="forceMsg">Key đã hết hạn hoặc bị thu hồi.</p>
+    <p id="forceMsg">Vui lòng đăng nhập lại.</p>
     <button onclick="location.reload()">ĐĂNG NHẬP LẠI</button>
   </div>
 </div>
@@ -361,12 +361,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
   </div>
   <div class="form-group">
     <label>Mật khẩu</label>
-    <input type="password" id="password" placeholder="Nhập mật khẩu...">
-  </div>
-  <div class="form-group">
-    <label>Key bản quyền</label>
-    <input type="password" id="loginKeyInput" placeholder="Nhập key login..." onkeydown="if(event.key==='Enter')handleLogin()">
-    <div class="drawer-hint" id="keyStatusHint" style="margin-top:4px">Nhập key do admin cung cấp</div>
+    <input type="password" id="password" placeholder="Nhập mật khẩu..." onkeydown="if(event.key==='Enter')handleLogin()">
   </div>
   <button class="btn-login" id="btnLogin" onclick="handleLogin()">ĐĂNG NHẬP</button>
 
@@ -391,7 +386,6 @@ tr:hover td{background:rgba(96,165,250,.04)}
       <div class="badge badge-online off" id="socketBadge"><div class="dot dot-gray" id="socketDot"></div> Socket: OFF</div>
       <div class="badge badge-auto off" id="autoStatusBadge"><div class="dot dot-gray"></div> AUTO: OFF</div>
       <div class="badge badge-bet off" id="betStatusBadge"><div class="dot dot-gray"></div> CƯỢC: CHỜ</div>
-      <div class="badge badge-key" id="keyBadge"><div class="dot dot-yellow"></div> KEY: —</div>
     </div>
 
     <div class="prediction-box" id="predictionBox">
@@ -449,30 +443,16 @@ let saveTimer = null;
 let lastProcessedSession = 0;
 let mySid = null;
 
-const STORAGE_KEY_BALANCE   = 'lc79_balance';
-const STORAGE_KEY_CONFIG    = 'lc79_config';
-const STORAGE_KEY_LOGIN_KEY = 'lc79_login_key';
-const STORAGE_KEY_SID       = 'lc79_sid';
+const STORAGE_KEY_BALANCE = 'lc79_balance';
+const STORAGE_KEY_CONFIG  = 'lc79_config';
+const STORAGE_KEY_SID     = 'lc79_sid';
 
 /* ============================================
    STORAGE HELPERS
 ============================================ */
-function getSavedLoginKey(){ try{ return localStorage.getItem(STORAGE_KEY_LOGIN_KEY)||''; }catch(e){ return ''; } }
-function setSavedLoginKey(k){ try{ localStorage.setItem(STORAGE_KEY_LOGIN_KEY, k); }catch(e){} }
-
 function saveSid(sid){ try{ if(sid) localStorage.setItem(STORAGE_KEY_SID, sid); }catch(e){} }
 function loadSid(){ try{ return localStorage.getItem(STORAGE_KEY_SID)||null; }catch(e){ return null; } }
 function clearSid(){ try{ localStorage.removeItem(STORAGE_KEY_SID); }catch(e){} }
-
-function formatRemaining(seconds){
-  if(!seconds || seconds <= 0) return '—';
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if(d > 0) return `${d}d ${h}h`;
-  if(h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
 
 /* ============================================
    DRAWER
@@ -622,19 +602,6 @@ function updateBetBadge(betAmount){
   }
 }
 
-function updateKeyBadge(expiresAt){
-  const badge = document.getElementById('keyBadge');
-  if(!expiresAt){ badge.innerHTML='<div class="dot dot-yellow"></div> KEY: —'; return; }
-  const remaining = Math.max(0, expiresAt - Math.floor(Date.now()/1000));
-  if(remaining <= 0){
-    badge.className='badge badge-online off';
-    badge.innerHTML='<div class="dot dot-red"></div> KEY: HẾT HẠN';
-    return;
-  }
-  badge.className='badge badge-key';
-  badge.innerHTML=`<div class="dot dot-yellow"></div> KEY: ${formatRemaining(remaining)}`;
-}
-
 function showForceModal(title, msg){
   document.getElementById('forceTitle').innerText = '🔒 ' + title;
   document.getElementById('forceMsg').innerText = msg;
@@ -664,18 +631,12 @@ function processResult(payload){
 async function handleLogin(){
   const u = document.getElementById('username').value.trim();
   const p = document.getElementById('password').value.trim();
-  const k = document.getElementById('loginKeyInput').value.trim();
 
   if(!u || !p) return toast('Nhập đủ tài khoản/mật khẩu','error');
-  if(!k) return toast('Vui lòng nhập key bản quyền','error');
 
   const btn=document.getElementById('btnLogin');
   btn.disabled=true;
   btn.innerHTML='<span class="spinner"></span> Đang đăng nhập...';
-
-  const hint = document.getElementById('keyStatusHint');
-  hint.style.color = '#94a3b8';
-  hint.innerText = '⏳ Đang xác thực key với server...';
 
   try{
     const r=await fetch('/api/login',{
@@ -684,7 +645,6 @@ async function handleLogin(){
       body:JSON.stringify({
         username: u,
         password: p,
-        key: k
       })
     });
     const d=await r.json();
@@ -692,17 +652,11 @@ async function handleLogin(){
     if(!d.success){
       toast(d.error||'Lỗi đăng nhập','error');
       btn.disabled=false; btn.innerText='ĐĂNG NHẬP';
-      hint.innerText = '❌ ' + (d.error || 'Sai thông tin');
-      hint.style.color = '#f87171';
       return;
     }
 
-    setSavedLoginKey(k);
     mySid = d.sid;
     saveSid(mySid);
-
-    hint.innerText = '✅ Đăng nhập thành công';
-    hint.style.color = '#34d399';
 
     document.getElementById('loginView').style.display='none';
     document.getElementById('mainView').style.display='flex';
@@ -753,7 +707,7 @@ function connectSocket(sid){
   socket.on('force_logout', d => {
     showForceModal(
       d.expired ? 'Key đã hết hạn' : 'Phiên bị thu hồi',
-      d.reason || 'Key không còn hiệu lực.'
+      d.reason || 'Vui lòng đăng nhập lại.'
     );
   });
 
@@ -949,10 +903,6 @@ setInterval(()=>{
   const cfg=loadConfig();
   if(cfg) applyConfigToInputs(cfg);
 
-  const savedKey = getSavedLoginKey();
-  if(savedKey) document.getElementById('loginKeyInput').value = savedKey;
-
-  // Auto-resume nếu có SID cũ (backend sẽ trả về state nếu session còn)
   const savedSid = loadSid();
   if(savedSid){
     mySid = savedSid;
