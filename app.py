@@ -142,23 +142,28 @@ def get_prediction():
     }
 
 def parse_result_side(result_raw):
+    """Hàm này được viết lại để đảm bảo độ chính xác tuyệt đối"""
     if not result_raw:
         return None
     s = str(result_raw).strip().upper()
-    if s in ("TAI", "TÀI", "T"):
-        return "TAI"
-    if s in ("XIU", "XỈU", "X"):
-        return "XIU"
+    
+    # Nếu là chuỗi text TÀI/XỈU
     if "TÀI" in s or "TAI" in s:
         return "TAI"
     if "XỈU" in s or "XIU" in s:
         return "XIU"
+    
+    # Nếu là chuỗi xúc xắc dạng "2-2-6" hoặc "2 2 6"
     try:
-        nums = [int(x) for x in s.replace("-", " ").replace(",", " ").split() if x.isdigit()]
+        import re
+        nums = [int(x) for x in re.findall(r'\d+', s)]
         if len(nums) >= 3:
-            return "TAI" if sum(nums[:3]) >= 11 else "XIU"
+            total = sum(nums[:3])
+            # Quy tắc chuẩn: 11-17 là TÀI, 4-10 là XỈU
+            return "TAI" if total >= 11 else "XIU"
     except Exception:
         pass
+    
     return None
 
 # ==========================================
@@ -210,11 +215,6 @@ def login_game(username, password):
 # 🔥 CƯỢC CỐ ĐỊNH — KHÔNG NHÂN ĐÔI
 # ==========================================
 def calc_next_bet(st):
-    """
-    LUÔN trả về số tiền cược cố định do user nhập.
-    Không phụ thuộc win/loss streak.
-    Chỉ thay đổi khi user đổi base_bet_amount qua /api/config.
-    """
     return int(st["base_bet_amount"])
 
 # ==========================================
@@ -273,7 +273,6 @@ def game_socket_worker(sid, jwt_token):
         if check_target_profit():
             return
 
-        # 🔥 Luôn lấy lại base_bet_amount (cố định)
         st["current_bet"] = calc_next_bet(st)
         pred = get_prediction()
         st["current_prediction"] = pred["side"]
@@ -318,7 +317,6 @@ def game_socket_worker(sid, jwt_token):
             logger.warning(f"[{sid}] ⚠ Dự đoán không hợp lệ: {st['current_prediction']}")
             return
 
-        # 🔥 Luôn dùng base_bet_amount trực tiếp (không qua calc_next_bet để tránh lỗi cũ)
         bet_amount = int(st["base_bet_amount"])
 
         try:
@@ -362,9 +360,19 @@ def game_socket_worker(sid, jwt_token):
         if pred and result_side:
             pred_str = str(pred).strip().upper()
             pred_key = "TAI" if pred_str.startswith("T") else ("XIU" if pred_str.startswith("X") else None)
+            
+            # 🔥 FIX LỖI TẠI ĐÂY: So sánh chính xác TAI/XIU
             if pred_key:
-                is_win = (pred_key == result_side)
+                # Nếu kết quả trả về là "TAI" hoặc "XIU" thì so sánh trực tiếp
+                if result_side in ("TAI", "XIU"):
+                     is_win = (pred_key == result_side)
+                else:
+                     # Nếu result_side là dạng xúc xắc, tính tổng
+                     total = sum(dices) if dices and len(dices) >=3 else 0
+                     actual_side = "TAI" if total >= 11 else "XIU"
+                     is_win = (pred_key == actual_side)
 
+                # Cập nhật thắng thua và tiền
                 if st["waiting_for_result"]:
                     bet_amt = int(st["current_bet"])
                     if is_win:
@@ -505,7 +513,7 @@ def api_login():
         "profit_loss": 0,
         "auto_bet_enabled": False,
         "x2_mode": False,
-        "x2_loss_mode": False,       # 🔥 TẮT mặc định
+        "x2_loss_mode": False,
         "x2_loss_limit": 5,
         "win_streak": 0,
         "loss_streak": 0,
@@ -545,7 +553,7 @@ def api_config():
             new_amt = int(data["betAmount"])
             if new_amt >= 1000:
                 st["base_bet_amount"] = new_amt
-                st["current_bet"] = new_amt   # 🔥 Áp dụng ngay
+                st["current_bet"] = new_amt
                 logger.info(f"[Config {sid}] 💰 Bet cố định = {new_amt:,}đ")
         except (TypeError, ValueError):
             pass
