@@ -26,6 +26,10 @@ GAME_WS_PATH    = "txmd5/"
 GAME_WS_NS      = "/txmd5"
 COMMON_PARAMS   = "cp=R&cl=R&pf=web"
 
+# ===== KEY SERVER =====
+KEY_SERVER_URL     = "https://leminhadminios.onrender.com"
+KEY_CHECK_INTERVAL = 30   # giây — kiểm tra lại key định kỳ
+
 # ==========================================
 # GLOBAL DATA
 # ==========================================
@@ -36,18 +40,98 @@ GLOBAL_HISTORY_LOCK = threading.Lock()
 WEB_SESSIONS = {}
 WS_CLIENTS   = {}
 
-# Cache NGUYÊN VĂN response API
-API_LAST_RAW = {
-    "data": None,      # raw dict
-    "ts": 0,
-    "error": None,
-}
+API_LAST_RAW = {"data": None, "ts": 0, "error": None}
 
 # ==========================================
-# GỌI API — trả nguyên văn, KHÔNG chế biến
+# KEY SERVER HELPERS
+# ==========================================
+def key_server_verify(key, device):
+    try:
+        r = requests.post(
+            f"{KEY_SERVER_URL}/api/verify_key",
+            json={"key": key, "device": device},
+            timeout=15,
+        )
+        return r.json()
+    except Exception as e:
+        logger.error(f"[KeyServer] verify fail: {e}")
+        return {"success": False, "error": f"Không kết nối được server key: {e}"}
+
+def key_server_check(key, device):
+    try:
+        r = requests.post(
+            f"{KEY_SERVER_URL}/api/check_key",
+            json={"key": key, "device": device},
+            timeout=15,
+        )
+        return r.json()
+    except Exception as e:
+        logger.error(f"[KeyServer] check fail: {e}")
+        # Grace: tránh logout nhầm khi server key tạm down
+        return {"success": True, "grace": True, "error": str(e)}
+
+# ==========================================
+# FORCE LOGOUT
+# ==========================================
+def force_logout(sid, reason, expired=False):
+    logger.warning(f"[{sid}] 🔒 FORCE LOGOUT: {reason}")
+    try:
+        socketio.emit("force_logout", {
+            "reason": reason,
+            "expired": expired,
+        }, to=sid)
+    except Exception:
+        pass
+    if sid in WS_CLIENTS:
+        try:
+            WS_CLIENTS[sid].disconnect()
+        except Exception:
+            pass
+        del WS_CLIENTS[sid]
+    if sid in WEB_SESSIONS:
+        del WEB_SESSIONS[sid]
+
+# ==========================================
+# KEY MONITOR WORKER
+# ==========================================
+def key_monitor_worker(sid):
+    st = WEB_SESSIONS.get(sid)
+    if not st:
+        return
+    logger.info(f"[{sid}] Key monitor started ({st['key'][:12]}...)")
+
+    while True:
+        socketio.sleep(KEY_CHECK_INTERVAL)
+        if sid not in WEB_SESSIONS:
+            break
+
+        st = WEB_SESSIONS[sid]
+        key        = st.get("key")
+        device     = st.get("device")
+        expires_at = st.get("key_expires_at", 0)
+
+        if not key or not device:
+            break
+
+        # 1) Local expiry check (nhanh, không phụ thuộc server)
+        if expires_at and time.time() > expires_at:
+            force_logout(sid, "Key đã hết hạn", expired=True)
+            break
+
+        # 2) Server check (bắt trường hợp admin revoke)
+        result = key_server_check(key, device)
+        if not result.get("success") and not result.get("grace"):
+            force_logout(
+                sid,
+                result.get("error", "Key không hợp lệ"),
+                expired=result.get("expired", False),
+            )
+            break
+
+# ==========================================
+# API LỊCH SỬ — giữ nguyên văn
 # ==========================================
 def fetch_api_raw():
-    """Gọi API, trả NGUYÊN VĂN response (dict). Không đoán, không fallback."""
     try:
         url = f"{API_HISTORY_URL}?{COMMON_PARAMS}&at=&_t={int(time.time()*1000)}"
         r = requests.get(url, timeout=5,
@@ -55,8 +139,8 @@ def fetch_api_raw():
                                   "User-Agent": "Mozilla/5.0"})
         r.raise_for_status()
         data = r.json()
-        API_LAST_RAW["data"] = data
-        API_LAST_RAW["ts"] = time.time()
+        API_LAST_RAW["data"]  = data
+        API_LAST_RAW["ts"]    = time.time()
         API_LAST_RAW["error"] = None
         return data
     except Exception as e:
@@ -64,9 +148,6 @@ def fetch_api_raw():
         logger.error(f"[API] Fetch fail: {e}")
         return None
 
-# ==========================================
-# API DATA WORKER — chỉ cache nguyên văn
-# ==========================================
 def api_data_worker():
     logger.info("[API Worker] started")
     last_session_logged = None
@@ -79,12 +160,12 @@ def api_data_worker():
             du_doan    = data.get("du_doan")
             do_tin_cay = data.get("do_tin_cay")
 
-            # Ghi history (chỉ để đối chiếu, không dùng thay prediction)
             if session_id and result_str and session_id != last_session_logged:
                 side = None
-                if "tài" in result_str.lower() or "tai" in result_str.lower():
+                low = result_str.lower()
+                if "tài" in low or "tai" in low:
                     side = "Tài"
-                elif "xỉu" in result_str.lower() or "xiu" in result_str.lower():
+                elif "xỉu" in low or "xiu" in low:
                     side = "Xỉu"
 
                 dices = []
@@ -99,10 +180,8 @@ def api_data_worker():
                     with GLOBAL_HISTORY_LOCK:
                         if not any(h["session"] == session_id for h in GLOBAL_HISTORY[-5:]):
                             GLOBAL_HISTORY.append({
-                                "session": session_id,
-                                "dice": dices,
-                                "side": side,
-                                "ts": time.time(),
+                                "session": session_id, "dice": dices,
+                                "side": side, "ts": time.time(),
                             })
                             if len(GLOBAL_HISTORY) > MAX_GLOBAL_HISTORY:
                                 GLOBAL_HISTORY.pop(0)
@@ -110,66 +189,46 @@ def api_data_worker():
                                         f"du_doan={du_doan} | conf={do_tin_cay}")
                     last_session_logged = session_id
 
-        socketio.sleep(1.5)  # poll 1.5s để bám sát API
+        socketio.sleep(1.5)
 
 socketio.start_background_task(api_data_worker)
 
 # ==========================================
-# DỰ ĐOÁN — CHỈ lấy từ API, KHÔNG fallback random
+# DỰ ĐOÁN — lấy nguyên văn API
 # ==========================================
 def get_prediction():
-    """
-    Trả về dict:
-      {"side": <giá trị API trả>, "conf": <giá trị API trả>, "ready": bool,
-       "api_ok": bool, "api_error": str|None}
-    Nếu API lỗi → side=None, frontend tự hiện "—"
-    """
-    # Dùng cache nếu còn mới (< 1.5s)
     if API_LAST_RAW["data"] and (time.time() - API_LAST_RAW["ts"]) < 1.5:
         data = API_LAST_RAW["data"]
     else:
         data = fetch_api_raw()
 
     if not data:
-        return {
-            "side": None,
-            "conf": None,
-            "ready": False,
-            "api_ok": False,
-            "api_error": API_LAST_RAW.get("error") or "API không phản hồi",
-        }
+        return {"side": None, "conf": None, "ready": False,
+                "api_ok": False,
+                "api_error": API_LAST_RAW.get("error") or "API không phản hồi"}
 
-    du_doan = data.get("du_doan")
+    du_doan    = data.get("du_doan")
     do_tin_cay = data.get("do_tin_cay")
-
-    # KHÔNG capitalize, KHÔNG ép int — giữ NGUYÊN những gì API trả
     side_out = du_doan if du_doan else None
     conf_out = do_tin_cay if do_tin_cay is not None else None
 
     return {
-        "side": side_out,
-        "conf": conf_out,
+        "side": side_out, "conf": conf_out,
         "ready": side_out is not None,
-        "api_ok": True,
-        "api_error": None,
-        "raw": data,  # cho debug
+        "api_ok": True, "api_error": None, "raw": data,
     }
 
 # ==========================================
-# PARSE RESULT — chỉ dùng để so thắng/thua, KHÔNG thay thế API
+# PARSE RESULT
 # ==========================================
 def parse_result_side(result_raw):
     if not result_raw:
         return None
     s = str(result_raw).strip().upper()
-    if s in ("TAI", "TÀI", "T"):
-        return "TAI"
-    if s in ("XIU", "XỈU", "X"):
-        return "XIU"
-    if "TÀI" in s or "TAI" in s:
-        return "TAI"
-    if "XỈU" in s or "XIU" in s:
-        return "XIU"
+    if s in ("TAI", "TÀI", "T"):   return "TAI"
+    if s in ("XIU", "XỈU", "X"):   return "XIU"
+    if "TÀI" in s or "TAI" in s:   return "TAI"
+    if "XỈU" in s or "XIU" in s:   return "XIU"
     try:
         nums = [int(x) for x in s.replace("-", " ").replace(",", " ").split() if x.isdigit()]
         if len(nums) >= 3:
@@ -179,13 +238,13 @@ def parse_result_side(result_raw):
     return None
 
 # ==========================================
-# LOGIN
+# LOGIN GAME
 # ==========================================
 def md5_hash(t): return hashlib.md5(t.encode()).hexdigest()
 
 def login_game(username, password):
     try:
-        pw = md5_hash(password)
+        pw  = md5_hash(password)
         url = f"{API_LOGIN_URL}?c=3&un={username}&pw={pw}&{COMMON_PARAMS}&at="
         sess = requests.Session()
         headers = {
@@ -202,7 +261,7 @@ def login_game(username, password):
 
         sk = data["sessionKey"]
         sk += "=" * ((4 - len(sk) % 4) % 4)
-        sk_data = json.loads(base64.b64decode(sk).decode("utf-8"))
+        sk_data  = json.loads(base64.b64decode(sk).decode("utf-8"))
         nickname = sk_data.get("nickname") or sk_data.get("nickName")
 
         access_token = data["accessToken"]
@@ -287,22 +346,21 @@ def game_socket_worker(sid, jwt_token):
 
         st["session_id"] = new_id
         st["has_bet_this_session"] = False
-        st["waiting_for_result"] = False
+        st["waiting_for_result"]    = False
 
         if check_target_profit():
             return
 
         st["current_bet"] = calc_next_bet(st)
 
-        # Lấy dự đoán NGUYÊN VĂN từ API
         pred = get_prediction()
-        st["current_prediction"] = pred["side"]  # có thể None nếu API lỗi
-        st["last_api_raw"] = pred.get("raw")
+        st["current_prediction"] = pred["side"]
+        st["last_api_raw"]       = pred.get("raw")
 
         socketio.emit("session_update", {
             "session_id": new_id,
-            "prediction": pred["side"],          # None nếu API không trả
-            "conf": pred["conf"],                # nguyên văn API
+            "prediction": pred["side"],
+            "conf": pred["conf"],
             "ready": pred["ready"],
             "api_ok": pred["api_ok"],
             "api_error": pred["api_error"],
@@ -321,28 +379,25 @@ def game_socket_worker(sid, jwt_token):
         if st["has_bet_this_session"]:
             return
         if not st["current_prediction"]:
-            logger.warning(f"[{sid}] ⚠ Không có dự đoán từ API → bỏ qua đặt cược")
+            logger.warning(f"[{sid}] ⚠ Không có dự đoán → bỏ qua")
             return
         if not st["session_id"]:
             return
 
-        # So khớp "Tài"/"Xỉu" linh hoạt
         pred_str = str(st["current_prediction"]).strip().upper()
-        if pred_str.startswith("T"):
-            bet_type = "TAI"
-        elif pred_str.startswith("X"):
-            bet_type = "XIU"
+        if pred_str.startswith("T"):   bet_type = "TAI"
+        elif pred_str.startswith("X"): bet_type = "XIU"
         else:
-            logger.warning(f"[{sid}] ⚠ Dự đoán không hợp lệ: {st['current_prediction']}")
+            logger.warning(f"[{sid}] ⚠ Dự đoán lạ: {st['current_prediction']}")
             return
 
         try:
             sio.emit("bet", {"type": bet_type, "amount": st["current_bet"]},
                      namespace=GAME_WS_NS)
             st["has_bet_this_session"] = True
-            st["waiting_for_result"] = True
+            st["waiting_for_result"]   = True
             logger.info(f"[{sid}] 🚀 BET {st['current_bet']:,} → {bet_type} "
-                        f"(session {st['session_id']}, pred API={st['current_prediction']})")
+                        f"(pred={st['current_prediction']})")
             socketio.emit("toast", {
                 "type": "info",
                 "msg": f"🚀 Cược {st['current_bet']:,}đ vào {pred_str}"
@@ -369,7 +424,6 @@ def game_socket_worker(sid, jwt_token):
         session_of_result = data.get("id") or st.get("session_id")
 
         result_side = parse_result_side(result_raw)
-
         pred = st.get("current_prediction")
         is_win = None
         profit_delta = 0
@@ -379,63 +433,53 @@ def game_socket_worker(sid, jwt_token):
             pred_key = "TAI" if pred_str.startswith("T") else ("XIU" if pred_str.startswith("X") else None)
             if pred_key:
                 is_win = (pred_key == result_side)
-
                 if st["waiting_for_result"]:
                     bet_amt = int(st["current_bet"])
                     if is_win:
                         profit_delta = int(bet_amt * 0.98)
                         st["profit_loss"] += profit_delta
-                        st["win_streak"] += 1
-                        st["loss_streak"] = 0
-                        st["win_count"] += 1
+                        st["win_streak"]  += 1
+                        st["loss_streak"]  = 0
+                        st["win_count"]   += 1
                     else:
                         profit_delta = -bet_amt
                         st["profit_loss"] += profit_delta
-                        st["win_streak"] = 0
+                        st["win_streak"]   = 0
                         st["loss_streak"] += 1
-                        st["lose_count"] += 1
+                        st["lose_count"]  += 1
                     st["waiting_for_result"] = False
-                    st["balance"] = st["balance"] + profit_delta
+                    st["balance"] += profit_delta
 
                 st["history"].insert(0, {
-                    "session": session_of_result,
-                    "pred": pred,                      # NGUYÊN VĂN
-                    "bet": st["current_bet"],
-                    "result": result_side,
-                    "dice": dices,
-                    "win": is_win,
+                    "session": session_of_result, "pred": pred,
+                    "bet": st["current_bet"], "result": result_side,
+                    "dice": dices, "win": is_win,
                 })
                 st["history"] = st["history"][:30]
 
-        logger.info(f"[{sid}] 📊 Result {session_of_result}: {result_side} "
+        logger.info(f"[{sid}] 📊 {session_of_result}: {result_side} "
                     f"| pred={pred} | win={is_win} | profit={st['profit_loss']:,}")
 
         socketio.emit("result_update", {
             "session": session_of_result,
-            "pred": pred,                                # nguyên văn
-            "result": result_side or result_raw,         # nguyên văn nếu không parse được
-            "dices": dices,
-            "is_win": is_win,
-            "bet": st["current_bet"],
-            "balance": st["balance"],
-            "profit_loss": st["profit_loss"],
-            "profit_delta": profit_delta,
+            "pred": pred, "result": result_side or result_raw,
+            "dices": dices, "is_win": is_win,
+            "bet": st["current_bet"], "balance": st["balance"],
+            "profit_loss": st["profit_loss"], "profit_delta": profit_delta,
             "history": st["history"][:15],
         }, to=sid)
-
         socketio.emit("stats_update", public_state(st), to=sid)
         check_target_profit()
 
     try:
-        logger.info(f"[{sid}] Calling sio.connect()...")
+        logger.info(f"[{sid}] Connecting game socket...")
         connect_headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Origin": "https://tele68.com",
             "Referer": "https://tele68.com/",
         }
-        connect_url = f"{GAME_WS_URL}?token={jwt_token}"
         sio.connect(
-            connect_url,
+            f"{GAME_WS_URL}?token={jwt_token}",
             socketio_path=GAME_WS_PATH,
             namespaces=[GAME_WS_NS],
             headers=connect_headers,
@@ -443,7 +487,6 @@ def game_socket_worker(sid, jwt_token):
             transports=["websocket"],
             wait_timeout=15,
         )
-        logger.info(f"[{sid}] Connected, waiting...")
         sio.wait()
     except Exception as e:
         logger.error(f"[{sid}] ❌ SOCKET ERROR: {type(e).__name__} - {e}")
@@ -474,6 +517,8 @@ def public_state(st):
         "loss_streak": st["loss_streak"],
         "socket_connected": st["socket_connected"],
         "history": st["history"][:15],
+        "key_expires_at": st.get("key_expires_at"),
+        "key_remaining": max(0, (st.get("key_expires_at") or 0) - time.time()),
     }
 
 # ==========================================
@@ -494,20 +539,58 @@ def stats_broadcast_worker():
 socketio.start_background_task(stats_broadcast_worker)
 
 # ==========================================
+# SOCKET JOIN (để nhận event theo room)
+# ==========================================
+@socketio.on("join_session")
+def on_join_session(data):
+    custom_sid = (data or {}).get("sid")
+    if custom_sid and custom_sid in WEB_SESSIONS:
+        from flask_socketio import join_room
+        join_room(custom_sid)
+        logger.info(f"WS join room: {custom_sid}")
+
+# ==========================================
 # ROUTES
 # ==========================================
 @app.route("/")
 def index():
     return render_template("index.html")
 
+@app.route("/api/verify_key", methods=["POST"])
+def api_verify_key():
+    """Pre-check key trước khi login (frontend gọi để hiển thị hạn)."""
+    data   = request.json or {}
+    key    = (data.get("key") or "").strip().upper()
+    device = (data.get("device") or "").strip()
+    if not key or not device:
+        return jsonify({"success": False, "error": "Thiếu key hoặc device"})
+    return jsonify(key_server_verify(key, device))
+
 @app.route("/api/login", methods=["POST"])
 def api_login():
-    data = request.json or {}
+    data     = request.json or {}
     username = (data.get("username") or "").strip()
     password = (data.get("password") or "").strip()
+    key      = (data.get("key") or "").strip().upper()
+    device   = (data.get("device") or "").strip()
+
     if not username or not password:
         return jsonify({"success": False, "error": "Thiếu tài khoản/mật khẩu"})
+    if not key:
+        return jsonify({"success": False, "error": "Thiếu key bản quyền"})
+    if not device:
+        return jsonify({"success": False, "error": "Thiếu mã thiết bị"})
 
+    # Verify key với server key trước
+    kr = key_server_verify(key, device)
+    if not kr.get("success"):
+        return jsonify({
+            "success": False,
+            "error": kr.get("error", "Key không hợp lệ"),
+            "expired": kr.get("expired", False),
+        })
+
+    # Login game
     res = login_game(username, password)
     if "_error" in res:
         return jsonify({"success": False, "error": res["_error"]})
@@ -519,6 +602,9 @@ def api_login():
         "balance": res["money"],
         "token": res["token"],
         "username": username,
+        "key": key,
+        "device": device,
+        "key_expires_at": kr.get("expires_at", 0),
         "profit_loss": 0,
         "auto_bet_enabled": False,
         "x2_mode": False,
@@ -541,12 +627,15 @@ def api_login():
     }
 
     socketio.start_background_task(game_socket_worker, sid, res["token"])
+    socketio.start_background_task(key_monitor_worker, sid)
 
     return jsonify({
         "success": True,
         "sid": sid,
         "nickname": res["nickname"],
         "balance": res["money"],
+        "key_expires_at": kr.get("expires_at"),
+        "key_remaining": kr.get("remaining"),
     })
 
 @app.route("/api/config", methods=["POST"])
@@ -554,7 +643,7 @@ def api_config():
     sid = session.get("sid")
     if not sid or sid not in WEB_SESSIONS:
         return jsonify({"success": False, "error": "Chưa login"})
-    st = WEB_SESSIONS[sid]
+    st   = WEB_SESSIONS[sid]
     data = request.json or {}
 
     if "betAmount" in data:
@@ -562,10 +651,9 @@ def api_config():
             new_amt = int(data["betAmount"])
             if new_amt >= 1000:
                 st["base_bet_amount"] = new_amt
-                st["current_bet"] = new_amt
+                st["current_bet"]     = new_amt
         except (TypeError, ValueError):
             pass
-
     if "auto_bet_enabled" in data:
         st["auto_bet_enabled"] = bool(data["auto_bet_enabled"])
     if "x2_mode" in data:
@@ -592,12 +680,8 @@ def api_stats():
         return jsonify({"success": False})
     return jsonify({"success": True, "state": public_state(WEB_SESSIONS[sid])})
 
-# ==========================================
-# API DEBUG — xem API trả gì NGUYÊN VĂN
-# ==========================================
 @app.route("/api/debug_api")
 def api_debug_api():
-    """Trả NGUYÊN VĂN response API để đối chiếu với UI."""
     data = fetch_api_raw()
     return jsonify({
         "ok": data is not None,
@@ -611,8 +695,8 @@ def api_reset_history():
     sid = session.get("sid")
     if sid and sid in WEB_SESSIONS:
         st = WEB_SESSIONS[sid]
-        st["history"] = []
-        st["win_count"] = 0
+        st["history"]    = []
+        st["win_count"]  = 0
         st["lose_count"] = 0
         st["profit_loss"] = 0
         socketio.emit("stats_update", public_state(st), to=sid)
