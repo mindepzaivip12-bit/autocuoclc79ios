@@ -36,7 +36,7 @@
         body {
             background-color: var(--bg-color);
             color: var(--text-main);
-            padding: 16px;
+            padding: 12px; /* Giảm padding tổng thể */
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -46,16 +46,15 @@
 
         .container {
             width: 100%;
-            max-width: 500px;
+            max-width: 480px; /* Thu nhỏ max-width để vừa mobile */
         }
 
-        /* ===== HIỆU ỨNG VIỀN PHÁT SÁNG ===== */
+        /* Hiệu ứng viền */
         @keyframes borderGlow {
             0% { box-shadow: 0 0 5px rgba(90, 95, 224, 0.2); }
             50% { box-shadow: 0 0 15px rgba(90, 95, 224, 0.6); }
             100% { box-shadow: 0 0 5px rgba(90, 95, 224, 0.2); }
         }
-
         .glow-border {
             border: 1px solid transparent;
             background-clip: padding-box;
@@ -63,208 +62,118 @@
             animation: borderGlow 2.5s infinite alternate;
         }
 
-        /* ===== HEADER LOGO ===== */
+        /* ===== HEADER ===== */
         .header {
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 16px;
+            gap: 10px;
+            margin-bottom: 12px;
             background: var(--card-bg);
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.03);
             position: relative;
             z-index: 10;
         }
         .logo {
-            width: 40px;
-            height: 40px;
+            width: 36px; height: 36px;
             background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
             border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 800;
-            color: #c0392b;
-            font-size: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; color: #c0392b; font-size: 13px;
             box-shadow: 0 2px 8px rgba(246, 211, 101, 0.4);
         }
-        .header-text h1 {
-            font-size: 16px;
-            color: var(--primary);
-            font-weight: 800;
-        }
-        .header-text p {
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-        .menu-icon {
-            margin-left: auto;
-            font-size: 20px;
-            color: var(--text-main);
-            cursor: pointer;
-            padding: 8px;
-            transition: transform 0.2s;
-        }
-        .menu-icon:active { transform: scale(0.9); }
+        .header-text h1 { font-size: 15px; color: var(--primary); font-weight: 800; }
+        .header-text p { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+        .menu-icon { margin-left: auto; font-size: 18px; cursor: pointer; padding: 6px; }
 
         /* ===== CARDS ===== */
         .card {
             background: var(--card-bg);
-            border-radius: 16px;
-            padding: 16px;
+            border-radius: 14px;
+            padding: 14px; /* Giảm padding */
             box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
-        /* ===== LOGIN FORM ===== */
-        .form-group {
-            margin-bottom: 12px;
-        }
-        .form-group label {
-            display: block;
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-muted);
-            margin-bottom: 6px;
-        }
+        /* Form */
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
         .form-control {
-            width: 100%;
-            padding: 12px 16px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 14px;
-            outline: none;
-            transition: all 0.2s;
-            background: #FAFAFA;
+            width: 100%; padding: 10px 14px;
+            border: 1px solid var(--border); border-radius: 8px;
+            font-size: 13px; outline: none; background: #FAFAFA;
         }
-        .form-control:focus {
-            border-color: var(--primary);
-            background: #fff;
-            box-shadow: 0 0 8px rgba(90, 95, 224, 0.2);
-        }
+        .form-control:focus { border-color: var(--primary); background: #fff; }
 
         .btn {
-            width: 100%;
-            padding: 14px;
-            border: none;
-            border-radius: 8px;
-            background: var(--primary);
-            color: white;
-            font-size: 14px;
-            font-weight: 700;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: all 0.2s;
+            width: 100%; padding: 12px;
+            border: none; border-radius: 8px;
+            background: var(--primary); color: white;
+            font-size: 13px; font-weight: 700; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
         }
         .btn:active { transform: scale(0.98); }
-        .btn:disabled { background: #b2bec3; cursor: not-allowed; }
         
-        .btn-auto-off { 
-            background: var(--success); 
-            box-shadow: 0 0 10px rgba(0, 200, 81, 0.4);
-        }
-        .btn-auto-on { 
-            background: var(--danger); 
-            box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
-        }
+        .btn-auto-off { background: var(--success); box-shadow: 0 0 10px rgba(0, 200, 81, 0.4); }
+        .btn-auto-on { background: var(--danger); box-shadow: 0 0 10px rgba(255, 68, 68, 0.4); }
 
-        /* ===== DASHBOARD UI ===== */
+        /* ===== DASHBOARD ===== */
         #dashboard { display: none; }
 
         .top-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
-            background: var(--card-bg);
-            padding: 10px 16px;
-            border-radius: 12px;
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 10px; background: var(--card-bg);
+            padding: 8px 12px; border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.03);
         }
-        .status-dot {
-            width: 8px; height: 8px; border-radius: 50%;
-            background: var(--danger); display: inline-block;
-            margin-right: 6px;
-        }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); display: inline-block; margin-right: 4px; }
         .status-dot.online { background: var(--success); }
         .badge {
-            font-size: 10px; padding: 4px 8px; border-radius: 20px;
+            font-size: 9px; padding: 3px 6px; border-radius: 20px;
             font-weight: 600; text-transform: uppercase;
-            transition: all 0.3s;
         }
         .badge-green { background: var(--green-light); color: var(--success); }
         .badge-gray { background: #f0f0f0; color: #888; }
         
         /* Prediction Box */
         .pred-box {
-            background: var(--purple-light);
-            border-radius: 12px;
-            padding: 14px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            opacity: 0.6;
-            transition: opacity 0.3s;
+            background: var(--purple-light); border-radius: 10px;
+            padding: 12px; display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; opacity: 0.6; transition: opacity 0.3s;
             border: 1px solid #e0d4ff;
         }
-        .pred-box.active { 
-            opacity: 1; 
-            box-shadow: 0 0 15px rgba(90, 95, 224, 0.15);
-        }
-        .pred-box .label { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px; }
-        .pred-box .value { font-size: 26px; font-weight: 800; color: var(--primary); }
-        .pred-box .session { font-size: 12px; color: var(--text-muted); font-weight: 600; text-align: right; }
+        .pred-box.active { opacity: 1; box-shadow: 0 0 15px rgba(90, 95, 224, 0.15); }
+        .pred-box .label { font-size: 10px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px; }
+        .pred-box .value { font-size: 24px; font-weight: 800; color: var(--primary); }
+        .pred-box .session { font-size: 11px; color: var(--text-muted); font-weight: 600; text-align: right; }
 
         /* Stats Grid */
         .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 12px;
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 8px; margin-bottom: 10px;
         }
-        .stat-box {
-            padding: 10px 12px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            background: #fff;
-        }
-        .stat-box .label { font-size: 10px; color: var(--text-muted); margin-bottom: 2px; font-weight: 600;}
-        .stat-box .value { font-size: 14px; font-weight: 700; }
+        .stat-box { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+        .stat-box .label { font-size: 9px; color: var(--text-muted); margin-bottom: 2px; font-weight: 600;}
+        .stat-box .value { font-size: 13px; font-weight: 700; }
 
         /* Action Buttons */
-        .action-btns {
-            display: flex;
-            gap: 10px;
-            margin-top: 12px;
-        }
+        .action-btns { display: flex; gap: 8px; margin-top: 10px; }
         
-        /* History Table - RÚT GỌN & ĐẦY ĐỦ THÔNG TIN */
+        /* LỊCH SỬ CƯỢC - ĐÃ RÚT GỌN TỐI ĐA ĐỂ KHÔNG BỊ TRÀN */
         .history-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 5px;
-            font-size: 12px;
+            width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 11px;
+            table-layout: fixed; /* Ép bảng không tràn */
         }
         .history-table th {
-            text-align: left;
-            padding: 6px 4px;
-            color: var(--text-muted);
-            font-weight: 600;
-            border-bottom: 1px solid var(--border);
-            font-size: 11px;
-            white-space: nowrap;
+            text-align: left; padding: 6px 2px; color: var(--text-muted);
+            font-weight: 600; border-bottom: 1px solid var(--border);
+            font-size: 10px; white-space: nowrap;
         }
         .history-table td {
-            padding: 8px 4px;
-            border-bottom: 1px solid #f9f9f9;
-            font-weight: 500;
-            white-space: nowrap;
+            padding: 8px 2px; border-bottom: 1px solid #f9f9f9;
+            font-weight: 500; white-space: nowrap;
+            overflow: hidden; text-overflow: ellipsis; /* Cắt chữ nếu quá dài */
         }
         
         .text-success { color: var(--success); font-weight: 700; }
@@ -275,101 +184,57 @@
         .result-win { background-color: rgba(0, 200, 81, 0.05); }
         .result-lose { background-color: rgba(255, 68, 68, 0.05); }
 
-        .empty-history {
-            text-align: center;
-            padding: 20px;
-            color: var(--text-muted);
-            font-style: italic;
-        }
+        .empty-history { text-align: center; padding: 15px; color: var(--text-muted); font-style: italic; }
 
-        /* ===== SIDEBAR MENU ===== */
+        /* ===== SIDEBAR ===== */
         .sidebar {
-            position: fixed;
-            top: 0;
-            right: -320px;
-            width: 300px;
-            height: 100vh;
-            background: var(--sidebar-bg);
-            z-index: 1000;
+            position: fixed; top: 0; right: -300px; width: 280px; height: 100vh;
+            background: var(--sidebar-bg); z-index: 1000;
             transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: 20px;
-            box-shadow: -5px 0 20px rgba(0,0,0,0.2);
-            color: var(--sidebar-text);
-            display: flex;
-            flex-direction: column;
+            padding: 20px; box-shadow: -5px 0 20px rgba(0,0,0,0.2);
+            color: var(--sidebar-text); display: flex; flex-direction: column;
         }
         .sidebar.active { right: 0; }
-        
-        .sidebar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            color: white;
-        }
-        .sidebar-header h3 { font-size: 15px; letter-spacing: 0.5px; }
-        .close-btn { font-size: 20px; cursor: pointer; color: var(--sidebar-text); transition: color 0.2s; }
-        .close-btn:hover { color: white; }
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; color: white; }
+        .sidebar-header h3 { font-size: 14px; }
+        .close-btn { font-size: 18px; cursor: pointer; color: var(--sidebar-text); }
         
         .sidebar-stats {
-            background: rgba(255,255,255,0.05);
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 20px;
-            border: 1px solid rgba(255,255,255,0.05);
+            background: rgba(255,255,255,0.05); border-radius: 10px;
+            padding: 12px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.05);
         }
-        .sidebar-item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 12px;
-            align-items: center;
-        }
+        .sidebar-item { display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center; }
         .sidebar-item:last-child { margin-bottom: 0; }
-        .sidebar-item .label { font-size: 12px; }
-        .sidebar-item .value { font-size: 14px; font-weight: 700; color: white; }
+        .sidebar-item .label { font-size: 11px; }
+        .sidebar-item .value { font-size: 13px; font-weight: 700; color: white; }
         
         .sidebar-item.profit .value { color: var(--success); text-shadow: 0 0 8px rgba(0,200,81,0.3); }
         .sidebar-item.loss .value { color: var(--danger); text-shadow: 0 0 8px rgba(255,68,68,0.3); }
 
         .sidebar-form { margin-bottom: 20px; }
-        .sidebar-form label {
-            color: var(--sidebar-text);
-            font-size: 12px;
-            margin-bottom: 8px;
-            display: block;
-        }
+        .sidebar-form label { color: var(--sidebar-text); font-size: 11px; margin-bottom: 6px; display: block; }
         .sidebar-form input {
-            background: rgba(0,0,0,0.2);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: white;
-            padding: 10px 12px;
-            width: 100%;
-            border-radius: 8px;
-            outline: none;
+            background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1);
+            color: white; padding: 10px; width: 100%; border-radius: 8px; outline: none; font-size: 13px;
         }
         .sidebar-form input:focus { border-color: var(--primary); }
 
         .overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.4);
-            backdrop-filter: blur(2px);
-            z-index: 999;
-            display: none;
-            opacity: 0;
-            transition: opacity 0.3s;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4); backdrop-filter: blur(2px);
+            z-index: 999; display: none; opacity: 0; transition: opacity 0.3s;
         }
         .overlay.active { display: block; opacity: 1; }
 
         /* ===== TOAST ===== */
         #toast-container {
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            position: fixed; top: 15px; left: 50%; transform: translateX(-50%);
             z-index: 9999; display: flex; flex-direction: column; gap: 8px;
-            width: 90%; max-width: 400px; pointer-events: none;
+            width: 90%; max-width: 350px; pointer-events: none;
         }
         .toast {
-            padding: 12px 20px; border-radius: 8px; color: white;
-            font-size: 14px; font-weight: 500; text-align: center;
+            padding: 10px 16px; border-radius: 8px; color: white;
+            font-size: 13px; font-weight: 500; text-align: center;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: slideDown 0.3s;
         }
         .toast.success { background: var(--success); }
@@ -382,7 +247,7 @@
 
     <div id="toast-container"></div>
 
-    <!-- SIDEBAR MENU (3 GẠCH) -->
+    <!-- SIDEBAR -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <h3><i class="fa-solid fa-gear"></i> CÀI ĐẶT & THỐNG KÊ</h3>
@@ -407,31 +272,30 @@
         <div class="sidebar-form">
             <label><i class="fa-solid fa-money-bill-wave"></i> Mức cược cố định (VNĐ)</label>
             <input type="number" id="bet_amount" class="form-control" value="10000" step="1000" min="1000">
-            <small style="color: #888; font-size: 11px; margin-top: 4px; display: block;">*Thay đổi sẽ áp dụng cho phiên tới.</small>
+            <small style="color: #888; font-size: 10px; margin-top: 4px; display: block;">*Áp dụng cho phiên tới.</small>
         </div>
         
-        <button class="btn btn-red" id="btn_logout_sidebar" style="margin-top: auto; box-shadow: none;">
-            <i class="fa-solid fa-power-off"></i> ĐĂNG XUẤT NGAY
+        <button class="btn btn-red" id="btn_logout_sidebar" style="margin-top: auto; box-shadow: none; background: #ff4444;">
+            <i class="fa-solid fa-power-off"></i> ĐĂNG XUẤT
         </button>
     </div>
     <div class="overlay" id="overlay"></div>
 
-    <!-- KHU VỰC CHÍNH -->
+    <!-- MAIN -->
     <div class="container">
-        <!-- HEADER -->
         <div class="header">
             <div class="logo">LC79</div>
             <div class="header-text">
                 <h1>TOOL AUTO LC79</h1>
-                <p>Hệ thống phân tích cầu & dự đoán Tài Xỉu tự động</p>
+                <p>Hệ thống phân tích cầu & dự đoán Tài Xỉu</p>
             </div>
             <i class="fa-solid fa-bars menu-icon" id="open-sidebar"></i>
         </div>
 
-        <!-- ================= MÀN HÌNH ĐĂNG NHẬP ================= -->
+        <!-- LOGIN -->
         <div id="login-screen">
             <div class="card glow-border">
-                <div class="card-title" style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #555; margin-bottom: 16px; font-size: 13px;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #555; margin-bottom: 12px; font-size: 12px;">
                     <i class="fa-solid fa-sliders" style="color: var(--primary);"></i> BẢNG ĐIỀU KHIỂN
                 </div>
                 
@@ -450,24 +314,20 @@
                     <input type="text" id="license_key" class="form-control" placeholder="Dán key vào đây...">
                 </div>
 
-                <button id="btn_login" class="btn">
-                    ĐĂNG NHẬP
-                </button>
+                <button id="btn_login" class="btn">ĐĂNG NHẬP</button>
             </div>
         </div>
 
-        <!-- ================= MÀN HÌNH DASHBOARD ================= -->
+        <!-- DASHBOARD -->
         <div id="dashboard">
-            <!-- Top Bar -->
             <div class="top-bar">
                 <div>
-                    <span class="badge badge-green" style="margin-right: 6px;"><span class="status-dot online"></span> Online</span>
+                    <span class="badge badge-green" style="margin-right: 4px;"><span class="status-dot online"></span> Online</span>
                     <span class="badge badge-gray" id="status-auto-badge">AUTO - OFF</span>
                 </div>
             </div>
 
             <div class="card glow-border">
-                <!-- Box Dự đoán -->
                 <div class="pred-box" id="pred-box">
                     <div>
                         <div class="label">DỰ ĐOÁN AI</div>
@@ -479,7 +339,6 @@
                     </div>
                 </div>
 
-                <!-- Thông số -->
                 <div class="stats-grid">
                     <div class="stat-box">
                         <div class="label">NICKNAME</div>
@@ -503,31 +362,29 @@
                     </div>
                 </div>
 
-                <!-- Nút điều khiển -->
                 <div class="action-btns">
                     <button id="btn_auto" class="btn btn-auto-off"><i class="fa-solid fa-play"></i> BẬT AUTO</button>
                     <button id="btn_logout" class="btn btn-red" style="background: #555;"><i class="fa-solid fa-ban"></i> NGẮT BOT</button>
                 </div>
             </div>
 
-            <!-- Lịch sử cược - CẬP NHẬT CỘT TIỀN CƯỢC & TIỀN THẮNG -->
+            <!-- BẢNG LỊCH SỬ ĐÃ RÚT GỌN CỘT -->
             <div class="card">
-                <div style="font-size: 13px; font-weight: 700; color: #555; margin-bottom: 8px; text-transform: uppercase;">LỊCH SỬ CƯỢC</div>
+                <div style="font-size: 12px; font-weight: 700; color: #555; margin-bottom: 8px; text-transform: uppercase;">LỊCH SỬ CƯỢC</div>
                 <table class="history-table">
                     <thead>
                         <tr>
-                            <th>PHIÊN</th>
-                            <th>DỰ ĐOÁN</th>
-                            <th>TIỀN CƯỢC</th>
-                            <th>XÚC XẮC</th>
-                            <th>KẾT QUẢ</th>
-                            <th>TIỀN THẮNG</th>
+                            <th style="width: 20%;">PHIÊN</th>
+                            <th style="width: 20%;">D.ĐOÁN</th>
+                            <th style="width: 20%;">CƯỢC</th>
+                            <th style="width: 20%;">KẾT QUẢ</th>
+                            <th style="width: 20%;">LÃI</th>
                         </tr>
                     </thead>
                     <tbody id="history-body">
                         <tr>
-                            <td colspan="6" class="empty-history">
-                                <i class="fa-solid fa-power-off"></i> Vui lòng bấm BẬT AUTO để bắt đầu...
+                            <td colspan="5" class="empty-history">
+                                <i class="fa-solid fa-power-off"></i> Bấm BẬT AUTO để chạy...
                             </td>
                         </tr>
                     </tbody>
@@ -536,7 +393,6 @@
         </div>
     </div>
 
-    <!-- ================= SCRIPTS ================= -->
     <script>
         const socket = io();
         let isAutoRunning = false; 
@@ -560,7 +416,6 @@
             return 'DEV-' + Math.abs(h).toString(16);
         }
 
-        // LOGIC MỞ/ĐÓNG SIDEBAR
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('overlay');
         
@@ -577,7 +432,6 @@
         document.getElementById('close-sidebar').addEventListener('click', closeSidebar);
         overlay.addEventListener('click', closeSidebar);
 
-        // ĐĂNG NHẬP
         document.getElementById('btn_login').addEventListener('click', async function() {
             const btn = this;
             const username = document.getElementById('username').value.trim();
@@ -609,11 +463,11 @@
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('dashboard').style.display = 'block';
                 
-                document.getElementById('nickname-display').innerText = data.nickname;
-                updateBalance(data.balance);
+                // Fix lỗi undefined nếu data trả về thiếu
+                document.getElementById('nickname-display').innerText = data.nickname || 'Thành viên';
+                updateBalance(data.balance || 0);
                 
                 toggleAutoUI(false);
-
                 socket.emit('join_session', { sid: data.sid });
 
             } catch (err) {
@@ -622,7 +476,6 @@
             }
         });
 
-        // CẬP NHẬT SỐ DƯ
         let currentBalance = 0;
         let initialBalance = 0;
         
@@ -649,7 +502,6 @@
             }
         }
 
-        // LƯU TIỀN CƯỢC
         const betInput = document.getElementById('bet_amount');
         const betDisplay = document.getElementById('bet-display');
         
@@ -663,7 +515,6 @@
             const val = this.value;
             localStorage.setItem('lc79_bet_amount', val);
             betDisplay.innerText = parseInt(val || 0).toLocaleString();
-            
             fetch('/api/config', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -671,7 +522,6 @@
             });
         });
 
-        // BẬT / TẮT AUTO
         const btnAuto = document.getElementById('btn_auto');
         const statusBadge = document.getElementById('status-auto-badge');
         const statusText = document.getElementById('status-text');
@@ -718,7 +568,6 @@
             toggleAutoUI(!isAutoRunning);
         });
 
-        // ĐĂNG XUẤT
         document.getElementById('btn_logout').addEventListener('click', async function() {
             if (!confirm('Bạn có chắc muốn ngắt bot và đăng xuất?')) return;
             await fetch('/api/logout', { method: 'POST' });
@@ -731,7 +580,6 @@
             location.reload();
         });
 
-        // LẮNG NGHE SOCKET
         socket.on('force_logout', (data) => {
             showToast('🔒 ' + data.reason, 'error');
             setTimeout(() => location.reload(), 2000);
@@ -740,7 +588,7 @@
         socket.on('toast', (data) => showToast(data.msg, data.type || 'info'));
 
         socket.on('stats_update', (st) => {
-            updateBalance(st.balance);
+            updateBalance(st.balance || 0);
         });
 
         socket.on('session_update', (data) => {
@@ -754,53 +602,48 @@
             }
         });
 
-        // CẬP NHẬT LỊCH SỬ VỚI TIỀN CƯỢC VÀ TIỀN THẮNG
+        // XỬ LÝ LỊCH SỬ - ĐÃ FIX LỖI UNDEFINED VÀ CHỈNH CỘT
         socket.on('result_update', (data) => {
             if (!isAutoRunning) return;
 
             const tr = document.createElement('tr');
             
+            // Fix lỗi undefined: Dùng dấu ? để kiểm tra nếu data bị thiếu
             const isWin = data.result === 'WIN';
             const resultClass = isWin ? 'text-success' : 'text-danger';
             const resultText = isWin ? 'THẮNG' : 'THUA';
             
-            const predColor = data.prediction === 'TÀI' ? 'text-primary' : 'text-danger';
+            const prediction = data.prediction ? data.prediction.toUpperCase() : '---';
+            const predColor = prediction === 'TÀI' ? 'text-primary' : 'text-danger';
             
-            const dice = data.dice ? data.dice.join(' - ') : '? - ? - ?';
-            
-            // Tiền cược từ server trả về (hoặc lấy từ input nếu server không trả)
+            const sessionId = data.session_id || '???';
             const betAmount = data.bet_amount || parseInt(betInput.value) || 0;
-            
-            // Tiền thắng: Nếu thắng thì hiển thị số tiền thắng, nếu thua hiển thị 0 hoặc dấu trừ
-            // Giả sử tỷ lệ ăn là 1:1 (cược 10k thắng 10k). Bạn có thể sửa công thức theo ý muốn.
             const winAmount = isWin ? betAmount : 0;
             
-            // Định dạng hiển thị tiền thắng
+            // Format hiển thị lãi
             const winDisplay = isWin 
                 ? `<span class="text-success">+${winAmount.toLocaleString()}</span>` 
                 : `<span class="text-muted">0</span>`;
 
             tr.className = isWin ? 'result-win' : 'result-lose';
 
+            // Gộp cột Xúc xắc vào Kết quả để không bị tràn màn hình
             tr.innerHTML = `
-                <td class="text-muted" style="font-size: 11px;">#${data.session_id}</td>
-                <td class="${predColor}">${data.prediction}</td>
-                <td>${betAmount.toLocaleString()}</td>
-                <td style="font-size: 11px; color: #666;">${dice}</td>
-                <td class="${resultClass}" style="font-size: 13px;">${resultText}</td>
+                <td class="text-muted" style="font-size: 10px;">#${sessionId}</td>
+                <td class="${predColor}" style="font-size: 11px;">${prediction}</td>
+                <td style="font-size: 11px;">${betAmount.toLocaleString()}</td>
+                <td class="${resultClass}" style="font-size: 12px;">${resultText}</td>
                 <td>${winDisplay}</td>
             `;
             
             historyBody.insertBefore(tr, historyBody.firstChild);
             
-            // Đếm win/lose
             let winLoseDisplay = document.getElementById('winlose-display');
             let currentWin = parseInt(winLoseDisplay.innerText.split('/')[0]) || 0;
             let currentLose = parseInt(winLoseDisplay.innerText.split('/')[1]) || 0;
             if (isWin) currentWin++; else currentLose++;
             winLoseDisplay.innerText = `${currentWin} / ${currentLose}`;
             
-            // Giới hạn 10 dòng
             if (historyBody.children.length > 10) {
                 historyBody.removeChild(historyBody.lastChild);
             }
