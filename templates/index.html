@@ -176,13 +176,11 @@ body::after{
 .badge-bet{background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.3)}
 .badge-bet.off{background:rgba(71,85,105,.3);color:#94a3b8;border-color:#334155}
 .badge-bet.active{background:rgba(16,185,129,.15);color:#34d399;border-color:rgba(16,185,129,.4)}
-.badge-key{background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.3)}
 .dot{width:6px;height:6px;border-radius:50%;background:#60a5fa}
 .dot-green{background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.6)}
 .dot-red{background:#f87171;box-shadow:0 0 8px rgba(248,113,113,.6)}
 .dot-gray{background:#64748b}
 .dot-active{background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.8)}
-.dot-yellow{background:#fbbf24;box-shadow:0 0 8px rgba(251,191,36,.6)}
 
 .prediction-box{
   background:linear-gradient(135deg,#0b1220 0%,#0f172a 100%);
@@ -247,13 +245,13 @@ body::after{
 
 .table-title{font-size:13px;color:#93c5fd;font-weight:600;text-transform:uppercase;margin-bottom:15px;letter-spacing:.5px}
 .table-wrapper{overflow-x:auto;border-radius:8px}
-table{width:100%;border-collapse:collapse;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:480px}
 th{
-  text-align:left;padding:12px 10px;color:#94a3b8;font-weight:600;
+  text-align:left;padding:12px 8px;color:#94a3b8;font-weight:600;
   border-bottom:1px solid rgba(96,165,250,0.15);font-size:11px;text-transform:uppercase;
-  background:rgba(96,165,250,.04);letter-spacing:.5px;
+  background:rgba(96,165,250,.04);letter-spacing:.5px;white-space:nowrap;
 }
-td{padding:12px 10px;border-bottom:1px solid #1e293b;font-weight:600;color:#cbd5e1}
+td{padding:12px 8px;border-bottom:1px solid #1e293b;font-weight:600;color:#cbd5e1;white-space:nowrap}
 tr:hover td{background:rgba(96,165,250,.04)}
 .val-tai{color:#60a5fa;text-shadow:0 0 8px rgba(96,165,250,.4)}
 .val-xiu{color:#f87171;text-shadow:0 0 8px rgba(248,113,113,.4)}
@@ -396,7 +394,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
       </div>
       <div class="pred-right">
         <span class="session-label">PHIÊN</span>
-        <span class="session-value" id="sessionValue">%</span>
+        <span class="session-value" id="sessionValue">#—</span>
       </div>
     </div>
 
@@ -404,8 +402,8 @@ tr:hover td{background:rgba(96,165,250,.04)}
       <div class="info-item"><span class="info-label">NICKNAME</span><div class="info-value" id="nicknameDisplay">—</div></div>
       <div class="info-item"><span class="info-label">SỐ DƯ</span><div class="info-value" id="balanceDisplay">0</div></div>
       <div class="info-item"><span class="info-label">CƯỢC PHIÊN</span><div class="info-value" id="betDisplay">0</div></div>
-      <div class="info-item highlight"><span class="info-label">LỢI NHUẬN </span><div class="info-value" id="plDisplay" style="font-size:18px;">0</div></div>
-      <div class="info-item"><span class="info-label">WIN / LOSE</span><div class="info-value"><span class="val-win" id="winCount">0</span> / <span class="val-lose" id="loseCount">0</span></div></div>
+      <div class="info-item highlight"><span class="info-label">LỢI NHUẬN (CHỐT LÃI)</span><div class="info-value" id="plDisplay" style="font-size:18px;">0</div></div>
+      <div class="info-item"><span class="info-label">TỔNG WIN / LOSE</span><div class="info-value"><span class="val-win" id="winCount">0</span> / <span class="val-lose" id="loseCount">0</span></div></div>
       <div class="info-item"><span class="info-label">TRẠNG THÁI AUTO</span><div class="info-value" id="statusText">Chờ kết nối...</div></div>
     </div>
 
@@ -420,7 +418,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
         <thead>
           <tr>
             <th>PHIÊN</th><th>DỰ ĐOÁN</th><th>CƯỢC</th>
-            <th>KẾT QUẢ</th><th>XÚC XẮC</th><th>THẮNG/THUA</th>
+            <th>KẾT QUẢ</th><th>XÚC XẮC</th><th>KẾT LUẬN</th>
           </tr>
         </thead>
         <tbody id="historyBody"></tbody>
@@ -800,8 +798,18 @@ function applyState(s){
   if(s.balance!==undefined) updateBalanceUI(s.balance,true);
   if(s.profit_loss!==undefined) updateProfitUI(s.profit_loss);
 
-  document.getElementById('winCount').innerText=s.win_count??0;
-  document.getElementById('loseCount').innerText=s.lose_count??0;
+  // ✅ Tự đếm Win/Lose nếu backend không trả về sẵn
+  let winCount = s.win_count;
+  let loseCount = s.lose_count;
+  if((winCount === undefined || loseCount === undefined) && Array.isArray(s.history)){
+    winCount = 0; loseCount = 0;
+    s.history.forEach(h => {
+      if(h.win === true) winCount++;
+      else if(h.win === false) loseCount++;
+    });
+  }
+  document.getElementById('winCount').innerText = winCount ?? 0;
+  document.getElementById('loseCount').innerText = loseCount ?? 0;
 
   const betVal=Number(s.current_bet||0);
   document.getElementById('betDisplay').innerText=betVal.toLocaleString();
@@ -847,7 +855,7 @@ function applyState(s){
 }
 
 /* ============================================
-   RENDER HISTORY (nhận diện đúng/sai rõ ràng)
+   RENDER HISTORY
 ============================================ */
 function renderHistory(rows){
   const tb=document.getElementById('historyBody');
