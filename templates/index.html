@@ -442,20 +442,27 @@ tr:hover td{background:rgba(96,165,250,.04)}
 </div>
 
 <script>
+/* ============================================
+   STATE
+============================================ */
 let socket = null;
 let autoOn = false;
 let curState = null;
 let lastBalance = 0;
 let saveTimer = null;
 let lastProcessedSession = 0;
+let keyExpiresAt = 0;
+let mySid = null;   // SID backend trả về, gửi kèm mọi request
 
 const STORAGE_KEY_BALANCE   = 'lc79_balance';
 const STORAGE_KEY_CONFIG    = 'lc79_config';
 const STORAGE_KEY_LOGIN_KEY = 'lc79_login_key';
 const STORAGE_KEY_DEVICE    = 'lc79_device_id';
+const STORAGE_KEY_SID       = 'lc79_sid';
 
-let keyExpiresAt = 0;
-
+/* ============================================
+   DEVICE ID
+============================================ */
 function getDeviceId(){
   try{
     let id = localStorage.getItem(STORAGE_KEY_DEVICE);
@@ -474,8 +481,15 @@ function getDeviceId(){
   }
 }
 
+/* ============================================
+   STORAGE HELPERS
+============================================ */
 function getSavedLoginKey(){ try{ return localStorage.getItem(STORAGE_KEY_LOGIN_KEY)||''; }catch(e){ return ''; } }
 function setSavedLoginKey(k){ try{ localStorage.setItem(STORAGE_KEY_LOGIN_KEY, k); }catch(e){} }
+
+function saveSid(sid){ try{ if(sid) localStorage.setItem(STORAGE_KEY_SID, sid); }catch(e){} }
+function loadSid(){ try{ return localStorage.getItem(STORAGE_KEY_SID)||null; }catch(e){ return null; } }
+function clearSid(){ try{ localStorage.removeItem(STORAGE_KEY_SID); }catch(e){} }
 
 function formatRemaining(seconds){
   if(!seconds || seconds <= 0) return '—';
@@ -487,6 +501,9 @@ function formatRemaining(seconds){
   return `${m}m`;
 }
 
+/* ============================================
+   DRAWER
+============================================ */
 function toggleDrawer(){
   const d = document.getElementById('drawer');
   const o = document.getElementById('drawerOverlay');
@@ -496,19 +513,17 @@ function toggleDrawer(){
   else{ d.classList.add('show'); o.classList.add('show'); h.classList.add('active'); }
 }
 
-function saveBalance(b){ try{ localStorage.setItem(STORAGE_KEY_BALANCE, JSON.stringify({balance:b,timestamp:Date.now()})); }catch(e){} }
-function loadBalance(){ try{ const r=localStorage.getItem(STORAGE_KEY_BALANCE); if(!r)return null; const d=JSON.parse(r); if(Date.now()-d.timestamp<864e5)return d.balance; localStorage.removeItem(STORAGE_KEY_BALANCE); }catch(e){} return null; }
-
+/* ============================================
+   CONFIG
+============================================ */
 function loadConfig(){ try{ const r=localStorage.getItem(STORAGE_KEY_CONFIG); return r?JSON.parse(r):null; }catch(e){ return null; } }
 function saveConfig(cfg){ try{ localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify({...cfg,timestamp:Date.now()})); }catch(e){} }
 function applyConfigToInputs(cfg){
   if(!cfg)return;
-  if(cfg.betAmount!==undefined)    document.getElementById('betAmount').value    = cfg.betAmount;
+  if(cfg.betAmount!==undefined) document.getElementById('betAmount').value = cfg.betAmount;
 }
 function readConfigFromInputs(){
-  return {
-    betAmount:    parseInt(document.getElementById('betAmount').value)    || 10000,
-  };
+  return { betAmount: parseInt(document.getElementById('betAmount').value) || 10000 };
 }
 function showSavedIndicator(id){
   const el=document.getElementById(id); if(!el)return;
@@ -521,19 +536,43 @@ function onConfigChange(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>pushConfigToServer(cfg),500);
 }
+
+/* Headers luôn kèm X-SID để backend fallback nếu cookie mất */
+function apiHeaders(){
+  const h = {'Content-Type':'application/json'};
+  if(mySid) h['X-SID'] = mySid;
+  return h;
+}
+
 async function pushConfigToServer(cfg){
   try{
-    await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},
+    const r = await fetch('/api/config',{
+      method:'POST',
+      headers: apiHeaders(),
       body:JSON.stringify({
-        auto_bet_enabled:autoOn,
-        betAmount:cfg.betAmount,
-        x2_loss_mode:false,
-        target_profit:null
-      })});
+        auto_bet_enabled: autoOn,
+        betAmount: cfg.betAmount,
+        x2_loss_mode: false,
+        target_profit: null
+      })
+    });
+    const d = await r.json();
+    if(!d.success){
+      // session mất → force login
+      if((d.error||'').toLowerCase().includes('login')){
+        showForceModal('Phiên đăng nhập đã hết', 'Vui lòng đăng nhập lại.');
+        return;
+      }
+      toast('Lỗi lưu cài đặt: ' + (d.error||'unknown'),'error');
+      return;
+    }
     toast('💾 Đã lưu cài đặt cược','success');
   }catch(e){ toast('Lỗi lưu cài đặt: '+e.message,'error'); }
 }
 
+/* ============================================
+   UI HELPERS
+============================================ */
 function showResultFlash(isWin, result, pred){
   const flash=document.getElementById('predResultFlash');
   const box=document.getElementById('predictionBox');
@@ -584,6 +623,7 @@ function toast(msg,type='info'){
   document.getElementById('toasts').appendChild(el);
   setTimeout(()=>el.remove(),3500);
 }
+
 function updateBalanceUI(balance,animate=false){
   const el=document.getElementById('balanceDisplay');
   const newVal=Number(balance).toLocaleString();
@@ -593,11 +633,15 @@ function updateBalanceUI(balance,animate=false){
   }
   lastBalance=balance; saveBalance(balance);
 }
+function saveBalance(b){ try{ localStorage.setItem(STORAGE_KEY_BALANCE, JSON.stringify({balance:b,timestamp:Date.now()})); }catch(e){} }
+function loadBalance(){ try{ const r=localStorage.getItem(STORAGE_KEY_BALANCE); if(!r)return null; const d=JSON.parse(r); if(Date.now()-d.timestamp<864e5)return d.balance; localStorage.removeItem(STORAGE_KEY_BALANCE); }catch(e){} return null; }
+
 function updateProfitUI(profit){
   const pl=document.getElementById('plDisplay');
   pl.innerText=(profit>=0?'+':'')+Number(profit).toLocaleString();
   pl.style.color=profit>=0?'#34d399':'#f87171';
 }
+
 function updateBetBadge(betAmount){
   const badge=document.getElementById('betStatusBadge');
   if(betAmount>0){
@@ -608,19 +652,31 @@ function updateBetBadge(betAmount){
     badge.innerHTML='<div class="dot dot-gray"></div> CƯỢC: CHỜ';
   }
 }
+
 function updateKeyBadge(expiresAt){
   const badge = document.getElementById('keyBadge');
   if(!expiresAt){ badge.innerHTML='<div class="dot dot-yellow"></div> KEY: —'; return; }
   const remaining = Math.max(0, expiresAt - Math.floor(Date.now()/1000));
   if(remaining <= 0){
-    badge.innerHTML='<div class="dot dot-red"></div> KEY: HẾT HẠN';
     badge.className='badge badge-online off';
+    badge.innerHTML='<div class="dot dot-red"></div> KEY: HẾT HẠN';
     return;
   }
   badge.className='badge badge-key';
   badge.innerHTML=`<div class="dot dot-yellow"></div> KEY: ${formatRemaining(remaining)}`;
 }
 
+function showForceModal(title, msg){
+  document.getElementById('forceTitle').innerText = '🔒 ' + title;
+  document.getElementById('forceMsg').innerText = msg;
+  document.getElementById('forceModal').classList.add('show');
+  if(socket){ try{ socket.disconnect(); }catch(e){} }
+  clearSid();
+}
+
+/* ============================================
+   RESULT PROCESSING
+============================================ */
 function processResult(payload){
   if(!payload) return;
   if(payload.balance!==undefined) updateBalanceUI(payload.balance,true);
@@ -633,17 +689,24 @@ function processResult(payload){
   }
 }
 
+/* ============================================
+   LOGIN
+============================================ */
 async function handleLogin(){
   const u = document.getElementById('username').value.trim();
   const p = document.getElementById('password').value.trim();
   const k = document.getElementById('loginKeyInput').value.trim();
-  
+
   if(!u || !p) return toast('Nhập đủ tài khoản/mật khẩu','error');
   if(!k) return toast('Vui lòng nhập key bản quyền','error');
 
   const btn=document.getElementById('btnLogin');
   btn.disabled=true;
   btn.innerHTML='<span class="spinner"></span> Đang đăng nhập...';
+
+  const hint = document.getElementById('keyStatusHint');
+  hint.style.color = '#94a3b8';
+  hint.innerText = '⏳ Đang xác thực key với server (có thể mất 30-60s nếu server key đang wake-up)...';
 
   try{
     const r=await fetch('/api/login',{
@@ -657,18 +720,23 @@ async function handleLogin(){
       })
     });
     const d=await r.json();
+
     if(!d.success){
       toast(d.error||'Lỗi đăng nhập','error');
-      btn.disabled=false; btn.innerText='ĐĂNG NHẬP'; 
-      document.getElementById('keyStatusHint').innerText = '❌ ' + (d.error || 'Sai thông tin');
-      document.getElementById('keyStatusHint').style.color = '#f87171';
+      btn.disabled=false; btn.innerText='ĐĂNG NHẬP';
+      hint.innerText = '❌ ' + (d.error || 'Sai thông tin');
+      hint.style.color = '#f87171';
       return;
     }
-    
+
+    // Lưu key + sid
     setSavedLoginKey(k);
-    document.getElementById('keyStatusHint').innerText = '✅ Đăng nhập thành công';
-    document.getElementById('keyStatusHint').style.color = '#34d399';
-    
+    mySid = d.sid;
+    saveSid(mySid);
+
+    hint.innerText = '✅ Đăng nhập thành công';
+    hint.style.color = '#34d399';
+
     document.getElementById('loginView').style.display='none';
     document.getElementById('mainView').style.display='flex';
     document.getElementById('nicknameDisplay').innerText=d.nickname;
@@ -687,7 +755,7 @@ async function handleLogin(){
       setTimeout(()=>pushConfigToServer(cachedCfg),300);
     }
 
-    connectSocket(d.sid);
+    connectSocket(mySid);
     toast('Đăng nhập thành công!','success');
     setTimeout(pollStats,500);
   }catch(e){
@@ -696,13 +764,23 @@ async function handleLogin(){
   }
 }
 
+/* ============================================
+   SOCKET
+============================================ */
 function connectSocket(sid){
-  socket=io(window.location.origin,{transports:['websocket','polling']});
+  socket=io(window.location.origin,{
+    transports:['websocket','polling'],
+    reconnection:true,
+    reconnectionAttempts:50,
+    reconnectionDelay:2000
+  });
 
   socket.on('connect',()=>{
     document.getElementById('statusText').innerText='Đã kết nối Server';
     document.getElementById('statusText').style.color='#34d399';
     if(sid) socket.emit('join_session', { sid: sid });
+    // ngay khi connect, kéo state mới
+    setTimeout(pollStats, 300);
   });
   socket.on('disconnect',()=>{
     document.getElementById('statusText').innerText='Mất kết nối Server';
@@ -712,11 +790,10 @@ function connectSocket(sid){
   socket.on('toast',d=>toast(d.msg,d.type));
 
   socket.on('force_logout', d => {
-    const modal = document.getElementById('forceModal');
-    document.getElementById('forceTitle').innerText = d.expired ? '🔒 Key đã hết hạn' : '🔒 Phiên bị thu hồi';
-    document.getElementById('forceMsg').innerText = d.reason || 'Key không còn hiệu lực.';
-    modal.classList.add('show');
-    if(socket){ try{ socket.disconnect(); }catch(e){} }
+    showForceModal(
+      d.expired ? 'Key đã hết hạn' : 'Phiên bị thu hồi',
+      d.reason || 'Key không còn hiệu lực.'
+    );
   });
 
   socket.on('session_update',d=>{
@@ -726,9 +803,11 @@ function connectSocket(sid){
       el.innerText=String(d.prediction).toUpperCase();
       const p = String(d.prediction).toUpperCase();
       el.className='pred-value '+(p.startsWith('T')?'val-tai':'val-xiu');
-      document.getElementById('predPercent').innerText = d.ready?`(Độ tin cậy: ${d.conf}%)`:`(Đang lấy dữ liệu: ${d.history_len}/12)`;
+      document.getElementById('predPercent').innerText = d.ready
+        ? `(Độ tin cậy: ${d.conf}%)`
+        : `(Đang lấy dữ liệu: ${d.history_len||0}/12)`;
     }else{
-      document.getElementById('predPercent').innerText=`(Đang lấy dữ liệu: ${d.history_len}/12)`;
+      document.getElementById('predPercent').innerText = `(Đang lấy dữ liệu: ${d.history_len||0}/12)`;
     }
     const betVal=Number(d.current_bet||0);
     document.getElementById('betDisplay').innerText=betVal.toLocaleString();
@@ -754,37 +833,45 @@ function connectSocket(sid){
   });
 }
 
+/* ============================================
+   POLL
+============================================ */
 async function pollStats(){
   try{
-    const r=await fetch('/api/stats');
+    const r=await fetch('/api/stats',{headers: apiHeaders()});
     const d=await r.json();
-    if(d.success){
-      applyState(d.state);
-      if(d.state.key_expires_at) updateKeyBadge(d.state.key_expires_at);
-      const s=d.state;
-      if(Array.isArray(s.history) && s.history.length){
-        const newest=s.history[0];
-        if(newest && newest.session > lastProcessedSession &&
-           newest.win !== null && newest.win !== undefined && newest.result){
-          processResult({
-            session:newest.session, pred:newest.pred, result:newest.result,
-            is_win:newest.win, dice:newest.dice, bet:newest.bet,
-            balance:s.balance, profit_loss:s.profit_loss, history:s.history
-          });
-        }
+    if(!d.success) return;
+
+    applyState(d.state);
+    if(d.state.key_expires_at) updateKeyBadge(d.state.key_expires_at);
+
+    const s=d.state;
+    if(Array.isArray(s.history) && s.history.length){
+      const newest=s.history[0];
+      if(newest && newest.session > lastProcessedSession &&
+         newest.win !== null && newest.win !== undefined && newest.result){
+        processResult({
+          session:newest.session, pred:newest.pred, result:newest.result,
+          is_win:newest.win, dice:newest.dice, bet:newest.bet,
+          balance:s.balance, profit_loss:s.profit_loss, history:s.history
+        });
       }
     }
   }catch(e){}
 }
 
+/* ============================================
+   APPLY STATE
+============================================ */
 function applyState(s){
-  curState=s; autoOn=s.auto_bet_enabled;
+  if(!s) return;
+  curState=s; autoOn=!!s.auto_bet_enabled;
 
   if(s.balance!==undefined) updateBalanceUI(s.balance,true);
   if(s.profit_loss!==undefined) updateProfitUI(s.profit_loss);
 
-  document.getElementById('winCount').innerText=s.win_count;
-  document.getElementById('loseCount').innerText=s.lose_count;
+  document.getElementById('winCount').innerText=s.win_count??0;
+  document.getElementById('loseCount').innerText=s.lose_count??0;
 
   const betVal=Number(s.current_bet||0);
   document.getElementById('betDisplay').innerText=betVal.toLocaleString();
@@ -829,6 +916,9 @@ function applyState(s){
   if(s.history) renderHistory(s.history);
 }
 
+/* ============================================
+   RENDER HISTORY
+============================================ */
 function renderHistory(rows){
   const tb=document.getElementById('historyBody');
   tb.innerHTML='';
@@ -856,41 +946,69 @@ function renderHistory(rows){
   });
 }
 
+/* ============================================
+   ACTIONS
+============================================ */
 async function toggleAuto(){
   const cfg=readConfigFromInputs(); saveConfig(cfg);
   const newVal=!autoOn;
-  await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      auto_bet_enabled:newVal,
-      betAmount:cfg.betAmount,
-      x2_loss_mode:false,
-      target_profit:null
-    })});
-  toast(newVal?'✅ Đã bật chế độ Auto Cược':'⏸ Đã tắt chế độ Auto Cược',newVal?'success':'info');
-  pollStats();
+  try{
+    const r = await fetch('/api/config',{
+      method:'POST',
+      headers: apiHeaders(),
+      body:JSON.stringify({
+        auto_bet_enabled:newVal,
+        betAmount:cfg.betAmount,
+        x2_loss_mode:false,
+        target_profit:null
+      })
+    });
+    const d = await r.json();
+    if(!d.success){
+      toast(d.error||'Lỗi cấu hình','error');
+      if((d.error||'').toLowerCase().includes('login')){
+        showForceModal('Phiên đăng nhập đã hết', 'Vui lòng đăng nhập lại.');
+      }
+      return;
+    }
+    toast(newVal?'✅ Đã bật chế độ Auto Cược':'⏸ Đã tắt chế độ Auto Cược',newVal?'success':'info');
+    pollStats();
+  }catch(e){ toast('Lỗi: '+e.message,'error'); }
 }
 
 async function stopBot(){
-  await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({auto_bet_enabled:false})});
-  autoOn=false; toast('Đã ngắt Bot khẩn cấp','error'); pollStats();
+  try{
+    await fetch('/api/config',{
+      method:'POST',
+      headers: apiHeaders(),
+      body:JSON.stringify({auto_bet_enabled:false})
+    });
+    autoOn=false; toast('Đã ngắt Bot khẩn cấp','error'); pollStats();
+  }catch(e){ toast('Lỗi: '+e.message,'error'); }
 }
 
 async function resetHistory(){
   if(!confirm('Xóa toàn bộ lịch sử và đưa lợi nhuận về 0?')) return;
-  await fetch('/api/reset_history',{method:'POST'});
-  toast('Đã xóa lịch sử','success');
-  updateProfitUI(0);
-  localStorage.removeItem(STORAGE_KEY_BALANCE);
-  lastProcessedSession=0;
+  try{
+    await fetch('/api/reset_history',{method:'POST', headers: apiHeaders()});
+    toast('Đã xóa lịch sử','success');
+    updateProfitUI(0);
+    localStorage.removeItem(STORAGE_KEY_BALANCE);
+    lastProcessedSession=0;
+  }catch(e){ toast('Lỗi: '+e.message,'error'); }
 }
 
 async function logout(){
   if(!confirm('Đăng xuất khỏi tài khoản?')) return;
-  try{ await fetch('/api/logout',{method:'POST'}); }catch(e){}
+  try{ await fetch('/api/logout',{method:'POST', headers: apiHeaders()}); }catch(e){}
   if(socket){ try{ socket.disconnect(); }catch(e){} }
+  clearSid();
   location.reload();
 }
 
+/* ============================================
+   INIT + HEARTBEAT
+============================================ */
 setInterval(()=>{
   if(socket && socket.connected) pollStats();
   if(keyExpiresAt) updateKeyBadge(keyExpiresAt);
@@ -901,8 +1019,33 @@ setInterval(()=>{
   if(cfg) applyConfigToInputs(cfg);
 
   const savedKey = getSavedLoginKey();
-  if(savedKey){
-    document.getElementById('loginKeyInput').value = savedKey;
+  if(savedKey) document.getElementById('loginKeyInput').value = savedKey;
+
+  // Auto-resume nếu có SID cũ
+  const savedSid = loadSid();
+  if(savedSid){
+    mySid = savedSid;
+    // Thử lấy stats — nếu backend còn session, vào luôn
+    fetch('/api/stats',{headers: apiHeaders()})
+      .then(r=>r.json())
+      .then(d=>{
+        if(d.success && d.state){
+          // session còn sống → resume UI
+          document.getElementById('loginView').style.display='none';
+          document.getElementById('mainView').style.display='flex';
+          document.getElementById('nicknameDisplay').innerText = d.state.nickname || '—';
+          keyExpiresAt = d.state.key_expires_at || 0;
+          updateKeyBadge(keyExpiresAt);
+          applyState(d.state);
+          connectSocket(savedSid);
+          toast('🔄 Đã khôi phục phiên làm việc','success');
+        } else {
+          // session đã mất
+          clearSid();
+          mySid = null;
+        }
+      })
+      .catch(()=>{ clearSid(); mySid = null; });
   }
 })();
 </script>
