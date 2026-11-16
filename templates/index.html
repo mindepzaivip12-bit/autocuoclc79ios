@@ -49,16 +49,30 @@
             max-width: 500px;
         }
 
+        /* ===== HIỆU ỨNG VIỀN PHÁT SÁNG ===== */
+        @keyframes borderGlow {
+            0% { box-shadow: 0 0 5px rgba(90, 95, 224, 0.2); }
+            50% { box-shadow: 0 0 15px rgba(90, 95, 224, 0.6); }
+            100% { box-shadow: 0 0 5px rgba(90, 95, 224, 0.2); }
+        }
+
+        .glow-border {
+            border: 1px solid transparent;
+            background-clip: padding-box;
+            position: relative;
+            animation: borderGlow 2.5s infinite alternate;
+        }
+
         /* ===== HEADER LOGO ===== */
         .header {
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             background: var(--card-bg);
             padding: 12px 16px;
             border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
             position: relative;
             z-index: 10;
         }
@@ -73,6 +87,7 @@
             font-weight: 800;
             color: #c0392b;
             font-size: 14px;
+            box-shadow: 0 2px 8px rgba(246, 211, 101, 0.4);
         }
         .header-text h1 {
             font-size: 16px;
@@ -90,38 +105,29 @@
             color: var(--text-main);
             cursor: pointer;
             padding: 8px;
+            transition: transform 0.2s;
         }
+        .menu-icon:active { transform: scale(0.9); }
 
         /* ===== CARDS ===== */
         .card {
             background: var(--card-bg);
             border-radius: 16px;
-            padding: 20px;
+            padding: 16px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-            margin-bottom: 16px;
-        }
-
-        .card-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            font-weight: 700;
-            color: #555;
-            margin-bottom: 16px;
-            text-transform: uppercase;
+            margin-bottom: 12px;
         }
 
         /* ===== LOGIN FORM ===== */
         .form-group {
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
         .form-group label {
             display: block;
             font-size: 12px;
             font-weight: 600;
             color: var(--text-muted);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .form-control {
             width: 100%;
@@ -136,6 +142,7 @@
         .form-control:focus {
             border-color: var(--primary);
             background: #fff;
+            box-shadow: 0 0 8px rgba(90, 95, 224, 0.2);
         }
 
         .btn {
@@ -157,11 +164,14 @@
         .btn:active { transform: scale(0.98); }
         .btn:disabled { background: #b2bec3; cursor: not-allowed; }
         
-        /* Nút Bật/Tắt Auto */
-        .btn-auto-off { background: var(--success); }
-        .btn-auto-on { background: var(--danger); }
-        .btn-auto-off:hover { background: #00b347; }
-        .btn-auto-on:hover { background: #e63939; }
+        .btn-auto-off { 
+            background: var(--success); 
+            box-shadow: 0 0 10px rgba(0, 200, 81, 0.4);
+        }
+        .btn-auto-on { 
+            background: var(--danger); 
+            box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+        }
 
         /* ===== DASHBOARD UI ===== */
         #dashboard { display: none; }
@@ -170,11 +180,11 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             background: var(--card-bg);
-            padding: 12px 16px;
+            padding: 10px 16px;
             border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
         }
         .status-dot {
             width: 8px; height: 8px; border-radius: 50%;
@@ -194,67 +204,77 @@
         .pred-box {
             background: var(--purple-light);
             border-radius: 12px;
-            padding: 16px;
+            padding: 14px 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
-            opacity: 0.5; /* Làm mờ khi chưa bật auto */
+            margin-bottom: 12px;
+            opacity: 0.6;
             transition: opacity 0.3s;
+            border: 1px solid #e0d4ff;
         }
-        .pred-box.active { opacity: 1; }
-        .pred-box .label { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 4px; }
-        .pred-box .value { font-size: 28px; font-weight: 800; color: var(--primary); }
+        .pred-box.active { 
+            opacity: 1; 
+            box-shadow: 0 0 15px rgba(90, 95, 224, 0.15);
+        }
+        .pred-box .label { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px; }
+        .pred-box .value { font-size: 26px; font-weight: 800; color: var(--primary); }
         .pred-box .session { font-size: 12px; color: var(--text-muted); font-weight: 600; text-align: right; }
 
         /* Stats Grid */
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 16px;
+            gap: 10px;
+            margin-bottom: 12px;
         }
         .stat-box {
-            padding: 12px;
+            padding: 10px 12px;
             border: 1px solid var(--border);
             border-radius: 8px;
+            background: #fff;
         }
-        .stat-box .label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600;}
-        .stat-box .value { font-size: 15px; font-weight: 700; }
+        .stat-box .label { font-size: 10px; color: var(--text-muted); margin-bottom: 2px; font-weight: 600;}
+        .stat-box .value { font-size: 14px; font-weight: 700; }
 
         /* Action Buttons */
         .action-btns {
             display: flex;
-            gap: 12px;
-            margin-top: 20px;
+            gap: 10px;
+            margin-top: 12px;
         }
         
-        /* History Table */
+        /* History Table - RÚT GỌN & ĐẦY ĐỦ THÔNG TIN */
         .history-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
+            margin-top: 5px;
             font-size: 12px;
         }
         .history-table th {
             text-align: left;
-            padding: 8px 0;
+            padding: 6px 4px;
             color: var(--text-muted);
             font-weight: 600;
             border-bottom: 1px solid var(--border);
+            font-size: 11px;
+            white-space: nowrap;
         }
         .history-table td {
-            padding: 10px 0;
+            padding: 8px 4px;
             border-bottom: 1px solid #f9f9f9;
             font-weight: 500;
+            white-space: nowrap;
         }
-        .text-success { color: var(--success); }
-        .text-danger { color: var(--danger); }
-        .text-primary { color: var(--primary); }
-        .text-muted { color: var(--text-muted); }
-        .text-gray { color: #b0b0b0; } /* Màu cho trạng thái chờ */
         
-        /* Hiệu ứng chờ (Loading) cho lịch sử khi chưa bật auto */
+        .text-success { color: var(--success); font-weight: 700; }
+        .text-danger { color: var(--danger); font-weight: 700; }
+        .text-primary { color: var(--primary); font-weight: 700; }
+        .text-muted { color: var(--text-muted); }
+        
+        .result-win { background-color: rgba(0, 200, 81, 0.05); }
+        .result-lose { background-color: rgba(255, 68, 68, 0.05); }
+
         .empty-history {
             text-align: center;
             padding: 20px;
@@ -266,50 +286,52 @@
         .sidebar {
             position: fixed;
             top: 0;
-            right: -300px;
-            width: 280px;
+            right: -320px;
+            width: 300px;
             height: 100vh;
             background: var(--sidebar-bg);
             z-index: 1000;
-            transition: right 0.3s ease;
+            transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             padding: 20px;
-            box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+            box-shadow: -5px 0 20px rgba(0,0,0,0.2);
             color: var(--sidebar-text);
             display: flex;
             flex-direction: column;
         }
         .sidebar.active { right: 0; }
+        
         .sidebar-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             color: white;
         }
-        .sidebar-header h3 { font-size: 16px; }
-        .close-btn { font-size: 20px; cursor: pointer; color: var(--sidebar-text); }
+        .sidebar-header h3 { font-size: 15px; letter-spacing: 0.5px; }
+        .close-btn { font-size: 20px; cursor: pointer; color: var(--sidebar-text); transition: color 0.2s; }
+        .close-btn:hover { color: white; }
         
         .sidebar-stats {
             background: rgba(255,255,255,0.05);
             border-radius: 12px;
             padding: 15px;
             margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.05);
         }
         .sidebar-item {
             display: flex;
             justify-content: space-between;
             margin-bottom: 12px;
+            align-items: center;
         }
         .sidebar-item:last-child { margin-bottom: 0; }
         .sidebar-item .label { font-size: 12px; }
         .sidebar-item .value { font-size: 14px; font-weight: 700; color: white; }
         
-        .sidebar-item.profit .value { color: var(--success); }
-        .sidebar-item.loss .value { color: var(--danger); }
+        .sidebar-item.profit .value { color: var(--success); text-shadow: 0 0 8px rgba(0,200,81,0.3); }
+        .sidebar-item.loss .value { color: var(--danger); text-shadow: 0 0 8px rgba(255,68,68,0.3); }
 
-        .sidebar-form {
-            margin-bottom: 20px;
-        }
+        .sidebar-form { margin-bottom: 20px; }
         .sidebar-form label {
             color: var(--sidebar-text);
             font-size: 12px;
@@ -320,20 +342,24 @@
             background: rgba(0,0,0,0.2);
             border: 1px solid rgba(255,255,255,0.1);
             color: white;
+            padding: 10px 12px;
+            width: 100%;
+            border-radius: 8px;
+            outline: none;
         }
-        .sidebar-form input:focus {
-            border-color: var(--primary);
-            background: rgba(0,0,0,0.4);
-        }
+        .sidebar-form input:focus { border-color: var(--primary); }
 
         .overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(2px);
             z-index: 999;
             display: none;
+            opacity: 0;
+            transition: opacity 0.3s;
         }
-        .overlay.active { display: block; }
+        .overlay.active { display: block; opacity: 1; }
 
         /* ===== TOAST ===== */
         #toast-container {
@@ -359,7 +385,7 @@
     <!-- SIDEBAR MENU (3 GẠCH) -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h3>CÀI ĐẶT & THỐNG KÊ</h3>
+            <h3><i class="fa-solid fa-gear"></i> CÀI ĐẶT & THỐNG KÊ</h3>
             <i class="fa-solid fa-xmark close-btn" id="close-sidebar"></i>
         </div>
         
@@ -381,10 +407,10 @@
         <div class="sidebar-form">
             <label><i class="fa-solid fa-money-bill-wave"></i> Mức cược cố định (VNĐ)</label>
             <input type="number" id="bet_amount" class="form-control" value="10000" step="1000" min="1000">
-            <small style="color: #888; font-size: 11px; margin-top: 4px; display: block;">*Lưu ý: Thay đổi sẽ áp dụng cho phiên tiếp theo.</small>
+            <small style="color: #888; font-size: 11px; margin-top: 4px; display: block;">*Thay đổi sẽ áp dụng cho phiên tới.</small>
         </div>
         
-        <button class="btn btn-red" id="btn_logout_sidebar" style="margin-top: auto;">
+        <button class="btn btn-red" id="btn_logout_sidebar" style="margin-top: auto; box-shadow: none;">
             <i class="fa-solid fa-power-off"></i> ĐĂNG XUẤT NGAY
         </button>
     </div>
@@ -404,9 +430,9 @@
 
         <!-- ================= MÀN HÌNH ĐĂNG NHẬP ================= -->
         <div id="login-screen">
-            <div class="card">
-                <div class="card-title">
-                    <i class="fa-solid fa-sliders"></i> BẢNG ĐIỀU KHIỂN
+            <div class="card glow-border">
+                <div class="card-title" style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #555; margin-bottom: 16px; font-size: 13px;">
+                    <i class="fa-solid fa-sliders" style="color: var(--primary);"></i> BẢNG ĐIỀU KHIỂN
                 </div>
                 
                 <div class="form-group">
@@ -435,17 +461,13 @@
             <!-- Top Bar -->
             <div class="top-bar">
                 <div>
-                    <span class="badge badge-green" style="margin-right: 8px;"><span class="status-dot online"></span> Online</span>
-                    <!-- Trạng thái Auto mặc định là OFF -->
+                    <span class="badge badge-green" style="margin-right: 6px;"><span class="status-dot online"></span> Online</span>
                     <span class="badge badge-gray" id="status-auto-badge">AUTO - OFF</span>
-                </div>
-                <div style="font-size: 12px; color: var(--text-muted);">
-                    <i class="fa-regular fa-clock"></i> <span id="time-left">--:--:--</span>
                 </div>
             </div>
 
-            <div class="card">
-                <!-- Box Dự đoán (Mờ đi khi chưa bật) -->
+            <div class="card glow-border">
+                <!-- Box Dự đoán -->
                 <div class="pred-box" id="pred-box">
                     <div>
                         <div class="label">DỰ ĐOÁN AI</div>
@@ -457,7 +479,7 @@
                     </div>
                 </div>
 
-                <!-- Thông số (Giống ảnh) -->
+                <!-- Thông số -->
                 <div class="stats-grid">
                     <div class="stat-box">
                         <div class="label">NICKNAME</div>
@@ -472,14 +494,10 @@
                         <div class="value" id="bet-display">10,000</div>
                     </div>
                     <div class="stat-box">
-                        <div class="label">RET STEP / GỐC</div>
-                        <div class="value">GỐC</div>
-                    </div>
-                    <div class="stat-box">
                         <div class="label">WIN / LOSE</div>
                         <div class="value" id="winlose-display">0 / 0</div>
                     </div>
-                    <div class="stat-box">
+                    <div class="stat-box" style="grid-column: span 2;">
                         <div class="label">TRẠNG THÁI</div>
                         <div class="value" id="status-text" style="color: var(--text-muted);">Chờ lệnh</div>
                     </div>
@@ -487,24 +505,23 @@
 
                 <!-- Nút điều khiển -->
                 <div class="action-btns">
-                    <!-- Mặc định là nút BẬT AUTO (màu xanh) -->
                     <button id="btn_auto" class="btn btn-auto-off"><i class="fa-solid fa-play"></i> BẬT AUTO</button>
-                    <button id="btn_logout" class="btn btn-red"><i class="fa-solid fa-ban"></i> NGẮT BOT</button>
+                    <button id="btn_logout" class="btn btn-red" style="background: #555;"><i class="fa-solid fa-ban"></i> NGẮT BOT</button>
                 </div>
             </div>
 
-            <!-- Lịch sử cược -->
+            <!-- Lịch sử cược - CẬP NHẬT CỘT TIỀN CƯỢC & TIỀN THẮNG -->
             <div class="card">
-                <div class="card-title">LỊCH SỬ CƯỢC</div>
+                <div style="font-size: 13px; font-weight: 700; color: #555; margin-bottom: 8px; text-transform: uppercase;">LỊCH SỬ CƯỢC</div>
                 <table class="history-table">
                     <thead>
                         <tr>
                             <th>PHIÊN</th>
                             <th>DỰ ĐOÁN</th>
-                            <th>CƯỢC</th>
-                            <th>KẾT QUẢ</th>
+                            <th>TIỀN CƯỢC</th>
                             <th>XÚC XẮC</th>
                             <th>KẾT QUẢ</th>
+                            <th>TIỀN THẮNG</th>
                         </tr>
                     </thead>
                     <tbody id="history-body">
@@ -522,9 +539,8 @@
     <!-- ================= SCRIPTS ================= -->
     <script>
         const socket = io();
-        let isAutoRunning = false; // Biến quản lý trạng thái Auto
+        let isAutoRunning = false; 
 
-        // Hàm hiển thị thông báo
         function showToast(msg, type = 'info') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -537,7 +553,6 @@
             }, 3000);
         }
 
-        // Tạo mã thiết bị
         async function getDeviceFingerprint() {
             const raw = navigator.platform + screen.width + screen.height + navigator.language;
             let h = 0;
@@ -545,7 +560,7 @@
             return 'DEV-' + Math.abs(h).toString(16);
         }
 
-        // LOGIC MỞ/ĐÓNG SIDEBAR (3 GẠCH)
+        // LOGIC MỞ/ĐÓNG SIDEBAR
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('overlay');
         
@@ -562,7 +577,7 @@
         document.getElementById('close-sidebar').addEventListener('click', closeSidebar);
         overlay.addEventListener('click', closeSidebar);
 
-        // Xử lý đăng nhập
+        // ĐĂNG NHẬP
         document.getElementById('btn_login').addEventListener('click', async function() {
             const btn = this;
             const username = document.getElementById('username').value.trim();
@@ -594,16 +609,12 @@
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('dashboard').style.display = 'block';
                 
-                // Hiển thị dữ liệu ban đầu
                 document.getElementById('nickname-display').innerText = data.nickname;
                 updateBalance(data.balance);
                 
-                // Đặt trạng thái Auto ban đầu là OFF (Chưa chạy)
                 toggleAutoUI(false);
 
                 socket.emit('join_session', { sid: data.sid });
-
-                if (data.key_expires_at) startKeyCountdown(data.key_expires_at);
 
             } catch (err) {
                 showToast('❌ Lỗi kết nối!', 'error');
@@ -611,18 +622,17 @@
             }
         });
 
-        // Hàm cập nhật số dư & chốt lãi (Dùng cho sidebar)
+        // CẬP NHẬT SỐ DƯ
         let currentBalance = 0;
         let initialBalance = 0;
         
         function updateBalance(newBalance) {
             currentBalance = newBalance;
-            if (initialBalance === 0) initialBalance = newBalance; // Lưu số dư ban đầu để tính lãi
+            if (initialBalance === 0) initialBalance = newBalance; 
             
             document.getElementById('balance-display').innerText = newBalance.toLocaleString();
             document.getElementById('sidebar-balance').innerText = newBalance.toLocaleString();
             
-            // Tính toán lãi/lỗ
             const diff = newBalance - initialBalance;
             const profitEl = document.getElementById('sidebar-profit');
             const lossEl = document.getElementById('sidebar-loss');
@@ -639,26 +649,7 @@
             }
         }
 
-        // Đếm ngược thời gian Key
-        let countdownInterval = null;
-        function startKeyCountdown(expiresAt) {
-            if (countdownInterval) clearInterval(countdownInterval);
-            const el = document.getElementById('time-left');
-            function tick() {
-                const remaining = Math.max(0, expiresAt - Math.floor(Date.now() / 1000));
-                if (remaining <= 0) {
-                    clearInterval(countdownInterval);
-                    el.innerText = 'HẾT HẠN'; return;
-                }
-                const h = Math.floor(remaining / 3600);
-                const m = Math.floor((remaining % 3600) / 60);
-                const s = remaining % 60;
-                el.innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-            }
-            tick(); countdownInterval = setInterval(tick, 1000);
-        }
-
-        // XỬ LÝ LƯU TIỀN CƯỢC TỰ ĐỘNG (TỪ SIDEBAR)
+        // LƯU TIỀN CƯỢC
         const betInput = document.getElementById('bet_amount');
         const betDisplay = document.getElementById('bet-display');
         
@@ -671,9 +662,8 @@
         betInput.addEventListener('input', function() {
             const val = this.value;
             localStorage.setItem('lc79_bet_amount', val);
-            betDisplay.innerText = parseInt(val || 0).toLocaleString(); // Cập nhật hiển thị ngoài màn hình chính
+            betDisplay.innerText = parseInt(val || 0).toLocaleString();
             
-            // Gửi lên server (nếu cần)
             fetch('/api/config', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -681,7 +671,7 @@
             });
         });
 
-        // ================= LOGIC BẬT / TẮT AUTO =================
+        // BẬT / TẮT AUTO
         const btnAuto = document.getElementById('btn_auto');
         const statusBadge = document.getElementById('status-auto-badge');
         const statusText = document.getElementById('status-text');
@@ -694,65 +684,54 @@
             isAutoRunning = isRunning;
             
             if (isRunning) {
-                // Giao diện khi ĐANG CHẠY
                 btnAuto.className = 'btn btn-auto-on';
                 btnAuto.innerHTML = '<i class="fa-solid fa-stop"></i> TẮT AUTO';
-                
                 statusBadge.className = 'badge badge-green';
                 statusBadge.innerText = 'AUTO - ON';
-                
                 statusText.innerText = 'Đang chạy';
                 statusText.style.color = 'var(--success)';
+                predBox.classList.add('active');
                 
-                predBox.classList.add('active'); // Sáng lên
-                
-                // Xóa thông báo chờ trong bảng lịch sử
                 if (historyBody.querySelector('.empty-history')) {
                     historyBody.innerHTML = '';
                 }
                 
                 showToast('🚀 Đã bật chế độ Auto!', 'success');
-                socket.emit('toggle_auto', { status: true }); // Gửi lệnh lên server
+                socket.emit('toggle_auto', { status: true });
             } else {
-                // Giao diện khi ĐÃ TẮT
                 btnAuto.className = 'btn btn-auto-off';
                 btnAuto.innerHTML = '<i class="fa-solid fa-play"></i> BẬT AUTO';
-                
                 statusBadge.className = 'badge badge-gray';
                 statusBadge.innerText = 'AUTO - OFF';
-                
                 statusText.innerText = 'Chờ lệnh';
                 statusText.style.color = 'var(--text-muted)';
-                
-                predBox.classList.remove('active'); // Mờ đi
+                predBox.classList.remove('active');
                 predDisplay.innerText = '--';
+                sessionDisplay.innerText = '#------';
                 
                 showToast('🛑 Đã tắt chế độ Auto!', 'info');
-                socket.emit('toggle_auto', { status: false }); // Gửi lệnh lên server
+                socket.emit('toggle_auto', { status: false });
             }
         }
 
-        // Bấm nút Bật/Tắt Auto
         btnAuto.addEventListener('click', () => {
             toggleAutoUI(!isAutoRunning);
         });
 
-        // Nút ngắt bot / đăng xuất
+        // ĐĂNG XUẤT
         document.getElementById('btn_logout').addEventListener('click', async function() {
             if (!confirm('Bạn có chắc muốn ngắt bot và đăng xuất?')) return;
             await fetch('/api/logout', { method: 'POST' });
             location.reload();
         });
         
-        // Nút đăng xuất ở Sidebar
         document.getElementById('btn_logout_sidebar').addEventListener('click', async function() {
             if (!confirm('Bạn có chắc muốn đăng xuất?')) return;
             await fetch('/api/logout', { method: 'POST' });
             location.reload();
         });
 
-        // ================= LẮNG NGHE SOCKET =================
-        
+        // LẮNG NGHE SOCKET
         socket.on('force_logout', (data) => {
             showToast('🔒 ' + data.reason, 'error');
             setTimeout(() => location.reload(), 2000);
@@ -760,15 +739,12 @@
 
         socket.on('toast', (data) => showToast(data.msg, data.type || 'info'));
 
-        // Cập nhật số dư, trạng thái
         socket.on('stats_update', (st) => {
             updateBalance(st.balance);
-            if (st.key_expires_at) startKeyCountdown(st.key_expires_at);
         });
 
-        // Cập nhật phiên và dự đoán mới (Chỉ cập nhật khi đang bật Auto)
         socket.on('session_update', (data) => {
-            if (!isAutoRunning) return; // Bỏ qua nếu Auto đang tắt
+            if (!isAutoRunning) return;
 
             if (data.session_id) sessionDisplay.innerText = '#' + data.session_id;
             
@@ -778,41 +754,53 @@
             }
         });
 
-        // Cập nhật lịch sử cược (Chỉ cập nhật khi đang bật Auto)
+        // CẬP NHẬT LỊCH SỬ VỚI TIỀN CƯỢC VÀ TIỀN THẮNG
         socket.on('result_update', (data) => {
-            if (!isAutoRunning) return; // Bỏ qua nếu Auto đang tắt
+            if (!isAutoRunning) return;
 
             const tr = document.createElement('tr');
             
             const isWin = data.result === 'WIN';
-            const statusColor = isWin ? 'text-success' : 'text-danger';
-            const statusText = isWin ? 'THẮNG CƯỢC' : 'THUA CƯỢC';
+            const resultClass = isWin ? 'text-success' : 'text-danger';
+            const resultText = isWin ? 'THẮNG' : 'THUA';
+            
             const predColor = data.prediction === 'TÀI' ? 'text-primary' : 'text-danger';
-            const resColor = data.actual === 'TÀI' ? 'text-primary' : 'text-danger';
             
             const dice = data.dice ? data.dice.join(' - ') : '? - ? - ?';
+            
+            // Tiền cược từ server trả về (hoặc lấy từ input nếu server không trả)
+            const betAmount = data.bet_amount || parseInt(betInput.value) || 0;
+            
+            // Tiền thắng: Nếu thắng thì hiển thị số tiền thắng, nếu thua hiển thị 0 hoặc dấu trừ
+            // Giả sử tỷ lệ ăn là 1:1 (cược 10k thắng 10k). Bạn có thể sửa công thức theo ý muốn.
+            const winAmount = isWin ? betAmount : 0;
+            
+            // Định dạng hiển thị tiền thắng
+            const winDisplay = isWin 
+                ? `<span class="text-success">+${winAmount.toLocaleString()}</span>` 
+                : `<span class="text-muted">0</span>`;
+
+            tr.className = isWin ? 'result-win' : 'result-lose';
 
             tr.innerHTML = `
-                <td class="text-muted">#${data.session_id}</td>
-                <td class="${predColor}" style="font-weight:700;">${data.prediction}</td>
-                <td>${data.bet_amount.toLocaleString()}</td>
-                <td class="${resColor}" style="font-weight:700;">${data.actual}</td>
-                <td>${dice}</td>
-                <td class="${statusColor}" style="font-weight:700;">${statusText}</td>
+                <td class="text-muted" style="font-size: 11px;">#${data.session_id}</td>
+                <td class="${predColor}">${data.prediction}</td>
+                <td>${betAmount.toLocaleString()}</td>
+                <td style="font-size: 11px; color: #666;">${dice}</td>
+                <td class="${resultClass}" style="font-size: 13px;">${resultText}</td>
+                <td>${winDisplay}</td>
             `;
             
-            // Thêm vào đầu bảng
             historyBody.insertBefore(tr, historyBody.firstChild);
             
-            // Cập nhật Win/Lose (Giả lập logic đếm)
-            // Bạn có thể lấy từ server trả về thay vì đếm ở client
+            // Đếm win/lose
             let winLoseDisplay = document.getElementById('winlose-display');
             let currentWin = parseInt(winLoseDisplay.innerText.split('/')[0]) || 0;
             let currentLose = parseInt(winLoseDisplay.innerText.split('/')[1]) || 0;
             if (isWin) currentWin++; else currentLose++;
             winLoseDisplay.innerText = `${currentWin} / ${currentLose}`;
             
-            // Giới hạn hiển thị 10 dòng
+            // Giới hạn 10 dòng
             if (historyBody.children.length > 10) {
                 historyBody.removeChild(historyBody.lastChild);
             }
