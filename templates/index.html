@@ -25,7 +25,6 @@ body::after{
   pointer-events:none;z-index:0;
 }
 
-/* ===== HAMBURGER ===== */
 .hamburger{
   position:fixed;top:20px;left:20px;z-index:1001;
   width:48px;height:48px;border-radius:12px;cursor:pointer;
@@ -39,7 +38,6 @@ body::after{
 .hamburger.active span:nth-child(2){opacity:0}
 .hamburger.active span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
 
-/* ===== DRAWER ===== */
 .drawer-overlay{
   position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
   z-index:1000;opacity:0;pointer-events:none;transition:opacity .3s;
@@ -110,7 +108,6 @@ body::after{
 .btn-apply:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,130,246,.45)}
 .btn-apply:active{transform:translateY(0)}
 
-/* ===== LOGIN ===== */
 .login-container{
   position:relative;z-index:1;
   background:#111827;width:100%;max-width:400px;border-radius:16px;padding:30px;
@@ -147,7 +144,6 @@ body::after{
 .tele-contact:hover{background:rgba(96,165,250,.15);border-color:#60a5fa;transform:translateY(-1px)}
 .tele-contact svg{width:18px;height:18px;fill:#60a5fa}
 
-/* ===== MAIN ===== */
 .main-wrapper{display:none;width:100%;max-width:900px;flex-direction:column;gap:15px;position:relative;z-index:1}
 .top-header{
   background:#111827;border-radius:12px;padding:15px 25px;
@@ -451,35 +447,12 @@ let curState = null;
 let lastBalance = 0;
 let saveTimer = null;
 let lastProcessedSession = 0;
-let keyExpiresAt = 0;
-let mySid = null;   // SID backend trả về, gửi kèm mọi request
+let mySid = null;
 
 const STORAGE_KEY_BALANCE   = 'lc79_balance';
 const STORAGE_KEY_CONFIG    = 'lc79_config';
 const STORAGE_KEY_LOGIN_KEY = 'lc79_login_key';
-const STORAGE_KEY_DEVICE    = 'lc79_device_id';
 const STORAGE_KEY_SID       = 'lc79_sid';
-
-/* ============================================
-   DEVICE ID
-============================================ */
-function getDeviceId(){
-  try{
-    let id = localStorage.getItem(STORAGE_KEY_DEVICE);
-    if(!id){
-      id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
-      id = 'web-' + id;
-      localStorage.setItem(STORAGE_KEY_DEVICE, id);
-    }
-    return id;
-  }catch(e){
-    return 'web-fallback-' + Date.now();
-  }
-}
 
 /* ============================================
    STORAGE HELPERS
@@ -537,7 +510,6 @@ function onConfigChange(){
   saveTimer=setTimeout(()=>pushConfigToServer(cfg),500);
 }
 
-/* Headers luôn kèm X-SID để backend fallback nếu cookie mất */
 function apiHeaders(){
   const h = {'Content-Type':'application/json'};
   if(mySid) h['X-SID'] = mySid;
@@ -552,13 +524,10 @@ async function pushConfigToServer(cfg){
       body:JSON.stringify({
         auto_bet_enabled: autoOn,
         betAmount: cfg.betAmount,
-        x2_loss_mode: false,
-        target_profit: null
       })
     });
     const d = await r.json();
     if(!d.success){
-      // session mất → force login
       if((d.error||'').toLowerCase().includes('login')){
         showForceModal('Phiên đăng nhập đã hết', 'Vui lòng đăng nhập lại.');
         return;
@@ -706,7 +675,7 @@ async function handleLogin(){
 
   const hint = document.getElementById('keyStatusHint');
   hint.style.color = '#94a3b8';
-  hint.innerText = '⏳ Đang xác thực key với server (có thể mất 30-60s nếu server key đang wake-up)...';
+  hint.innerText = '⏳ Đang xác thực key với server...';
 
   try{
     const r=await fetch('/api/login',{
@@ -715,8 +684,7 @@ async function handleLogin(){
       body:JSON.stringify({
         username: u,
         password: p,
-        key: k,
-        device: getDeviceId()
+        key: k
       })
     });
     const d=await r.json();
@@ -729,7 +697,6 @@ async function handleLogin(){
       return;
     }
 
-    // Lưu key + sid
     setSavedLoginKey(k);
     mySid = d.sid;
     saveSid(mySid);
@@ -740,11 +707,6 @@ async function handleLogin(){
     document.getElementById('loginView').style.display='none';
     document.getElementById('mainView').style.display='flex';
     document.getElementById('nicknameDisplay').innerText=d.nickname;
-
-    if(d.key_expires_at){
-      keyExpiresAt = d.key_expires_at;
-      updateKeyBadge(keyExpiresAt);
-    }
 
     const cachedBalance=loadBalance();
     updateBalanceUI(cachedBalance!==null?cachedBalance:d.balance);
@@ -779,7 +741,6 @@ function connectSocket(sid){
     document.getElementById('statusText').innerText='Đã kết nối Server';
     document.getElementById('statusText').style.color='#34d399';
     if(sid) socket.emit('join_session', { sid: sid });
-    // ngay khi connect, kéo state mới
     setTimeout(pollStats, 300);
   });
   socket.on('disconnect',()=>{
@@ -818,18 +779,6 @@ function connectSocket(sid){
 
   socket.on('stats_update',s=>{
     applyState(s);
-    if(s.key_expires_at) updateKeyBadge(s.key_expires_at);
-    if(Array.isArray(s.history) && s.history.length){
-      const newest=s.history[0];
-      if(newest && newest.session > lastProcessedSession &&
-         newest.win !== null && newest.win !== undefined && newest.result){
-        processResult({
-          session:newest.session, pred:newest.pred, result:newest.result,
-          is_win:newest.win, dice:newest.dice, bet:newest.bet,
-          balance:s.balance, profit_loss:s.profit_loss, history:s.history
-        });
-      }
-    }
   });
 }
 
@@ -841,22 +790,7 @@ async function pollStats(){
     const r=await fetch('/api/stats',{headers: apiHeaders()});
     const d=await r.json();
     if(!d.success) return;
-
     applyState(d.state);
-    if(d.state.key_expires_at) updateKeyBadge(d.state.key_expires_at);
-
-    const s=d.state;
-    if(Array.isArray(s.history) && s.history.length){
-      const newest=s.history[0];
-      if(newest && newest.session > lastProcessedSession &&
-         newest.win !== null && newest.win !== undefined && newest.result){
-        processResult({
-          session:newest.session, pred:newest.pred, result:newest.result,
-          is_win:newest.win, dice:newest.dice, bet:newest.bet,
-          balance:s.balance, profit_loss:s.profit_loss, history:s.history
-        });
-      }
-    }
   }catch(e){}
 }
 
@@ -959,8 +893,6 @@ async function toggleAuto(){
       body:JSON.stringify({
         auto_bet_enabled:newVal,
         betAmount:cfg.betAmount,
-        x2_loss_mode:false,
-        target_profit:null
       })
     });
     const d = await r.json();
@@ -1011,7 +943,6 @@ async function logout(){
 ============================================ */
 setInterval(()=>{
   if(socket && socket.connected) pollStats();
-  if(keyExpiresAt) updateKeyBadge(keyExpiresAt);
 }, 3000);
 
 (function init(){
@@ -1021,26 +952,21 @@ setInterval(()=>{
   const savedKey = getSavedLoginKey();
   if(savedKey) document.getElementById('loginKeyInput').value = savedKey;
 
-  // Auto-resume nếu có SID cũ
+  // Auto-resume nếu có SID cũ (backend sẽ trả về state nếu session còn)
   const savedSid = loadSid();
   if(savedSid){
     mySid = savedSid;
-    // Thử lấy stats — nếu backend còn session, vào luôn
     fetch('/api/stats',{headers: apiHeaders()})
       .then(r=>r.json())
       .then(d=>{
         if(d.success && d.state){
-          // session còn sống → resume UI
           document.getElementById('loginView').style.display='none';
           document.getElementById('mainView').style.display='flex';
           document.getElementById('nicknameDisplay').innerText = d.state.nickname || '—';
-          keyExpiresAt = d.state.key_expires_at || 0;
-          updateKeyBadge(keyExpiresAt);
           applyState(d.state);
           connectSocket(savedSid);
           toast('🔄 Đã khôi phục phiên làm việc','success');
         } else {
-          // session đã mất
           clearSid();
           mySid = null;
         }
