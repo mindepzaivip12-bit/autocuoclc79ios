@@ -206,15 +206,16 @@ def login_game(username, password):
         logger.error(f"[Login] {e}")
         return {"_error": f"Lỗi kết nối: {e}"}
 
+# ==========================================
+# 🔥 CƯỢC CỐ ĐỊNH — KHÔNG NHÂN ĐÔI
+# ==========================================
 def calc_next_bet(st):
-    base = int(st["base_bet_amount"])
-    if st["x2_mode"] and st["win_streak"] >= 1:
-        return base * (2 ** min(st["win_streak"], 10))
-    if st["x2_loss_mode"] and st["loss_streak"] >= 1:
-        if st["loss_streak"] <= st["x2_loss_limit"]:
-            return base * (2 ** st["loss_streak"])
-        return base
-    return base
+    """
+    LUÔN trả về số tiền cược cố định do user nhập.
+    Không phụ thuộc win/loss streak.
+    Chỉ thay đổi khi user đổi base_bet_amount qua /api/config.
+    """
+    return int(st["base_bet_amount"])
 
 # ==========================================
 # GAME SOCKET WORKER
@@ -272,10 +273,14 @@ def game_socket_worker(sid, jwt_token):
         if check_target_profit():
             return
 
+        # 🔥 Luôn lấy lại base_bet_amount (cố định)
         st["current_bet"] = calc_next_bet(st)
         pred = get_prediction()
         st["current_prediction"] = pred["side"]
         st["last_api_raw"] = pred.get("raw")
+
+        logger.info(f"[{sid}] 🎯 Session {new_id} | Bet cố định={st['current_bet']:,}đ | "
+                    f"Pred={pred['side']}")
 
         socketio.emit("session_update", {
             "session_id": new_id,
@@ -313,16 +318,20 @@ def game_socket_worker(sid, jwt_token):
             logger.warning(f"[{sid}] ⚠ Dự đoán không hợp lệ: {st['current_prediction']}")
             return
 
+        # 🔥 Luôn dùng base_bet_amount trực tiếp (không qua calc_next_bet để tránh lỗi cũ)
+        bet_amount = int(st["base_bet_amount"])
+
         try:
-            sio.emit("bet", {"type": bet_type, "amount": st["current_bet"]},
+            sio.emit("bet", {"type": bet_type, "amount": bet_amount},
                      namespace=GAME_WS_NS)
             st["has_bet_this_session"] = True
             st["waiting_for_result"] = True
-            logger.info(f"[{sid}] 🚀 BET {st['current_bet']:,} → {bet_type} "
+            st["current_bet"] = bet_amount
+            logger.info(f"[{sid}] 🚀 BET CỐ ĐỊNH {bet_amount:,} → {bet_type} "
                         f"(session {st['session_id']}, pred API={st['current_prediction']})")
             socketio.emit("toast", {
                 "type": "info",
-                "msg": f"🚀 Cược {st['current_bet']:,}đ vào {pred_str}"
+                "msg": f"🚀 Cược {bet_amount:,}đ vào {pred_str}"
             }, to=sid)
         except Exception as e:
             logger.error(f"[{sid}] Bet error: {e}")
@@ -473,7 +482,6 @@ socketio.start_background_task(stats_broadcast_worker)
 def index():
     return render_template("index.html")
 
-# --- LOGIN (KHÔNG CẦN KEY) ---
 @app.route("/api/login", methods=["POST"])
 def api_login():
     data = request.json or {}
@@ -497,7 +505,7 @@ def api_login():
         "profit_loss": 0,
         "auto_bet_enabled": False,
         "x2_mode": False,
-        "x2_loss_mode": True,
+        "x2_loss_mode": False,       # 🔥 TẮT mặc định
         "x2_loss_limit": 5,
         "win_streak": 0,
         "loss_streak": 0,
@@ -537,7 +545,8 @@ def api_config():
             new_amt = int(data["betAmount"])
             if new_amt >= 1000:
                 st["base_bet_amount"] = new_amt
-                st["current_bet"] = new_amt
+                st["current_bet"] = new_amt   # 🔥 Áp dụng ngay
+                logger.info(f"[Config {sid}] 💰 Bet cố định = {new_amt:,}đ")
         except (TypeError, ValueError):
             pass
 
