@@ -290,7 +290,6 @@ tr:hover td{background:rgba(96,165,250,.04)}
 ::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}
 ::-webkit-scrollbar-thumb:hover{background:#334155}
 
-/* ===== FORCE LOGOUT MODAL ===== */
 .force-modal{
   position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);
   z-index:10000;display:none;align-items:center;justify-content:center;padding:20px;
@@ -314,7 +313,6 @@ tr:hover td{background:rgba(96,165,250,.04)}
 
 <div class="toast-wrap" id="toasts"></div>
 
-<!-- FORCE LOGOUT MODAL -->
 <div class="force-modal" id="forceModal">
   <div class="force-modal-box">
     <h2 id="forceTitle">🔒 Phiên đã kết thúc</h2>
@@ -323,7 +321,6 @@ tr:hover td{background:rgba(96,165,250,.04)}
   </div>
 </div>
 
-<!-- HAMBURGER -->
 <div class="hamburger" id="hamburger" onclick="toggleDrawer()">
   <span></span><span></span><span></span>
 </div>
@@ -336,7 +333,6 @@ tr:hover td{background:rgba(96,165,250,.04)}
     <button class="drawer-close" onclick="toggleDrawer()">×</button>
   </div>
 
-  <!-- CƯỢC CỐ ĐỊNH -->
   <div class="drawer-section">
     <div class="drawer-section-title">💰 CƯỢC CỐ ĐỊNH</div>
     <div class="drawer-field">
@@ -361,7 +357,6 @@ tr:hover td{background:rgba(96,165,250,.04)}
   </div>
 </div>
 
-<!-- LOGIN -->
 <div class="login-container" id="loginView">
   <h2>ĐĂNG NHẬP HỆ THỐNG</h2>
   <div class="form-group">
@@ -385,7 +380,6 @@ tr:hover td{background:rgba(96,165,250,.04)}
   </a>
 </div>
 
-<!-- MAIN -->
 <div class="main-wrapper" id="mainView">
   <div class="top-header">
     <div class="logo-text">
@@ -462,7 +456,6 @@ const STORAGE_KEY_DEVICE    = 'lc79_device_id';
 
 let keyExpiresAt = 0;
 
-// ============ DEVICE ID ============
 function getDeviceId(){
   try{
     let id = localStorage.getItem(STORAGE_KEY_DEVICE);
@@ -481,7 +474,6 @@ function getDeviceId(){
   }
 }
 
-// ============ LOGIN KEY ============
 function getSavedLoginKey(){ try{ return localStorage.getItem(STORAGE_KEY_LOGIN_KEY)||''; }catch(e){ return ''; } }
 function setSavedLoginKey(k){ try{ localStorage.setItem(STORAGE_KEY_LOGIN_KEY, k); }catch(e){} }
 
@@ -495,7 +487,6 @@ function formatRemaining(seconds){
   return `${m}m`;
 }
 
-// ============ DRAWER ============
 function toggleDrawer(){
   const d = document.getElementById('drawer');
   const o = document.getElementById('drawerOverlay');
@@ -505,7 +496,6 @@ function toggleDrawer(){
   else{ d.classList.add('show'); o.classList.add('show'); h.classList.add('active'); }
 }
 
-// ============ STORAGE ============
 function saveBalance(b){ try{ localStorage.setItem(STORAGE_KEY_BALANCE, JSON.stringify({balance:b,timestamp:Date.now()})); }catch(e){} }
 function loadBalance(){ try{ const r=localStorage.getItem(STORAGE_KEY_BALANCE); if(!r)return null; const d=JSON.parse(r); if(Date.now()-d.timestamp<864e5)return d.balance; localStorage.removeItem(STORAGE_KEY_BALANCE); }catch(e){} return null; }
 
@@ -537,26 +527,23 @@ async function pushConfigToServer(cfg){
       body:JSON.stringify({
         auto_bet_enabled:autoOn,
         betAmount:cfg.betAmount,
-        x2_loss_mode:false, // Tắt gấp thếp
-        target_profit:null  // Tắt chốt lãi
+        x2_loss_mode:false,
+        target_profit:null
       })});
     toast('💾 Đã lưu cài đặt cược','success');
   }catch(e){ toast('Lỗi lưu cài đặt: '+e.message,'error'); }
 }
 
-// ============ FLASH ============
 function showResultFlash(isWin, result, pred){
   const flash=document.getElementById('predResultFlash');
   const box=document.getElementById('predictionBox');
   if(isWin){
-    flash.innerHTML=`<div class="text-win">✓ THẮNG</div>
-      <small>Phiên trước: ${pred?String(pred).toUpperCase():'—'} → ${result||'—'}</small>`;
+    flash.innerHTML=`<div class="text-win">✓ THẮNG</div><small>Phiên trước: ${pred?String(pred).toUpperCase():'—'} → ${result||'—'}</small>`;
     flash.className='pred-result-flash';
     playSound('win');
     box.style.borderColor='#34d399';
   }else{
-    flash.innerHTML=`<div class="text-lose">✗ THUA</div>
-      <small>Phiên trước: ${pred?String(pred).toUpperCase():'—'} → ${result||'—'}</small>`;
+    flash.innerHTML=`<div class="text-lose">✗ THUA</div><small>Phiên trước: ${pred?String(pred).toUpperCase():'—'} → ${result||'—'}</small>`;
     flash.className='pred-result-flash lose';
     playSound('lose');
     box.style.borderColor='#f87171';
@@ -646,7 +633,6 @@ function processResult(payload){
   }
 }
 
-// ============ LOGIN ============
 async function handleLogin(){
   const u = document.getElementById('username').value.trim();
   const p = document.getElementById('password').value.trim();
@@ -679,7 +665,6 @@ async function handleLogin(){
       return;
     }
     
-    // Thành công
     setSavedLoginKey(k);
     document.getElementById('keyStatusHint').innerText = '✅ Đăng nhập thành công';
     document.getElementById('keyStatusHint').style.color = '#34d399';
@@ -711,7 +696,6 @@ async function handleLogin(){
   }
 }
 
-// ============ SOCKET ============
 function connectSocket(sid){
   socket=io(window.location.origin,{transports:['websocket','polling']});
 
@@ -879,8 +863,8 @@ async function toggleAuto(){
     body:JSON.stringify({
       auto_bet_enabled:newVal,
       betAmount:cfg.betAmount,
-      x2_loss_mode:false, // Tắt gấp thếp
-      target_profit:null  // Tắt chốt lãi
+      x2_loss_mode:false,
+      target_profit:null
     })});
   toast(newVal?'✅ Đã bật chế độ Auto Cược':'⏸ Đã tắt chế độ Auto Cược',newVal?'success':'info');
   pollStats();
@@ -912,7 +896,6 @@ setInterval(()=>{
   if(keyExpiresAt) updateKeyBadge(keyExpiresAt);
 }, 3000);
 
-// ============ INIT ============
 (function init(){
   const cfg=loadConfig();
   if(cfg) applyConfigToInputs(cfg);
