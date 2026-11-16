@@ -26,9 +26,6 @@ GAME_WS_PATH    = "txmd5/"
 GAME_WS_NS      = "/txmd5"
 COMMON_PARAMS   = "cp=R&cl=R&pf=web"
 
-# ✅ API SERVER TẠO KEY
-API_KEY_SERVER  = "https://leminhadminios.onrender.com"
-
 # ==========================================
 # GLOBAL DATA
 # ==========================================
@@ -45,133 +42,8 @@ API_LAST_RAW = {
     "error": None,
 }
 
-# Cache key đã xác thực (tránh gọi API liên tục)
-KEY_CACHE = {}  # {key: {"valid": bool, "expire": ts, "info": dict}}
-
 # ==========================================
-# KEY VALIDATION
-# ==========================================
-def verify_key_with_server(user_key: str) -> dict:
-    """
-    Gọi API server tạo key để xác thực.
-    Trả: {"valid": bool, "message": str, "info": dict}
-    """
-    if not user_key:
-        return {"valid": False, "message": "Thiếu key", "info": {}}
-
-    # Cache 60s
-    cached = KEY_CACHE.get(user_key)
-    if cached and (time.time() - cached["expire"] < 60):
-        return cached["info"]
-
-    try:
-        # Thử nhiều endpoint phổ biến
-        endpoints = [
-            f"{API_KEY_SERVER}/api/check_key",
-            f"{API_KEY_SERVER}/check_key",
-            f"{API_KEY_SERVER}/api/verify",
-            f"{API_KEY_SERVER}/verify",
-        ]
-        last_err = None
-        for url in endpoints:
-            try:
-                r = requests.post(
-                    url,
-                    json={"key": user_key},
-                    timeout=6,
-                    headers={"User-Agent": "Mozilla/5.0",
-                             "Content-Type": "application/json"},
-                )
-                if r.status_code == 404:
-                    continue
-                if r.status_code == 200:
-                    data = r.json()
-                    # Chuẩn hóa response
-                    valid = bool(
-                        data.get("valid")
-                        or data.get("success")
-                        or data.get("ok")
-                        or data.get("status") == "ok"
-                    )
-                    info = {
-                        "valid": valid,
-                        "message": data.get("message") or data.get("msg") or ("OK" if valid else "Key không hợp lệ"),
-                        "info": data.get("data") or data,
-                    }
-                    KEY_CACHE[user_key] = {"valid": valid, "expire": time.time(), "info": info}
-                    return info
-            except Exception as e:
-                last_err = str(e)
-                continue
-
-        # Fallback: thử GET
-        for url in endpoints:
-            try:
-                r = requests.get(
-                    f"{url}?key={user_key}",
-                    timeout=6,
-                    headers={"User-Agent": "Mozilla/5.0"},
-                )
-                if r.status_code == 404:
-                    continue
-                if r.status_code == 200:
-                    data = r.json()
-                    valid = bool(
-                        data.get("valid")
-                        or data.get("success")
-                        or data.get("ok")
-                        or data.get("status") == "ok"
-                    )
-                    info = {
-                        "valid": valid,
-                        "message": data.get("message") or data.get("msg") or ("OK" if valid else "Key không hợp lệ"),
-                        "info": data.get("data") or data,
-                    }
-                    KEY_CACHE[user_key] = {"valid": valid, "expire": time.time(), "info": info}
-                    return info
-            except Exception as e:
-                last_err = str(e)
-                continue
-
-        return {"valid": False, "message": f"Không kết nối được server key: {last_err}", "info": {}}
-
-    except Exception as e:
-        logger.error(f"[KeyVerify] {e}")
-        return {"valid": False, "message": f"Lỗi xác thực key: {e}", "info": {}}
-
-
-def create_key_on_server(account: str, days: int = 1, max_devices: int = 1) -> dict:
-    """
-    Gọi API server để TẠO key mới.
-    """
-    try:
-        endpoints = [
-            f"{API_KEY_SERVER}/api/create_key",
-            f"{API_KEY_SERVER}/create_key",
-            f"{API_KEY_SERVER}/api/create",
-        ]
-        for url in endpoints:
-            try:
-                r = requests.post(
-                    url,
-                    json={"account": account, "days": days, "max_devices": max_devices},
-                    timeout=8,
-                    headers={"User-Agent": "Mozilla/5.0",
-                             "Content-Type": "application/json"},
-                )
-                if r.status_code == 404:
-                    continue
-                if r.status_code == 200:
-                    return {"success": True, "data": r.json()}
-                return {"success": False, "message": f"HTTP {r.status_code}: {r.text[:200]}"}
-            except Exception as e:
-                continue
-        return {"success": False, "message": "Không tìm thấy endpoint tạo key"}
-    except Exception as e:
-        return {"success": False, "message": str(e)}
-
-# ==========================================
-# GỌI API LỊCH SỬ — NGUYÊN VĂN
+# GỌI API LỊCH SỬ
 # ==========================================
 def fetch_api_raw():
     try:
@@ -601,61 +473,15 @@ socketio.start_background_task(stats_broadcast_worker)
 def index():
     return render_template("index.html")
 
-# --- API KEY ---
-@app.route("/api/verify_key", methods=["POST"])
-def api_verify_key():
-    data = request.json or {}
-    user_key = (data.get("key") or "").strip()
-    if not user_key:
-        return jsonify({"success": False, "valid": False, "message": "Thiếu key"})
-
-    res = verify_key_with_server(user_key)
-    return jsonify({
-        "success": res["valid"],
-        "valid": res["valid"],
-        "message": res["message"],
-        "info": res.get("info", {}),
-    })
-
-@app.route("/api/create_key", methods=["POST"])
-def api_create_key():
-    data = request.json or {}
-    account = (data.get("account") or "").strip()
-    days = int(data.get("days") or 1)
-    max_devices = int(data.get("max_devices") or 1)
-    if not account:
-        return jsonify({"success": False, "message": "Thiếu account"})
-    res = create_key_on_server(account, days, max_devices)
-    return jsonify(res)
-
-@app.route("/api/server_status")
-def api_server_status():
-    """Kiểm tra server key còn sống không"""
-    try:
-        r = requests.get(API_KEY_SERVER, timeout=5)
-        return jsonify({"alive": True, "status_code": r.status_code,
-                        "server": API_KEY_SERVER})
-    except Exception as e:
-        return jsonify({"alive": False, "error": str(e),
-                        "server": API_KEY_SERVER})
-
-# --- LOGIN ---
+# --- LOGIN (KHÔNG CẦN KEY) ---
 @app.route("/api/login", methods=["POST"])
 def api_login():
     data = request.json or {}
     username = (data.get("username") or "").strip()
     password = (data.get("password") or "").strip()
-    user_key = (data.get("key") or "").strip()
 
     if not username or not password:
         return jsonify({"success": False, "error": "Thiếu tài khoản/mật khẩu"})
-    if not user_key:
-        return jsonify({"success": False, "error": "Thiếu key bản quyền"})
-
-    # Xác thực key trước
-    key_res = verify_key_with_server(user_key)
-    if not key_res["valid"]:
-        return jsonify({"success": False, "error": f"Key không hợp lệ: {key_res['message']}"})
 
     res = login_game(username, password)
     if "_error" in res:
@@ -668,7 +494,6 @@ def api_login():
         "balance": res["money"],
         "token": res["token"],
         "username": username,
-        "user_key": user_key,
         "profit_loss": 0,
         "auto_bet_enabled": False,
         "x2_mode": False,
@@ -697,7 +522,6 @@ def api_login():
         "sid": sid,
         "nickname": res["nickname"],
         "balance": res["money"],
-        "key_info": key_res.get("info", {}),
     })
 
 @app.route("/api/config", methods=["POST"])
