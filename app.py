@@ -43,7 +43,7 @@ WS_CLIENTS   = {}
 API_LAST_RAW = {"data": None, "ts": 0, "error": None}
 
 # ==========================================
-# KEY SERVER HELPERS (ĐÃ FIX LỖI KẾT NỐI & BẢO TRÌ)
+# KEY SERVER HELPERS (KẾT NỐI SERVER KEY)
 # ==========================================
 def key_server_verify(key, device):
     """Gọi API verify key, có retry nếu server Render đang ngủ hoặc bị Cloudflare chặn."""
@@ -461,13 +461,16 @@ def api_login():
     if not key: return jsonify({"success": False, "error": "Thiếu key bản quyền"})
     if not device: return jsonify({"success": False, "error": "Thiếu mã thiết bị"})
 
+    # 1. Kiểm tra key với Server Key
     kr = key_server_verify(key, device)
     if not kr.get("success"):
         return jsonify({"success": False, "error": kr.get("error", "Key không hợp lệ"), "expired": kr.get("expired", False)})
 
+    # 2. Đăng nhập vào Game
     res = login_game(username, password)
     if "_error" in res: return jsonify({"success": False, "error": res["_error"]})
 
+    # 3. Tạo Session
     sid = os.urandom(8).hex()
     session["sid"] = sid
     WEB_SESSIONS[sid] = {
@@ -477,6 +480,8 @@ def api_login():
         "current_prediction": None, "waiting_for_result": False, "has_bet_this_session": False, "session_id": None,
         "win_count": 0, "lose_count": 0, "socket_connected": False, "history": [], "last_api_raw": None,
     }
+    
+    # 4. Chạy background worker cho Socket Game & Check Key
     socketio.start_background_task(game_socket_worker, sid, res["token"])
     socketio.start_background_task(key_monitor_worker, sid)
 
