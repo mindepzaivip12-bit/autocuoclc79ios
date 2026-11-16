@@ -28,7 +28,7 @@ COMMON_PARAMS   = "cp=R&cl=R&pf=web"
 
 # ===== KEY SERVER =====
 KEY_SERVER_URL     = "https://leminhadminios.onrender.com"
-KEY_CHECK_INTERVAL = 30
+KEY_CHECK_INTERVAL = 30   # giây — kiểm tra lại key định kỳ
 
 # ==========================================
 # GLOBAL DATA
@@ -43,56 +43,66 @@ WS_CLIENTS   = {}
 API_LAST_RAW = {"data": None, "ts": 0, "error": None}
 
 # ==========================================
-# KEY SERVER HELPERS (ĐÃ NÂNG CẤP DEBUG)
+# KEY SERVER HELPERS (ĐÃ FIX LỖI KẾT NỐI & BẢO TRÌ)
 # ==========================================
 def key_server_verify(key, device):
-    """Gọi API verify key, có retry nếu server Render đang ngủ."""
+    """Gọi API verify key, có retry nếu server Render đang ngủ hoặc bị Cloudflare chặn."""
     url = f"{KEY_SERVER_URL}/api/verify_key"
     payload = {"key": key, "device": device}
     
-    # Thử tối đa 3 lần
+    # Giả lập trình duyệt để tránh bị Cloudflare chặn (lỗi 403)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json"
+    }
+    
     for attempt in range(3):
         try:
-            r = requests.post(url, json=payload, timeout=25)
+            r = requests.post(url, json=payload, headers=headers, timeout=20)
             
-            # Log raw response để debug
-            logger.info(f"[KeyServer] Attempt {attempt+1} | Status: {r.status_code} | Body: {r.text[:300]}")
+            # Log ra Terminal để dễ debug
+            logger.info(f"[KeyServer] Attempt {attempt+1} | Status: {r.status_code} | Body: {r.text[:200]}")
             
-            # Nếu server trả về lỗi 5xx (thường do Render đang ngủ)
+            # 1) Nếu lỗi 502/503/504 (Render đang ngủ/khởi động lại) -> Chờ và thử lại
             if r.status_code >= 500:
-                logger.warning(f"[KeyServer] Server đang bảo trì/ngủ (Status {r.status_code}). Chờ 4s...")
                 time.sleep(4)
                 continue
                 
-            # Thử parse JSON
+            # 2) Nếu lỗi 403/404 (Sai API hoặc bị Cloudflare chặn) -> Báo lỗi ngay
+            if r.status_code in (403, 404):
+                return {"success": False, "error": f"Lỗi API ({r.status_code}): Sai đường dẫn hoặc bị chặn."}
+                
+            # 3) Nếu thành công (200) -> Parse JSON
             try:
                 res_json = r.json()
                 return res_json
             except ValueError:
-                # Nếu không phải JSON, trả về lỗi chi tiết từ server
-                error_msg = f"Server key trả về HTML/Lỗi (Status {r.status_code}). Chi tiết: {r.text[:50]}..."
-                logger.error(f"[KeyServer] {error_msg}")
-                if attempt == 2: # Lần cuối vẫn lỗi thì báo
-                    return {"success": False, "error": "Server key đang bảo trì hoặc sai API. Vui lòng báo Admin."}
+                # Server trả về HTML thay vì JSON (thường là trang bảo trì)
+                logger.error(f"[KeyServer] JSON Decode Error. Body: {r.text[:200]}")
+                if attempt == 2:
+                    return {"success": False, "error": "Server Key trả về HTML (Sai API hoặc lỗi 500)."}
                 time.sleep(4)
                 
         except requests.exceptions.RequestException as e:
             logger.error(f"[KeyServer] Lỗi mạng (lần {attempt+1}): {e}")
             if attempt == 2:
-                return {"success": False, "error": "Không thể kết nối tới Server Key."}
+                return {"success": False, "error": "Không thể kết nối tới Server Key (Timeout)."}
             time.sleep(4)
             
-    return {"success": False, "error": "Server Key không phản hồi sau nhiều lần thử."}
+    return {"success": False, "error": "Server Key đang bảo trì hoặc quá tải."}
 
 def key_server_check(key, device):
-    """Check key định kỳ, bỏ qua nếu server key sập."""
+    """Check key định kỳ, không chặn nếu server sập."""
+    url = f"{KEY_SERVER_URL}/api/check_key"
+    headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
     try:
-        r = requests.post(f"{KEY_SERVER_URL}/api/check_key", json={"key": key, "device": device}, timeout=15)
+        r = requests.post(url, json={"key": key, "device": device}, headers=headers, timeout=15)
         if r.status_code >= 500:
-            return {"success": True, "grace": True}
+            return {"success": True, "grace": True} # Bỏ qua nếu server sập
         return r.json()
     except Exception:
-        return {"success": True, "grace": True}
+        return {"success": True, "grace": True} # Mất mạng thì bỏ qua
 
 # ==========================================
 # FORCE LOGOUT
@@ -328,8 +338,7 @@ def game_socket_worker(sid, jwt_token):
             st["has_bet_this_session"] = True
             st["waiting_for_result"]   = True
             socketio.emit("toast", {"type": "info", "msg": f"🚀 Cược {st['current_bet']:,}đ vào {pred_str}"}, to=sid)
-        except Exception as e:
-            pass
+        except Exception: pass
 
     @sio.on("bet-result", namespace=GAME_WS_NS)
     def on_bet_result(data):
