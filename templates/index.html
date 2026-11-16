@@ -3,389 +3,573 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TXMD5 Auto Bot</title>
+<title>Tele68 Auto Bet</title>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-  background:linear-gradient(135deg,#0f0c29 0%,#302b63 50%,#24243e 100%);
-  color:#e0e0e0;min-height:100vh;padding:12px}
-.container{max-width:1200px;margin:0 auto}
-h1{text-align:center;font-size:22px;margin-bottom:12px;
-  background:linear-gradient(90deg,#00e5ff,#ff00ea);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
-  border-radius:14px;padding:14px;margin-bottom:12px;backdrop-filter:blur(10px)}
-.api-badge{display:flex;align-items:center;gap:10px;padding:10px 14px;
-  border-radius:10px;font-weight:600;transition:all .3s}
-.api-badge.ok{background:rgba(0,255,140,.12);border:1px solid rgba(0,255,140,.4);color:#00ff8c}
-.api-badge.fail{background:rgba(255,60,60,.12);border:1px solid rgba(255,60,60,.4);color:#ff5a5a}
-.api-badge.idle{background:rgba(150,150,150,.12);border:1px solid rgba(150,150,150,.4);color:#aaa}
-.api-badge .dot{width:10px;height:10px;border-radius:50%}
-.api-badge.ok .dot{background:#00ff8c;box-shadow:0 0 10px #00ff8c;animation:pulse 1.5s infinite}
-.api-badge.fail .dot{background:#ff5a5a;box-shadow:0 0 10px #ff5a5a;animation:pulse 1.5s infinite}
-.api-badge.idle .dot{background:#888}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-.prediction-box{text-align:center;padding:20px;border-radius:14px;
-  background:rgba(0,0,0,.25);border:2px solid rgba(255,255,255,.1);transition:all .4s}
-.prediction-box.tai{border-color:#ff4d6d;background:rgba(255,77,109,.12)}
-.prediction-box.xiu{border-color:#4dabf7;background:rgba(77,171,247,.12)}
-.prediction-box.idle{border-color:rgba(150,150,150,.3);background:rgba(0,0,0,.15);opacity:.6}
-.pred-label{font-size:12px;letter-spacing:2px;opacity:.7;text-transform:uppercase}
-.pred-side{font-size:46px;font-weight:900;letter-spacing:3px;margin:6px 0;transition:all .3s}
-.pred-side.tai{color:#ff4d6d;text-shadow:0 0 20px rgba(255,77,109,.6)}
-.pred-side.xiu{color:#4dabf7;text-shadow:0 0 20px rgba(77,171,247,.6)}
-.pred-side.idle{color:#666}
-.pred-conf{font-size:14px;opacity:.85}
-.pred-session{font-size:13px;opacity:.7;margin-top:6px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.stat-box{background:rgba(0,0,0,.25);border-radius:10px;padding:10px;text-align:center}
-.stat-label{font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:1px}
-.stat-value{font-size:18px;font-weight:700;margin-top:4px}
-.stat-value.pos{color:#00ff8c}
-.stat-value.neg{color:#ff5a5a}
-input[type=text],input[type=password],input[type=number]{
-  width:100%;padding:10px 12px;background:rgba(255,255,255,.06);
-  border:1px solid rgba(255,255,255,.15);border-radius:8px;
-  color:#fff;font-size:14px;outline:none;transition:all .2s}
-input:focus{border-color:#00e5ff;box-shadow:0 0 0 2px rgba(0,229,255,.2)}
-label{font-size:12px;opacity:.75;display:block;margin-bottom:4px}
-button{padding:11px 16px;border:none;border-radius:8px;cursor:pointer;
-  font-weight:600;font-size:14px;transition:all .2s;width:100%}
-.btn-primary{background:linear-gradient(135deg,#00e5ff,#0077ff);color:#000}
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(0,229,255,.4)}
-.btn-danger{background:linear-gradient(135deg,#ff4d6d,#c9184a);color:#fff}
-button:disabled{opacity:.5;cursor:not-allowed}
-.toggle-row{display:flex;justify-content:space-between;align-items:center;
-  padding:10px;background:rgba(0,0,0,.2);border-radius:8px;margin-bottom:8px}
-.switch{position:relative;width:44px;height:24px}
-.switch input{opacity:0;width:0;height:0}
-.slider{position:absolute;inset:0;background:#444;border-radius:24px;transition:.3s;cursor:pointer}
-.slider:before{content:"";position:absolute;width:18px;height:18px;left:3px;bottom:3px;
-  background:#fff;border-radius:50%;transition:.3s}
-.switch input:checked+.slider{background:linear-gradient(135deg,#00e5ff,#0077ff)}
-.switch input:checked+.slider:before{transform:translateX(20px)}
-.hist-list{max-height:320px;overflow-y:auto}
-.hist-item{display:flex;justify-content:space-between;align-items:center;
-  padding:8px 10px;border-radius:8px;margin-bottom:6px;font-size:13px;background:rgba(0,0,0,.2)}
-.hist-item.win{border-left:3px solid #00ff8c}
-.hist-item.lose{border-left:3px solid #ff5a5a}
-.hist-item.pending{border-left:3px solid #ffd60a}
-.hist-side{font-weight:700;padding:2px 8px;border-radius:6px;font-size:12px}
-.hist-side.tai{background:rgba(255,77,109,.2);color:#ff4d6d}
-.hist-side.xiu{background:rgba(77,171,247,.2);color:#4dabf7}
-#toast-container{position:fixed;top:16px;right:16px;z-index:9999;
-  display:flex;flex-direction:column;gap:8px}
-.toast{padding:12px 18px;border-radius:10px;color:#fff;font-size:13px;
-  font-weight:600;animation:slideIn .3s;min-width:240px;max-width:340px;
-  box-shadow:0 6px 20px rgba(0,0,0,.4)}
-.toast.success{background:linear-gradient(135deg,#00b86b,#007a47)}
-.toast.error{background:linear-gradient(135deg,#c9184a,#8b0a2a)}
-.toast.info{background:linear-gradient(135deg,#0077ff,#0050aa)}
-@keyframes slideIn{from{transform:translateX(120%)}to{transform:translateX(0)}}
-.hidden{display:none!important}
-.section-title{font-size:13px;font-weight:700;opacity:.8;
-  text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    color: #e8e8f0;
+    min-height: 100vh;
+    padding: 12px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; }
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    margin-bottom: 16px;
+    background: linear-gradient(90deg, #00d4ff, #7b2ff7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 800;
+  }
+  .card {
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .card-title {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #8b8ba7;
+    margin-bottom: 12px;
+    font-weight: 700;
+  }
+
+  /* LOGIN */
+  #loginScreen { max-width: 420px; margin: 60px auto; }
+  #loginScreen input {
+    width: 100%;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 15px;
+    outline: none;
+  }
+  #loginScreen input:focus { border-color: #7b2ff7; }
+  .btn {
+    padding: 12px 18px;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.15s;
+    color: #fff;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary {
+    width: 100%;
+    background: linear-gradient(135deg, #7b2ff7, #00d4ff);
+  }
+  .btn-green { background: linear-gradient(135deg, #00b894, #00cec9); }
+  .btn-red { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+  .btn-gray { background: rgba(255,255,255,0.1); }
+
+  /* API STATUS */
+  .api-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    transition: background 0.3s;
+  }
+  .api-bar.ok { background: rgba(0,184,148,0.15); border: 1px solid rgba(0,184,148,0.4); color: #00e6b0; }
+  .api-bar.err { background: rgba(231,76,60,0.15); border: 1px solid rgba(231,76,60,0.4); color: #ff7675; }
+  .api-bar.load { background: rgba(255,193,7,0.12); border: 1px solid rgba(255,193,7,0.35); color: #ffd93d; }
+  .api-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: currentColor;
+    animation: pulse 1.4s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  /* TOP STATS */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .stat-box {
+    background: rgba(0,0,0,0.25);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-label { font-size: 11px; color: #8b8ba7; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-value { font-size: 18px; font-weight: 800; margin-top: 4px; }
+  .profit-plus { color: #00e6b0; }
+  .profit-minus { color: #ff7675; }
+
+  /* PREDICTION */
+  .pred-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 20px;
+    border-radius: 12px;
+    background: rgba(0,0,0,0.25);
+  }
+  .pred-side {
+    font-size: 42px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-shadow: 0 0 20px currentColor;
+  }
+  .pred-tai { color: #ff6b6b; }
+  .pred-xiu { color: #4dabf7; }
+  .pred-none { color: #6c6c8a; font-size: 20px; }
+  .pred-conf { font-size: 14px; color: #8b8ba7; }
+  .pred-conf strong { color: #fff; font-size: 18px; }
+
+  /* CONTROLS */
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .row > label { font-size: 13px; color: #b0b0c8; min-width: 120px; }
+  .row input[type=number] {
+    flex: 1;
+    min-width: 120px;
+    padding: 9px 12px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+  }
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .toggle-row:last-child { border-bottom: none; }
+  .switch {
+    position: relative;
+    width: 48px; height: 26px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 13px;
+    cursor: pointer;
+    transition: background 0.25s;
+    flex-shrink: 0;
+  }
+  .switch.on { background: linear-gradient(135deg, #00b894, #00cec9); }
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 20px; height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.25s;
+  }
+  .switch.on::after { transform: translateX(22px); }
+
+  /* HISTORY */
+  .history-list { max-height: 340px; overflow-y: auto; }
+  .history-item {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    background: rgba(0,0,0,0.2);
+    font-size: 13px;
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .history-item.win { border-left: 3px solid #00e6b0; }
+  .history-item.lose { border-left: 3px solid #ff7675; }
+  .history-item.unknown { border-left: 3px solid #6c6c8a; }
+  .h-session { color: #8b8ba7; font-family: monospace; font-size: 11px; }
+  .h-pred { font-weight: 700; }
+  .h-result { font-weight: 700; }
+  .h-badge {
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .h-badge.win { background: rgba(0,230,176,0.2); color: #00e6b0; }
+  .h-badge.lose { background: rgba(255,118,117,0.2); color: #ff7675; }
+  .h-badge.wait { background: rgba(255,255,255,0.1); color: #b0b0c8; }
+
+  /* TOAST */
+  #toasts {
+    position: fixed;
+    top: 16px; right: 16px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 340px;
+  }
+  .toast {
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    animation: toastIn 0.3s ease;
+    backdrop-filter: blur(10px);
+  }
+  .toast.success { background: rgba(0,184,148,0.95); }
+  .toast.error { background: rgba(231,76,60,0.95); }
+  .toast.info { background: rgba(52,152,219,0.95); }
+  .toast.warn { background: rgba(243,156,18,0.95); }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(40px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .hidden { display: none !important; }
+  .muted { color: #8b8ba7; font-size: 12px; }
+
+  /* Mobile */
+  @media (max-width: 600px) {
+    .pred-side { font-size: 32px; }
+    .stat-value { font-size: 15px; }
+    .row > label { min-width: 100%; }
+  }
 </style>
 </head>
 <body>
-<div id="toast-container"></div>
-<div class="container">
-  <h1>⚡ TXMD5 AUTO BOT</h1>
+<div id="toasts"></div>
 
-  <div id="login-view" class="card">
-    <div class="section-title">🔐 Đăng nhập</div>
-    <div style="margin-bottom:10px">
-      <label>Tài khoản</label>
-      <input type="text" id="username" placeholder="username" autocomplete="username">
-    </div>
-    <div style="margin-bottom:12px">
-      <label>Mật khẩu</label>
-      <input type="password" id="password" placeholder="password" autocomplete="current-password">
-    </div>
-    <button class="btn-primary" id="btn-login">Đăng nhập</button>
+<div class="container">
+  <h1>🎲 TELE68 AUTO BET</h1>
+
+  <!-- LOGIN -->
+  <div id="loginScreen" class="card">
+    <div class="card-title">Đăng nhập</div>
+    <input id="username" type="text" placeholder="Tài khoản" autocomplete="username">
+    <input id="password" type="password" placeholder="Mật khẩu" autocomplete="current-password">
+    <button class="btn btn-primary" id="loginBtn" onclick="doLogin()">Đăng nhập</button>
+    <p class="muted" style="margin-top:10px;text-align:center" id="loginMsg"></p>
   </div>
 
-  <div id="dash-view" class="hidden">
-    <!-- API STATUS -->
-    <div id="api-badge" class="api-badge idle">
-      <div class="dot"></div>
-      <span id="api-text">Auto đang TẮT — API nghỉ</span>
-      <span id="api-time" style="margin-left:auto;font-size:11px;opacity:.7"></span>
-    </div>
+  <!-- MAIN -->
+  <div id="mainScreen" class="hidden">
 
-    <!-- PREDICTION -->
-    <div class="card">
-      <div id="prediction-box" class="prediction-box idle">
-        <div class="pred-label">Dự đoán phiên tiếp theo</div>
-        <div id="pred-side" class="pred-side idle">—</div>
-        <div id="pred-conf" class="pred-conf">Bật Auto để nhận dự đoán</div>
-        <div id="pred-session" class="pred-session">Phiên: —</div>
-      </div>
+    <!-- API STATUS -->
+    <div id="apiBar" class="api-bar load">
+      <span class="api-dot"></span>
+      <span id="apiText">Đang kiểm tra API...</span>
     </div>
 
     <!-- STATS -->
     <div class="card">
-      <div class="section-title">📊 Thống kê</div>
-      <div class="grid4">
-        <div class="stat-box"><div class="stat-label">Số dư</div><div class="stat-value" id="st-balance">—</div></div>
-        <div class="stat-box"><div class="stat-label">Lãi/Lỗ</div><div class="stat-value" id="st-pl">0</div></div>
-        <div class="stat-box"><div class="stat-label">Thắng</div><div class="stat-value pos" id="st-win">0</div></div>
-        <div class="stat-box"><div class="stat-label">Thua</div><div class="stat-value neg" id="st-lose">0</div></div>
-      </div>
-      <div class="grid4" style="margin-top:8px">
-        <div class="stat-box"><div class="stat-label">Chuỗi thắng</div><div class="stat-value" id="st-wstreak">0</div></div>
-        <div class="stat-box"><div class="stat-label">Chuỗi thua</div><div class="stat-value" id="st-lstreak">0</div></div>
-        <div class="stat-box"><div class="stat-label">Cược hiện tại</div><div class="stat-value" id="st-bet">—</div></div>
-        <div class="stat-box"><div class="stat-label">Socket</div><div class="stat-value" id="st-socket">—</div></div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-label">Tài khoản</div>
+          <div class="stat-value" id="sNick">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Số dư</div>
+          <div class="stat-value" id="sBalance">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Lãi / Lỗ</div>
+          <div class="stat-value" id="sProfit">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Thắng / Thua</div>
+          <div class="stat-value" id="sWL">0 / 0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Chuỗi thắng/thua</div>
+          <div class="stat-value" id="sStreak">0 / 0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Phiên hiện tại</div>
+          <div class="stat-value" id="sSession" style="font-size:13px">—</div>
+        </div>
       </div>
     </div>
 
-    <!-- CONFIG -->
+    <!-- PREDICTION -->
     <div class="card">
-      <div class="section-title">⚙️ Cấu hình Auto</div>
+      <div class="card-title">Dự đoán phiên hiện tại</div>
+      <div class="pred-box">
+        <div class="pred-side pred-none" id="predSide">CHỜ API</div>
+        <div class="pred-conf">Độ tin cậy: <strong id="predConf">—</strong></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <label>Tiền cược hiện tại:</label>
+        <input type="number" id="curBet" value="10000" min="1000" step="1000" onchange="updateBetAmount(this.value)">
+      </div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="card">
+      <div class="card-title">Cấu hình Auto</div>
       <div class="toggle-row">
-        <span>🤖 Bật Auto Cược</span>
-        <label class="switch"><input type="checkbox" id="tg-auto"><span class="slider"></span></label>
+        <span>🤖 Bật Auto Bet</span>
+        <div class="switch" id="tgAuto" onclick="toggleSwitch('tgAuto','auto_bet_enabled')"></div>
       </div>
       <div class="toggle-row">
-        <span>✖2 Khi Thắng</span>
-        <label class="switch"><input type="checkbox" id="tg-x2win"><span class="slider"></span></label>
+        <span>🔥 X2 khi thắng (cược gấp đôi)</span>
+        <div class="switch" id="tgX2" onclick="toggleSwitch('tgX2','x2_mode')"></div>
       </div>
       <div class="toggle-row">
-        <span>✖2 Khi Thua (gấp thếp)</span>
-        <label class="switch"><input type="checkbox" id="tg-x2loss" checked><span class="slider"></span></label>
+        <span>💸 X2 khi thua (gấp thếp)</span>
+        <div class="switch" id="tgX2Loss" onclick="toggleSwitch('tgX2Loss','x2_loss_mode')"></div>
       </div>
-      <div class="grid2" style="margin-top:8px">
-        <div><label>Cược cơ bản (đ)</label><input type="number" id="inp-base" value="10000" min="1000" step="1000"></div>
-        <div><label>Giới hạn ✖2 thua (lần)</label><input type="number" id="inp-limit" value="5" min="1" max="10"></div>
+      <div class="row" style="margin-top:10px">
+        <label>Giới hạn X2 thua:</label>
+        <input type="number" id="x2Limit" value="5" min="1" onchange="updateConfig('x2_loss_limit', this.value)">
       </div>
-      <div style="margin-top:8px">
-        <label>Mục tiêu lãi (đ, trống = tắt)</label>
-        <input type="number" id="inp-target" placeholder="VD: 500000">
+      <div class="row" style="margin-top:10px">
+        <label>Mục tiêu lãi (đ):</label>
+        <input type="number" id="targetProfit" value="" placeholder="VD: 500000" step="10000" onchange="updateConfig('target_profit', this.value)">
       </div>
-      <button class="btn-primary" style="margin-top:10px" id="btn-save">💾 Lưu cấu hình</button>
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn-red" style="flex:1" onclick="resetHistory()">🗑 Reset lịch sử</button>
+        <button class="btn btn-gray" style="flex:1" onclick="doLogout()">⏻ Đăng xuất</button>
+      </div>
     </div>
 
     <!-- HISTORY -->
     <div class="card">
-      <div class="section-title">📜 Lịch sử gần đây</div>
-      <div class="hist-list" id="hist-list">
-        <div style="text-align:center;opacity:.5;padding:20px">Bật Auto để bắt đầu ghi lịch sử</div>
+      <div class="card-title">Lịch sử gần đây</div>
+      <div class="history-list" id="historyList">
+        <p class="muted">Chưa có dữ liệu...</p>
       </div>
     </div>
 
-    <button class="btn-danger" id="btn-logout">Đăng xuất</button>
   </div>
 </div>
 
 <script>
-const socket = io({transports:['websocket','polling']});
-let SID = null;
-let AUTO_ON = false;
+const socket = io({ transports: ['websocket', 'polling'] });
+let currentSid = null;
+let state = {};
 
-/* ===== TOAST ===== */
-function toast(type,msg){
-  const el=document.createElement('div');
-  el.className='toast '+(type||'info');
-  el.textContent=msg;
-  document.getElementById('toast-container').appendChild(el);
-  setTimeout(()=>el.remove(),4000);
-}
-socket.on('toast',d=>toast(d.type,d.msg));
-
-/* ===== API STATUS ===== */
-function setApiStatus(state,text,ts){
-  const b=document.getElementById('api-badge');
-  const t=document.getElementById('api-text');
-  const tm=document.getElementById('api-time');
-  b.className='api-badge '+state;
-  t.textContent=text;
-  if(ts){tm.textContent='Cập nhật: '+new Date(ts*1000).toLocaleTimeString('vi-VN');}
-  else{tm.textContent='';}
+// ============ TOAST ============
+function toast(type, msg) {
+  const box = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 4000);
 }
 
-/* ===== PREDICTION ===== */
-function updatePredictionUI(side,conf,apiErr){
-  const box=document.getElementById('prediction-box');
-  const sEl=document.getElementById('pred-side');
-  const cEl=document.getElementById('pred-conf');
-  box.classList.remove('tai','xiu','idle');
-  sEl.classList.remove('tai','xiu','idle');
-
-  if(!AUTO_ON){
-    box.classList.add('idle');
-    sEl.classList.add('idle');
-    sEl.textContent='—';
-    cEl.textContent='Bật Auto để nhận dự đoán';
-    return;
+// ============ LOGIN ============
+async function doLogin() {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value.trim();
+  const msg = document.getElementById('loginMsg');
+  const btn = document.getElementById('loginBtn');
+  if (!username || !password) { msg.textContent = '⚠ Vui lòng nhập đủ thông tin'; return; }
+  btn.disabled = true;
+  msg.textContent = 'Đang đăng nhập...';
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await r.json();
+    if (!data.success) { msg.textContent = '❌ ' + (data.error || 'Đăng nhập thất bại'); btn.disabled = false; return; }
+    currentSid = data.sid;
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('mainScreen').classList.remove('hidden');
+    toast('success', '✅ Đăng nhập thành công: ' + data.nickname);
+    refreshStats();
+  } catch (e) {
+    msg.textContent = '❌ Lỗi: ' + e.message;
+    btn.disabled = false;
   }
-  if(!side){
-    box.classList.add('idle');
-    sEl.classList.add('idle');
-    sEl.textContent='—';
-    cEl.textContent=apiErr?('❌ '+apiErr):'Chờ dữ liệu API...';
-    return;
-  }
-  const key=String(side).toUpperCase().startsWith('T')?'tai':'xiu';
-  box.classList.add(key);
-  sEl.classList.add(key);
-  sEl.textContent=key==='tai'?'TÀI':'XỈU';
-  cEl.textContent=conf!=null?`Độ tin cậy: ${conf}%`:'Sẵn sàng cược';
 }
 
-/* ===== LOGIN ===== */
-document.getElementById('btn-login').onclick=async()=>{
-  const u=document.getElementById('username').value.trim();
-  const p=document.getElementById('password').value.trim();
-  if(!u||!p)return toast('error','Nhập đủ tài khoản & mật khẩu');
-  const btn=document.getElementById('btn-login');
-  btn.disabled=true;btn.textContent='Đang đăng nhập...';
-  try{
-    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({username:u,password:p})});
-    const d=await r.json();
-    if(!d.success){toast('error',d.error||'Login thất bại');return;}
-    SID=d.sid;
-    document.getElementById('login-view').classList.add('hidden');
-    document.getElementById('dash-view').classList.remove('hidden');
-    toast('success',`Xin chào ${d.nickname}!`);
-  }catch(e){toast('error','Lỗi mạng: '+e.message);}
-  finally{btn.disabled=false;btn.textContent='Đăng nhập';}
-};
+// ============ LOGOUT ============
+async function doLogout() {
+  if (!confirm('Đăng xuất?')) return;
+  try { await fetch('/api/logout', { method: 'POST' }); } catch(e) {}
+  location.reload();
+}
 
-/* ===== SESSION UPDATE ===== */
-socket.on('session_update',d=>{
-  if(!AUTO_ON)return; // safety
-  document.getElementById('pred-session').textContent='Phiên: '+(d.session_id||'—');
-  if(d.api_ok)setApiStatus('ok','✅ API ổn định — Dự đoán sẵn sàng',Date.now()/1000);
-  else setApiStatus('fail','❌ API lỗi: '+(d.api_error||'không rõ'),Date.now()/1000);
-  updatePredictionUI(d.prediction,d.conf,d.api_error);
-});
+// ============ STATS ============
+async function refreshStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+    if (d.success) applyState(d.state);
+  } catch (e) {}
+}
 
-/* ===== API STATUS (từ worker) ===== */
-socket.on('api_status',d=>{
-  if(!AUTO_ON)return;
-  if(d.ok){
-    setApiStatus('ok','✅ API ổn định — Dự đoán sẵn sàng',d.ts);
-    updatePredictionUI(d.du_doan,d.do_tin_cay,null);
-    if(d.phien)document.getElementById('pred-session').textContent='Phiên: '+d.phien;
-  }else{
-    setApiStatus('fail','❌ API lỗi: '+(d.error||'không rõ'),d.ts);
+function fmtMoney(v) {
+  if (v === null || v === undefined) return '—';
+  return Number(v).toLocaleString('vi-VN') + 'đ';
+}
+
+function applyState(s) {
+  state = s;
+  document.getElementById('sNick').textContent = s.nickname || '—';
+  document.getElementById('sBalance').textContent = fmtMoney(s.balance);
+
+  const pEl = document.getElementById('sProfit');
+  pEl.textContent = (s.profit_loss >= 0 ? '+' : '') + fmtMoney(s.profit_loss);
+  pEl.className = 'stat-value ' + (s.profit_loss >= 0 ? 'profit-plus' : 'profit-minus');
+
+  document.getElementById('sWL').textContent = (s.win_count || 0) + ' / ' + (s.lose_count || 0);
+  document.getElementById('sStreak').textContent = (s.win_streak || 0) + ' / ' + (s.loss_streak || 0);
+  document.getElementById('sSession').textContent = s.session_id || '—';
+
+  // prediction
+  const sideEl = document.getElementById('predSide');
+  const confEl = document.getElementById('predConf');
+  const pred = (s.current_prediction || '').toUpperCase();
+  if (pred.startsWith('T')) {
+    sideEl.textContent = 'TÀI';
+    sideEl.className = 'pred-side pred-tai';
+  } else if (pred.startsWith('X')) {
+    sideEl.textContent = 'XỈU';
+    sideEl.className = 'pred-side pred-xiu';
+  } else {
+    sideEl.textContent = 'CHỜ API';
+    sideEl.className = 'pred-side pred-none';
   }
-});
+  confEl.textContent = s.current_prediction ? '✓ có tín hiệu' : '—';
 
-/* ===== STATS ===== */
-socket.on('stats_update',st=>{
-  AUTO_ON=!!st.auto_bet_enabled;
-  document.getElementById('tg-auto').checked=AUTO_ON;
-  document.getElementById('tg-x2win').checked=st.x2_mode;
-  document.getElementById('tg-x2loss').checked=st.x2_loss_mode;
-
-  // Nếu auto tắt → hiển thị trạng thái idle
-  if(!AUTO_ON){
-    setApiStatus('idle','Auto đang TẮT — API nghỉ',null);
-    updatePredictionUI(null,null,null);
-    document.getElementById('pred-session').textContent='Phiên: —';
+  // bet input
+  const curBetInput = document.getElementById('curBet');
+  if (document.activeElement !== curBetInput && s.base_bet_amount) {
+    curBetInput.value = s.base_bet_amount;
   }
 
-  document.getElementById('st-balance').textContent=fmt(st.balance);
-  const pl=document.getElementById('st-pl');
-  pl.textContent=(st.profit_loss>=0?'+':'')+fmt(st.profit_loss);
-  pl.className='stat-value '+(st.profit_loss>0?'pos':st.profit_loss<0?'neg':'');
-  document.getElementById('st-win').textContent=st.win_count;
-  document.getElementById('st-lose').textContent=st.lose_count;
-  document.getElementById('st-wstreak').textContent=st.win_streak;
-  document.getElementById('st-lstreak').textContent=st.loss_streak;
-  document.getElementById('st-bet').textContent=fmt(st.current_bet);
-  const sockEl=document.getElementById('st-socket');
-  sockEl.textContent=st.socket_connected?'✅ OK':'❌ OFF';
-  sockEl.className='stat-value '+(st.socket_connected?'pos':'neg');
+  // toggles
+  setSwitch('tgAuto', s.auto_bet_enabled);
+  setSwitch('tgX2', s.x2_mode);
+  setSwitch('tgX2Loss', s.x2_loss_mode);
+  if (s.x2_loss_limit) document.getElementById('x2Limit').value = s.x2_loss_limit;
+  if (s.target_profit) document.getElementById('targetProfit').value = s.target_profit;
 
-  if(AUTO_ON&&st.current_prediction){
-    updatePredictionUI(st.current_prediction,null,null);
-    document.getElementById('pred-session').textContent='Phiên: '+(st.session_id||'—');
-  }
-  renderHistory(st.history||[]);
-});
+  // history
+  renderHistory(s.history || []);
+}
 
-/* ===== RESULT ===== */
-socket.on('result_update',d=>{
-  if(!AUTO_ON)return;
-  if(d.is_win===true)toast('success',`🏆 THẮNG phiên ${d.session} (+${fmt(d.profit_delta)}đ)`);
-  else if(d.is_win===false)toast('error',`💸 THUA phiên ${d.session} (${fmt(d.profit_delta)}đ)`);
-  else toast('info',`📊 Kết quả phiên ${d.session}: ${d.result||'?'}`);
-  if(d.profit_loss!=null){
-    const pl=document.getElementById('st-pl');
-    pl.textContent=(d.profit_loss>=0?'+':'')+fmt(d.profit_loss);
-    pl.className='stat-value '+(d.profit_loss>0?'pos':d.profit_loss<0?'neg':'');
-  }
-});
-
-/* ===== HISTORY ===== */
-function renderHistory(list){
-  const box=document.getElementById('hist-list');
-  if(!AUTO_ON){
-    box.innerHTML='<div style="text-align:center;opacity:.5;padding:20px">Bật Auto để bắt đầu ghi lịch sử</div>';
+function renderHistory(list) {
+  const box = document.getElementById('historyList');
+  if (!list.length) {
+    box.innerHTML = '<p class="muted">Chưa có dữ liệu...</p>';
     return;
   }
-  if(!list.length){
-    box.innerHTML='<div style="text-align:center;opacity:.5;padding:20px">Chưa có dữ liệu</div>';
-    return;
-  }
-  box.innerHTML=list.map(h=>{
-    const pred=String(h.pred||'').toUpperCase().startsWith('T')?'tai':'xiu';
-    const res=String(h.result||'').toUpperCase().startsWith('T')?'tai':'xiu';
-    const cls=h.win===true?'win':h.win===false?'lose':'pending';
-    const dice=(h.dice||[]).join('-');
-    return `<div class="hist-item ${cls}">
-      <span>#${h.session||'—'}</span>
-      <span class="hist-side ${pred}">${pred==='tai'?'TÀI':'XỈU'}</span>
-      <span>→</span>
-      <span class="hist-side ${res}">${res==='tai'?'TÀI':'XỈU'}</span>
-      <span style="opacity:.7;font-size:11px">${dice}</span>
-      <span>${h.win===true?'✅':h.win===false?'❌':'⏳'}</span>
+  box.innerHTML = list.map(h => {
+    const cls = h.win === true ? 'win' : (h.win === false ? 'lose' : 'unknown');
+    const badge = h.win === true ? '<span class="h-badge win">THẮNG</span>'
+                : h.win === false ? '<span class="h-badge lose">THUA</span>'
+                : '<span class="h-badge wait">CHỜ</span>';
+    const predTxt = h.pred ? (String(h.pred).toUpperCase().startsWith('T') ? 'TÀI' : 'XỈU') : '—';
+    const resTxt = h.result || '—';
+    return `<div class="history-item ${cls}">
+      <span class="h-session">#${h.session || '?'}</span>
+      <span class="h-pred">${predTxt}</span>
+      <span class="h-result">${resTxt}</span>
+      ${badge}
     </div>`;
   }).join('');
 }
 
-/* ===== SAVE CONFIG ===== */
-document.getElementById('btn-save').onclick=async()=>{
-  const payload={
-    auto_bet_enabled:document.getElementById('tg-auto').checked,
-    x2_mode:document.getElementById('tg-x2win').checked,
-    x2_loss_mode:document.getElementById('tg-x2loss').checked,
-    betAmount:parseInt(document.getElementById('inp-base').value)||10000,
-    x2_loss_limit:parseInt(document.getElementById('inp-limit').value)||5,
-    target_profit:document.getElementById('inp-target').value||null,
-  };
-  const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(payload)});
-  const d=await r.json();
-  if(d.success){
-    AUTO_ON=d.state.auto_bet_enabled;
-    toast('success',AUTO_ON?'✅ Đã BẬT Auto — Bot bắt đầu chạy':'⏹ Đã TẮT Auto — Bot nghỉ');
-    if(!AUTO_ON){
-      setApiStatus('idle','Auto đang TẮT — API nghỉ',null);
-      updatePredictionUI(null,null,null);
-      document.getElementById('pred-session').textContent='Phiên: —';
-      renderHistory([]);
-    }
-  }else toast('error',d.error||'Lỗi lưu');
-};
-
-/* ===== LOGOUT ===== */
-document.getElementById('btn-logout').onclick=async()=>{
-  await fetch('/api/logout',{method:'POST'});
-  location.reload();
-};
-
-/* ===== HELPERS ===== */
-function fmt(n){
-  if(n==null)return '—';
-  return Number(n).toLocaleString('vi-VN');
+// ============ SWITCH ============
+function setSwitch(id, on) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (on) el.classList.add('on'); else el.classList.remove('on');
 }
+function toggleSwitch(id, key) {
+  const el = document.getElementById(id);
+  const newVal = !el.classList.contains('on');
+  if (newVal) el.classList.add('on'); else el.classList.remove('on');
+  updateConfig(key, newVal);
+}
+
+// ============ CONFIG ============
+async function updateConfig(key, value) {
+  try {
+    const r = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: value })
+    });
+    const d = await r.json();
+    if (d.success) applyState(d.state);
+  } catch (e) { toast('error', 'Lỗi cập nhật: ' + e.message); }
+}
+
+async function updateBetAmount(v) {
+  const amt = parseInt(v);
+  if (!amt || amt < 1000) { toast('warn', 'Tiền cược tối thiểu 1,000đ'); return; }
+  await updateConfig('betAmount', amt);
+}
+
+async function resetHistory() {
+  if (!confirm('Reset lịch sử và lãi/lỗ?')) return;
+  try {
+    await fetch('/api/reset_history', { method: 'POST' });
+    toast('success', 'Đã reset lịch sử');
+    refreshStats();
+  } catch (e) {}
+}
+
+// ============ SOCKET ============
+socket.on('connect', () => {
+  console.log('[Socket] connected');
+  refreshStats();
+});
+socket.on('stats_update', (s) => { applyState(s); });
+
+socket.on('session_update', (d) => {
+  const apiBar = document.getElementById('apiBar');
+  const apiText = document.getElementById('apiText');
+  if (d.api_ok && d.ready) {
+    apiBar.className = 'api-bar ok';
+    apiText.textContent = `✅ API OK — Phiên #${d.session_id} | Dự đoán: ${d.prediction || '—'}`;
+  } else if (d.api_ok && !d.ready) {
+    apiBar.className = 'api-bar load';
+    apiText.textContent = `⏳ Phiên #${d.session_id} — chờ tín hiệu API...`;
+  } else {
+    apiBar.className = 'api-bar err';
+    apiText.textContent = `❌ API lỗi: ${d.api_error || 'không phản hồi'}`;
+  }
+});
+
+socket.on('result_update', (d) => {
+  let msg = `📊 Phiên #${d.session} → ${d.result || '?'}`;
+  if (d.is_win === true) msg += ` | THẮNG +${Number(d.profit_delta).toLocaleString('vi-VN')}đ`;
+  else if (d.is_win === false) msg += ` | THUA ${Number(d.profit_delta).toLocaleString('vi-VN')}đ`;
+  toast(d.is_win === true ? 'success' : (d.is_win === false ? 'error' : 'info'), msg);
+  refreshStats();
+});
+
+socket.on('toast', (d) => toast(d.type || 'info', d.msg));
+
+// fallback update mỗi 5s
+setInterval(() => { if (currentSid) refreshStats(); }, 5000);
 </script>
 </body>
 </html>
