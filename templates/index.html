@@ -193,15 +193,21 @@ body::after{
   content:'';position:absolute;top:0;left:0;width:100%;height:2px;
   background:linear-gradient(90deg,transparent,#60a5fa,transparent);opacity:.6;
 }
+.prediction-box.locked{border-color:rgba(251,191,36,.5)}
+.prediction-box.locked::before{background:linear-gradient(90deg,transparent,#fbbf24,transparent)}
+
 .pred-left{display:flex;flex-direction:column;gap:5px;z-index:2}
-.pred-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.pred-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px}
+.pred-label .lock-icon{font-size:10px}
 .pred-value{
   font-size:32px;font-weight:800;color:#93c5fd;letter-spacing:1px;
   text-shadow:0 0 20px rgba(96,165,250,.4);transition:.3s;
 }
 .pred-value.val-tai{color:#60a5fa;text-shadow:0 0 24px rgba(96,165,250,.7)}
 .pred-value.val-xiu{color:#f87171;text-shadow:0 0 24px rgba(248,113,113,.7)}
+.pred-value.val-locked{opacity:.7}
 .pred-percent{font-size:12px;color:#64748b;font-weight:500}
+.pred-percent.locked{color:#fbbf24}
 .pred-right{text-align:right;z-index:2}
 .session-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:4px;display:block;letter-spacing:.5px}
 .session-value{font-size:16px;font-weight:800;color:#e2e8f0;text-shadow:0 0 10px rgba(96,165,250,.2)}
@@ -257,6 +263,12 @@ tr:hover td{background:rgba(96,165,250,.04)}
 .val-xiu{color:#f87171;text-shadow:0 0 8px rgba(248,113,113,.4)}
 .val-win{color:#34d399;text-shadow:0 0 8px rgba(52,211,153,.4)}
 .val-lose{color:#f87171;text-shadow:0 0 8px rgba(248,113,113,.4)}
+.bet-tag{
+  display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;
+  font-weight:700;margin-left:6px;letter-spacing:.3px;
+}
+.bet-tag.tai{background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.3)}
+.bet-tag.xiu{background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.3)}
 
 .toast-wrap{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:320px}
 .toast{
@@ -266,6 +278,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
 .toast.success{background:linear-gradient(135deg,rgba(16,185,129,.9),rgba(52,211,153,.9));border:1px solid rgba(52,211,153,.5)}
 .toast.error{background:linear-gradient(135deg,rgba(239,68,68,.9),rgba(248,113,113,.9));border:1px solid rgba(248,113,113,.5)}
 .toast.info{background:linear-gradient(135deg,rgba(59,130,246,.9),rgba(96,165,250,.9));border:1px solid rgba(96,165,250,.5)}
+.toast.warn{background:linear-gradient(135deg,rgba(245,158,11,.9),rgba(251,191,36,.9));border:1px solid rgba(251,191,36,.5)}
 @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
 
 .spinner{
@@ -388,7 +401,10 @@ tr:hover td{background:rgba(96,165,250,.04)}
     <div class="prediction-box" id="predictionBox">
       <div class="pred-result-flash" id="predResultFlash"></div>
       <div class="pred-left">
-        <span class="pred-label">DỰ ĐOÁN PHIÊN HIỆN TẠI</span>
+        <span class="pred-label" id="predLabel">
+          <span id="predLabelText">DỰ ĐOÁN PHIÊN HIỆN TẠI</span>
+          <span class="lock-icon" id="lockIcon" style="display:none">🔒</span>
+        </span>
         <div class="pred-value" id="predValue">—</div>
         <div class="pred-percent" id="predPercent">(Đang chờ dữ liệu...)</div>
       </div>
@@ -439,6 +455,11 @@ let saveTimer = null;
 let lastProcessedSession = 0;
 let mySid = null;
 
+/* 🔒 KHÓA CỬA CƯỢC THEO PHIÊN — FIX LỖI API BÁO KHÁC CƯỢC KHÁC */
+let lockedBetSession = null;   // phiên đã đặt cược
+let lockedBetSide = null;      // "TAI" hoặc "XIU" — cửa THỰC TẾ đã đặt
+let lockedBetAmount = 0;       // số tiền thực tế đã đặt
+
 const STORAGE_KEY_BALANCE = 'lc79_balance';
 const STORAGE_KEY_CONFIG  = 'lc79_config';
 const STORAGE_KEY_DEVICE  = 'lc79_device_id';
@@ -460,13 +481,11 @@ function getDeviceId(){
       localStorage.setItem(STORAGE_KEY_DEVICE, id);
     }
     return id;
-  }catch(e){
-    return 'web-fallback-' + Date.now();
-  }
+  }catch(e){ return 'web-fallback-' + Date.now(); }
 }
 
 /* ============================================
-   STORAGE HELPERS
+   STORAGE
 ============================================ */
 function saveSid(sid){ try{ if(sid) localStorage.setItem(STORAGE_KEY_SID, sid); }catch(e){} }
 function loadSid(){ try{ return localStorage.getItem(STORAGE_KEY_SID)||null; }catch(e){ return null; } }
@@ -519,19 +538,14 @@ async function pushConfigToServer(cfg){
     const r = await fetch('/api/config',{
       method:'POST',
       headers: apiHeaders(),
-      body:JSON.stringify({
-        auto_bet_enabled: autoOn,
-        betAmount: cfg.betAmount
-      })
+      body:JSON.stringify({ auto_bet_enabled: autoOn, betAmount: cfg.betAmount })
     });
     const d = await r.json();
     if(!d.success){
       if((d.error||'').toLowerCase().includes('login')){
-        showForceModal('Phiên đăng nhập đã hết', 'Vui lòng đăng nhập lại.');
-        return;
+        showForceModal('Phiên đăng nhập đã hết', 'Vui lòng đăng nhập lại.'); return;
       }
-      toast('Lỗi lưu cài đặt: ' + (d.error||'unknown'),'error');
-      return;
+      toast('Lỗi lưu cài đặt: ' + (d.error||'unknown'),'error'); return;
     }
     toast('💾 Đã lưu cài đặt cược','success');
   }catch(e){ toast('Lỗi lưu cài đặt: '+e.message,'error'); }
@@ -540,16 +554,17 @@ async function pushConfigToServer(cfg){
 /* ============================================
    UI HELPERS
 ============================================ */
-function showResultFlash(isWin, result, pred){
+function showResultFlash(isWin, result, pred, actualSide){
   const flash=document.getElementById('predResultFlash');
   const box=document.getElementById('predictionBox');
+  const sideTxt = actualSide ? ` (đã đặt: ${actualSide})` : '';
   if(isWin){
-    flash.innerHTML=`<div class="text-win">✓ THẮNG</div><small>Phiên trước: ${pred?String(pred).toUpperCase():'—'} → ${result||'—'}</small>`;
+    flash.innerHTML=`<div class="text-win">✓ THẮNG</div><small>Phiên trước: ${pred?String(pred).toUpperCase():'—'}${sideTxt} → ${result||'—'}</small>`;
     flash.className='pred-result-flash';
     playSound('win');
     box.style.borderColor='#34d399';
   }else{
-    flash.innerHTML=`<div class="text-lose">✗ THUA</div><small>Phiên trước: ${pred?String(pred).toUpperCase():'—'} → ${result||'—'}</small>`;
+    flash.innerHTML=`<div class="text-lose">✗ THUA</div><small>Phiên trước: ${pred?String(pred).toUpperCase():'—'}${sideTxt} → ${result||'—'}</small>`;
     flash.className='pred-result-flash lose';
     playSound('lose');
     box.style.borderColor='#f87171';
@@ -558,7 +573,7 @@ function showResultFlash(isWin, result, pred){
   clearTimeout(showResultFlash._t);
   showResultFlash._t=setTimeout(()=>{
     flash.style.display='none';
-    box.style.borderColor='rgba(96,165,250,0.2)';
+    box.style.borderColor = lockedBetSession ? 'rgba(251,191,36,.5)' : 'rgba(96,165,250,0.2)';
   },4000);
 }
 
@@ -571,16 +586,13 @@ function playSound(type){
     if(type==='win'){
       osc.frequency.setValueAtTime(880,audioCtx.currentTime);
       osc.frequency.setValueAtTime(1320,audioCtx.currentTime+0.1);
-      gain.gain.setValueAtTime(0.15,audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.3);
-      osc.start(); osc.stop(audioCtx.currentTime+0.3);
     }else{
       osc.frequency.setValueAtTime(220,audioCtx.currentTime);
       osc.frequency.setValueAtTime(165,audioCtx.currentTime+0.15);
-      gain.gain.setValueAtTime(0.15,audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.3);
-      osc.start(); osc.stop(audioCtx.currentTime+0.3);
     }
+    gain.gain.setValueAtTime(0.15,audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.3);
+    osc.start(); osc.stop(audioCtx.currentTime+0.3);
   }catch(e){}
 }
 
@@ -609,11 +621,83 @@ function updateProfitUI(profit){
   pl.style.color=profit>=0?'#34d399':'#f87171';
 }
 
-function updateBetBadge(betAmount){
+/* ============================================
+   🔒 CẬP NHẬT PREDICTION — FIX CHÍNH
+   Quy tắc: Nếu phiên hiện tại ĐÃ ĐẶT CƯỢC → hiển thị cửa ĐÃ ĐẶT
+             Nếu chưa đặt → hiển thị dự đoán mới nhất từ API
+============================================ */
+function updatePredictionUI(state){
+  const el       = document.getElementById('predValue');
+  const percent  = document.getElementById('predPercent');
+  const box      = document.getElementById('predictionBox');
+  const labelTxt = document.getElementById('predLabelText');
+  const lockIcon = document.getElementById('lockIcon');
+
+  const sessionId = state.session_id;
+  const apiPred   = state.current_prediction || state.prediction;
+  // Backend NÊN trả 2 field: current_bet (số tiền) và current_bet_side (TAI/XIU)
+  const betAmt    = Number(state.current_bet || 0);
+  const betSide   = state.current_bet_side
+                    ? String(state.current_bet_side).toUpperCase()
+                    : null;
+
+  // ✅ NẾU có cược trong phiên này → KHÓA cửa theo cửa đã đặt
+  if (betAmt > 0 && betSide) {
+    if (lockedBetSession !== sessionId) {
+      lockedBetSession = sessionId;
+      lockedBetSide    = betSide;
+      lockedBetAmount  = betAmt;
+    }
+    // Hiển thị cửa ĐÃ ĐẶT, không phải dự đoán mới
+    el.innerText = lockedBetSide;
+    el.className = 'pred-value val-locked ' + (lockedBetSide.startsWith('T') ? 'val-tai' : 'val-xiu');
+    labelTxt.innerText = 'CỬA ĐÃ ĐẶT CƯỢC';
+    lockIcon.style.display = 'inline';
+    box.classList.add('locked');
+
+    // ⚠️ Cảnh báo nếu API đổi prediction khác cửa đã đặt (lỗi timing)
+    if (apiPred && String(apiPred).toUpperCase() !== lockedBetSide) {
+      percent.innerText = `⚠️ API báo ${String(apiPred).toUpperCase()} nhưng đã đặt ${lockedBetSide} (${betAmt.toLocaleString()}đ)`;
+      percent.className = 'pred-percent locked';
+    } else {
+      percent.innerText = `✓ Khớp lệnh — ${betAmt.toLocaleString()}đ`;
+      percent.className = 'pred-percent locked';
+    }
+  } else {
+    // 🟢 Chưa đặt cược → hiển thị dự đoán mới nhất
+    // (Reset lock nếu sang phiên mới chưa đặt)
+    if (lockedBetSession !== null && lockedBetSession !== sessionId) {
+      lockedBetSession = null; lockedBetSide = null; lockedBetAmount = 0;
+    }
+    box.classList.remove('locked');
+    lockIcon.style.display = 'none';
+    labelTxt.innerText = 'DỰ ĐOÁN PHIÊN HIỆN TẠI';
+
+    if (apiPred) {
+      const p = String(apiPred).toUpperCase();
+      el.innerText = p;
+      el.className = 'pred-value ' + (p.startsWith('T') ? 'val-tai' : 'val-xiu');
+      percent.className = 'pred-percent';
+      percent.innerText = state.ready
+        ? `(Độ tin cậy: ${state.conf}%)`
+        : `(Đang lấy dữ liệu: ${state.history_len||0}/12)`;
+    } else {
+      el.innerText = '—';
+      el.className = 'pred-value';
+      percent.className = 'pred-percent';
+      percent.innerText = `(Đang lấy dữ liệu: ${state.history_len||0}/12)`;
+    }
+  }
+}
+
+function updateBetBadge(betAmount, betSide){
   const badge=document.getElementById('betStatusBadge');
   if(betAmount>0){
+    const sideLabel = betSide ? ` ${String(betSide).toUpperCase()}` : '';
+    const sideClass = betSide && String(betSide).toUpperCase().startsWith('T') ? 'tai'
+                    : betSide ? 'xiu' : '';
     badge.className='badge badge-bet active';
-    badge.innerHTML=`<div class="dot dot-active"></div> CƯỢC: ${Number(betAmount).toLocaleString()}`;
+    badge.innerHTML=`<div class="dot dot-active"></div> CƯỢC: ${Number(betAmount).toLocaleString()}${sideClass?`<span class="bet-tag ${sideClass}">${sideLabel.trim()}</span>`:''}`;
   }else{
     badge.className='badge badge-bet off';
     badge.innerHTML='<div class="dot dot-gray"></div> CƯỢC: CHỜ';
@@ -639,12 +723,13 @@ function processResult(payload){
   if(payload.session && payload.session !== lastProcessedSession &&
      payload.is_win !== null && payload.is_win !== undefined && payload.result){
     lastProcessedSession = payload.session;
-    showResultFlash(payload.is_win, payload.result, payload.pred);
+    // ✅ Dùng side thực tế đã đặt để flash
+    showResultFlash(payload.is_win, payload.result, payload.pred, payload.bet_side || payload.pred);
   }
 }
 
 /* ============================================
-   LOGIN (chỉ tài khoản + mật khẩu, KHÔNG key)
+   LOGIN
 ============================================ */
 async function handleLogin(){
   const u = document.getElementById('username').value.trim();
@@ -659,11 +744,7 @@ async function handleLogin(){
     const r=await fetch('/api/login',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        username: u,
-        password: p,
-        device: getDeviceId()
-      })
+      body:JSON.stringify({ username: u, password: p, device: getDeviceId() })
     });
     const d=await r.json();
 
@@ -726,22 +807,24 @@ function connectSocket(sid){
     showForceModal('Phiên bị thu hồi', d.reason || 'Vui lòng đăng nhập lại.');
   });
 
-  socket.on('session_update',d=>{
+  socket.on('session_update', d => {
     document.getElementById('sessionValue').innerText='#'+d.session_id;
-    if(d.prediction){
-      const el=document.getElementById('predValue');
-      el.innerText=String(d.prediction).toUpperCase();
-      const p = String(d.prediction).toUpperCase();
-      el.className='pred-value '+(p.startsWith('T')?'val-tai':'val-xiu');
-      document.getElementById('predPercent').innerText = d.ready
-        ? `(Độ tin cậy: ${d.conf}%)`
-        : `(Đang lấy dữ liệu: ${d.history_len||0}/12)`;
-    }else{
-      document.getElementById('predPercent').innerText = `(Đang lấy dữ liệu: ${d.history_len||0}/12)`;
-    }
-    const betVal=Number(d.current_bet||0);
-    document.getElementById('betDisplay').innerText=betVal.toLocaleString();
-    updateBetBadge(betVal);
+
+    // ✅ FIX: Gộp state lại để dùng chung updatePredictionUI
+    updatePredictionUI({
+      session_id: d.session_id,
+      current_prediction: d.prediction,
+      current_bet: d.current_bet,
+      current_bet_side: d.current_bet_side,  // backend nên trả field này
+      ready: d.ready,
+      conf: d.conf,
+      history_len: d.history_len
+    });
+
+    const betVal = Number(d.current_bet || 0);
+    const betSide = d.current_bet_side || null;
+    document.getElementById('betDisplay').innerText = betVal.toLocaleString();
+    updateBetBadge(betVal, betSide);
   });
 
   socket.on('result_update',d=>processResult(d));
@@ -755,6 +838,7 @@ function connectSocket(sid){
         processResult({
           session:newest.session, pred:newest.pred, result:newest.result,
           is_win:newest.win, dice:newest.dice, bet:newest.bet,
+          bet_side: newest.bet_side || newest.pred,
           balance:s.balance, profit_loss:s.profit_loss, history:s.history
         });
       }
@@ -781,6 +865,7 @@ async function pollStats(){
         processResult({
           session:newest.session, pred:newest.pred, result:newest.result,
           is_win:newest.win, dice:newest.dice, bet:newest.bet,
+          bet_side: newest.bet_side || newest.pred,
           balance:s.balance, profit_loss:s.profit_loss, history:s.history
         });
       }
@@ -798,7 +883,6 @@ function applyState(s){
   if(s.balance!==undefined) updateBalanceUI(s.balance,true);
   if(s.profit_loss!==undefined) updateProfitUI(s.profit_loss);
 
-  // ✅ Tự đếm Win/Lose nếu backend không trả về sẵn
   let winCount = s.win_count;
   let loseCount = s.lose_count;
   if((winCount === undefined || loseCount === undefined) && Array.isArray(s.history)){
@@ -811,18 +895,15 @@ function applyState(s){
   document.getElementById('winCount').innerText = winCount ?? 0;
   document.getElementById('loseCount').innerText = loseCount ?? 0;
 
-  const betVal=Number(s.current_bet||0);
-  document.getElementById('betDisplay').innerText=betVal.toLocaleString();
-  updateBetBadge(betVal);
+  const betVal = Number(s.current_bet || 0);
+  const betSide = s.current_bet_side || null;
+  document.getElementById('betDisplay').innerText = betVal.toLocaleString();
+  updateBetBadge(betVal, betSide);
 
   if(s.session_id) document.getElementById('sessionValue').innerText='#'+s.session_id;
 
-  if(s.current_prediction){
-    const el=document.getElementById('predValue');
-    el.innerText=String(s.current_prediction).toUpperCase();
-    const p = String(s.current_prediction).toUpperCase();
-    el.className='pred-value '+(p.startsWith('T')?'val-tai':'val-xiu');
-  }
+  // ✅ FIX: Dùng hàm chung updatePredictionUI
+  updatePredictionUI(s);
 
   if(s.base_bet_amount!==undefined && !loadConfig()){
     const cfg={betAmount:s.base_bet_amount};
@@ -855,7 +936,7 @@ function applyState(s){
 }
 
 /* ============================================
-   RENDER HISTORY
+   RENDER HISTORY — hiển thị rõ cửa đã đặt vs kết quả
 ============================================ */
 function renderHistory(rows){
   const tb=document.getElementById('historyBody');
@@ -866,21 +947,23 @@ function renderHistory(rows){
   }
   rows.forEach(r=>{
     const tr=document.createElement('tr');
-    const predU = String(r.pred||'').toUpperCase();
+    // ✅ Ưu tiên bet_side (cửa THỰC TẾ đã đặt) — fallback pred (dự đoán)
+    const betSide = String(r.bet_side || r.pred || '').toUpperCase();
+    const predU = betSide;
     const resU = String(r.result||'').toUpperCase();
-    const predClass=predU.startsWith('T')?'val-tai':'val-xiu';
-    const resClass=resU.startsWith('T')?'val-tai':'val-xiu';
-    const wl=r.win===true
+    const predClass = predU.startsWith('T')?'val-tai':'val-xiu';
+    const resClass = resU.startsWith('T')?'val-tai':'val-xiu';
+    const wl = r.win===true
       ? '<span class="val-win">✓ THẮNG</span>'
       : r.win===false
         ? '<span class="val-lose">✗ THUA</span>'
         : '—';
-    const dice=Array.isArray(r.dice)?r.dice.slice(0,3).join(' - '):'—';
+    const dice = Array.isArray(r.dice)?r.dice.slice(0,3).join(' - '):'—';
     if(r.win===true) tr.style.background='rgba(52,211,153,.06)';
     else if(r.win===false) tr.style.background='rgba(248,113,113,.06)';
     tr.innerHTML=`
       <td>#${r.session}</td>
-      <td class="${predClass}">${r.pred||'—'}</td>
+      <td class="${predClass}">${predU||'—'}</td>
       <td>${Number(r.bet||0).toLocaleString()}</td>
       <td class="${resClass}">${r.result||'—'}</td>
       <td>${dice}</td>
@@ -899,10 +982,7 @@ async function toggleAuto(){
     const r = await fetch('/api/config',{
       method:'POST',
       headers: apiHeaders(),
-      body:JSON.stringify({
-        auto_bet_enabled:newVal,
-        betAmount:cfg.betAmount
-      })
+      body:JSON.stringify({ auto_bet_enabled:newVal, betAmount:cfg.betAmount })
     });
     const d = await r.json();
     if(!d.success){
@@ -936,6 +1016,7 @@ async function resetHistory(){
     updateProfitUI(0);
     localStorage.removeItem(STORAGE_KEY_BALANCE);
     lastProcessedSession=0;
+    lockedBetSession=null; lockedBetSide=null; lockedBetAmount=0;
   }catch(e){ toast('Lỗi: '+e.message,'error'); }
 }
 
