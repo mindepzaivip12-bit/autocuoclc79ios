@@ -9,71 +9,100 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',sans-serif}
 
-/* ===== NỀN TỐI + XANH DƯƠNG NHẠT ===== */
-body{
+/* ===== GIAO DIỆN NỀN SÁNG (THEO ẢNH) ===== */
+body.login-mode{
+  background:linear-gradient(180deg, #e4e6fc 0%, #f0f2f9 20%, #f8f9fc 100%);
+  min-height:100vh; display:flex; justify-content:center; align-items:center;
+  padding:20px; color:#333;
+}
+
+/* Wrapper chính khi login */
+.login-wrapper{
+  width:100%; max-width:400px; display:flex; flex-direction:column; gap:20px;
+}
+
+/* Card Header (Logo) */
+.login-header-card{
+  background:#fff; border-radius:16px; padding:20px;
+  display:flex; align-items:center; gap:15px;
+  box-shadow:0 4px 15px rgba(0,0,0,0.03); border:1px solid rgba(0,0,0,0.02);
+}
+.logo-diamond{
+  width:55px; height:45px; background:linear-gradient(135deg, #facc15, #f59e0b);
+  border-radius:6px; display:flex; justify-content:center; align-items:center;
+  font-weight:900; color:#ef4444; font-size:18px; font-style:italic;
+  box-shadow:0 4px 10px rgba(245,158,11,0.3); transform:rotate(-10deg);
+}
+.header-text h1{
+  font-size:18px; color:#6b21a8; font-weight:800; margin-bottom:4px;
+  background:linear-gradient(90deg, #7c3aed, #a855f7); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.header-text p{font-size:12px; color:#64748b; line-height:1.4}
+
+/* Card Form Đăng Nhập */
+.login-card{
+  background:#fff; border-radius:16px; padding:25px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.05); border:1px solid rgba(0,0,0,0.02);
+}
+.card-title{
+  font-size:12px; color:#64748b; font-weight:700; text-transform:uppercase;
+  display:flex; align-items:center; gap:8px; margin-bottom:20px; letter-spacing:0.5px;
+}
+.card-title span{
+  display:inline-flex; justify-content:center; align-items:center;
+  width:24px; height:24px; background:#eef2ff; color:#6366f1; border-radius:6px; font-size:14px;
+}
+
+.form-group{margin-bottom:15px}
+.form-group label{
+  display:block; font-size:11px; font-weight:700; color:#64748b;
+  margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;
+}
+.form-group input{
+  width:100%; padding:14px; background:#f8fafc; color:#334155;
+  border:1px solid #e2e8f0; border-radius:10px; outline:none; transition:.2s; font-size:14px;
+}
+.form-group input::placeholder{color:#94a3b8; font-weight:400}
+.form-group input:focus{border-color:#8b5cf6; background:#fff; box-shadow:0 0 0 3px rgba(139,92,246,.15)}
+
+.btn-login-light{
+  width:100%; padding:14px; background:linear-gradient(135deg, #6b73ff, #8b5cf6);
+  color:#fff; border:none; border-radius:12px; font-size:15px; font-weight:700;
+  cursor:pointer; transition:.2s; box-shadow:0 6px 20px rgba(107,115,255,0.3);
+  display:flex; justify-content:center; align-items:center; gap:8px; margin-top:10px;
+}
+.btn-login-light:hover{transform:translateY(-2px); box-shadow:0 8px 25px rgba(107,115,255,0.4)}
+.btn-login-light:disabled{opacity:.7; cursor:not-allowed; transform:none}
+
+/* Telegram Support */
+.tg-support-light{
+  text-align:center; margin-top:15px; font-size:14px; font-weight:600; color:#475569;
+}
+.tg-support-light a{
+  color:#8b5cf6; text-decoration:none; font-weight:800; font-size:15px;
+  background:rgba(139,92,246,0.1); padding:2px 8px; border-radius:6px;
+  transition:.2s;
+}
+.tg-support-light a:hover{background:rgba(139,92,246,0.2)}
+
+
+/* ===== GIAO DIỆN CHÍNH (DARK MODE) ===== */
+body.main-mode{
   background:linear-gradient(135deg,#0a0f1e 0%,#0f172a 50%,#0b1220 100%);
   min-height:100vh;display:flex;justify-content:center;align-items:center;
   padding:20px;color:#cbd5e1;
 }
-body::before{
-  content:'';position:fixed;top:-20%;left:-20%;width:60%;height:60%;
-  background:radial-gradient(circle,rgba(96,165,250,0.12) 0%,transparent 70%);
-  pointer-events:none;z-index:0;
-}
-body::after{
-  content:'';position:fixed;bottom:-20%;right:-20%;width:60%;height:60%;
-  background:radial-gradient(circle,rgba(147,197,253,0.08) 0%,transparent 70%);
-  pointer-events:none;z-index:0;
-}
-
-/* ===== LOGIN ===== */
-.login-container{
-  position:relative;z-index:1;
-  background:#111827;width:100%;max-width:400px;border-radius:16px;padding:30px;
-  box-shadow:0 10px 40px rgba(0,0,0,.6),0 0 0 1px rgba(96,165,250,0.15);
-  border:1px solid rgba(96,165,250,0.1);
-}
-.login-container h2{
-  text-align:center;color:#93c5fd;margin-bottom:20px;
-  text-shadow:0 0 20px rgba(96,165,250,.3);
-}
-.form-group{margin-bottom:15px}
-.form-group label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#94a3b8}
-.form-group input{
-  width:100%;padding:12px;background:#0b1220;color:#e2e8f0;
-  border:1px solid #1e293b;border-radius:8px;outline:none;transition:.2s;
-}
-.form-group input::placeholder{color:#475569}
-.form-group input:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(96,165,250,.15)}
-.btn-login{
-  width:100%;padding:12px;background:linear-gradient(135deg,#3b82f6,#60a5fa);
-  color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;
-  transition:.2s;box-shadow:0 4px 14px rgba(59,130,246,.3);
-}
-.btn-login:hover{background:linear-gradient(135deg,#2563eb,#3b82f6);transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,130,246,.45)}
-.btn-login:disabled{opacity:.6;cursor:not-allowed;transform:none}
-
-/* ===== MAIN ===== */
 .main-wrapper{display:none;width:100%;max-width:900px;flex-direction:column;gap:15px;position:relative;z-index:1}
 .top-header{
   background:#111827;border-radius:12px;padding:15px 25px;
   display:flex;justify-content:space-between;align-items:center;
   box-shadow:0 4px 20px rgba(0,0,0,.4);border:1px solid rgba(96,165,250,0.12);
 }
-.logo-text h1{
-  font-size:20px;color:#dbeafe;font-weight:800;letter-spacing:.5px;margin-bottom:4px;
-  text-shadow:0 0 20px rgba(96,165,250,.25);
-}
+.logo-text h1{font-size:20px;color:#dbeafe;font-weight:800;margin-bottom:4px;}
 .logo-text p{font-size:13px;color:#64748b}
-.main-card{
-  background:#111827;border-radius:16px;padding:25px;
-  box-shadow:0 10px 40px rgba(0,0,0,.5);border:1px solid rgba(96,165,250,0.12);
-}
-.section-title{
-  font-size:14px;color:#93c5fd;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:20px;
-}
+.main-card{background:#111827;border-radius:16px;padding:25px;box-shadow:0 10px 40px rgba(0,0,0,.5);border:1px solid rgba(96,165,250,0.12);}
+.section-title{font-size:14px;color:#93c5fd;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:20px;}
 
-/* ===== BADGES ===== */
 .status-badges{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
 .badge{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600}
 .badge-online{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3)}
@@ -83,50 +112,27 @@ body::after{
 .badge-bet{background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.3)}
 .badge-bet.off{background:rgba(71,85,105,.3);color:#94a3b8;border-color:#334155}
 .badge-bet.active{background:rgba(16,185,129,.15);color:#34d399;border-color:rgba(16,185,129,.4)}
+.badge-key{background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.4)}
 .dot{width:6px;height:6px;border-radius:50%;background:#60a5fa}
 .dot-green{background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.6)}
 .dot-red{background:#f87171;box-shadow:0 0 8px rgba(248,113,113,.6)}
 .dot-gray{background:#64748b}
 .dot-active{background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.8)}
 
-/* ===== PREDICTION BOX ===== */
-.prediction-box{
-  background:linear-gradient(135deg,#0b1220 0%,#0f172a 100%);
-  border:1px solid rgba(96,165,250,0.2);border-radius:12px;padding:20px;
-  display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;
-  position:relative;overflow:hidden;transition:border-color .3s;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
-}
-.prediction-box::before{
-  content:'';position:absolute;top:0;left:0;width:100%;height:2px;
-  background:linear-gradient(90deg,transparent,#60a5fa,transparent);opacity:.6;
-}
+.prediction-box{background:linear-gradient(135deg,#0b1220 0%,#0f172a 100%);border:1px solid rgba(96,165,250,0.2);border-radius:12px;padding:20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;position:relative;overflow:hidden;transition:border-color .3s;box-shadow:inset 0 1px 0 rgba(255,255,255,.03);}
+.prediction-box::before{content:'';position:absolute;top:0;left:0;width:100%;height:2px;background:linear-gradient(90deg,transparent,#60a5fa,transparent);opacity:.6;}
 .pred-left{display:flex;flex-direction:column;gap:5px;z-index:2}
 .pred-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-.pred-value{
-  font-size:32px;font-weight:800;color:#93c5fd;letter-spacing:1px;
-  text-shadow:0 0 20px rgba(96,165,250,.4);transition:.3s;
-}
+.pred-value{font-size:32px;font-weight:800;color:#93c5fd;letter-spacing:1px;text-shadow:0 0 20px rgba(96,165,250,.4);transition:.3s;}
 .pred-value.val-tai{color:#60a5fa;text-shadow:0 0 24px rgba(96,165,250,.7)}
 .pred-value.val-xiu{color:#f87171;text-shadow:0 0 24px rgba(248,113,113,.7)}
-.pred-algo{
-  font-size:11px;color:#93c5fd;background:rgba(96,165,250,.12);
-  padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;font-weight:600;
-  border:1px solid rgba(96,165,250,.2);
-}
+.pred-algo{font-size:11px;color:#93c5fd;background:rgba(96,165,250,.12);padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px;font-weight:600;border:1px solid rgba(96,165,250,.2);}
 .pred-percent{font-size:12px;color:#64748b;font-weight:500}
 .pred-right{text-align:right;z-index:2}
 .session-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:4px;display:block;letter-spacing:.5px}
 .session-value{font-size:16px;font-weight:800;color:#e2e8f0;text-shadow:0 0 10px rgba(96,165,250,.2)}
 
-/* ===== FLASH RESULT ===== */
-.pred-result-flash{
-  position:absolute;top:0;left:0;width:100%;height:100%;
-  background:rgba(16,185,129,0.15);
-  display:none;flex-direction:column;align-items:center;justify-content:center;
-  font-size:26px;font-weight:800;z-index:10;animation:fadeIn 0.2s;
-  backdrop-filter:blur(4px);
-}
+.pred-result-flash{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(16,185,129,0.15);display:none;flex-direction:column;align-items:center;justify-content:center;font-size:26px;font-weight:800;z-index:10;animation:fadeIn 0.2s;backdrop-filter:blur(4px);}
 .pred-result-flash.lose{background:rgba(239,68,68,0.15)}
 .pred-result-flash .text-win{color:#34d399;text-shadow:0 0 30px rgba(52,211,153,.8)}
 .pred-result-flash .text-lose{color:#f87171;text-shadow:0 0 30px rgba(248,113,113,.8)}
@@ -135,12 +141,7 @@ body::after{
 @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
 .pred-result-flash .text-win, .pred-result-flash .text-lose{animation:pulse 0.5s ease}
 
-/* ===== INFO GRID ===== */
-.info-grid{
-  display:grid;grid-template-columns:1fr 1fr;
-  border:1px solid rgba(96,165,250,0.15);border-radius:12px;margin-bottom:20px;overflow:hidden;
-  background:#0b1220;
-}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;border:1px solid rgba(96,165,250,0.15);border-radius:12px;margin-bottom:20px;overflow:hidden;background:#0b1220;}
 .info-item{padding:15px 20px;border-bottom:1px solid rgba(96,165,250,0.1)}
 .info-item:nth-child(odd){border-right:1px solid rgba(96,165,250,0.1)}
 .info-item:nth-last-child(-n+2){border-bottom:none}
@@ -148,26 +149,17 @@ body::after{
 .info-value{font-size:15px;font-weight:700;color:#e2e8f0}
 .info-item[style*="f8fafc"]{background:rgba(96,165,250,.05)!important}
 
-/* ===== BUTTONS ===== */
 .action-buttons{display:flex;gap:12px;margin-bottom:25px;flex-wrap:wrap}
-.btn-action{
-  padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;
-  cursor:pointer;display:flex;align-items:center;gap:8px;color:#fff;transition:.2s;
-}
+.btn-action{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;color:#fff;transition:.2s;}
 .btn-toggle-auto{background:linear-gradient(135deg,#10b981,#34d399);box-shadow:0 4px 14px rgba(16,185,129,.3)}
 .btn-toggle-auto.off{background:linear-gradient(135deg,#3b82f6,#60a5fa);box-shadow:0 4px 14px rgba(59,130,246,.3)}
 .btn-stop-bot{background:linear-gradient(135deg,#ef4444,#f87171);box-shadow:0 4px 14px rgba(239,68,68,.3)}
 .btn-action:hover{transform:translateY(-2px);filter:brightness(1.1)}
 
-/* ===== TABLE ===== */
 .table-title{font-size:13px;color:#93c5fd;font-weight:600;text-transform:uppercase;margin-bottom:15px;letter-spacing:.5px}
 .table-wrapper{overflow-x:auto;border-radius:8px}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{
-  text-align:left;padding:12px 10px;color:#94a3b8;font-weight:600;
-  border-bottom:1px solid rgba(96,165,250,0.15);font-size:11px;text-transform:uppercase;
-  background:rgba(96,165,250,.04);letter-spacing:.5px;
-}
+th{text-align:left;padding:12px 10px;color:#94a3b8;font-weight:600;border-bottom:1px solid rgba(96,165,250,0.15);font-size:11px;text-transform:uppercase;background:rgba(96,165,250,.04);letter-spacing:.5px;}
 td{padding:12px 10px;border-bottom:1px solid #1e293b;font-weight:600;color:#cbd5e1}
 tr:hover td{background:rgba(96,165,250,.04)}
 .val-tai{color:#60a5fa;text-shadow:0 0 8px rgba(96,165,250,.4)}
@@ -175,88 +167,93 @@ tr:hover td{background:rgba(96,165,250,.04)}
 .val-win{color:#34d399;text-shadow:0 0 8px rgba(52,211,153,.4)}
 .val-lose{color:#f87171;text-shadow:0 0 8px rgba(248,113,113,.4)}
 
-/* ===== SETTINGS ===== */
-.settings-panel{
-  display:none;background:#0b1220;padding:15px;border-radius:8px;margin-bottom:15px;
-  border:1px dashed rgba(96,165,250,0.3);gap:10px;flex-wrap:wrap;align-items:flex-end;
-}
-.settings-panel input{
-  padding:8px;background:#0f172a;color:#e2e8f0;
-  border:1px solid #1e293b;border-radius:6px;width:140px;outline:none;transition:.2s;
-}
+.settings-panel{display:none;background:#0b1220;padding:15px;border-radius:8px;margin-bottom:15px;border:1px dashed rgba(96,165,250,0.3);gap:10px;flex-wrap:wrap;align-items:flex-end;}
+.settings-panel input{padding:8px;background:#0f172a;color:#e2e8f0;border:1px solid #1e293b;border-radius:6px;width:140px;outline:none;transition:.2s;}
 .settings-panel input:focus{border-color:#60a5fa;background:#0b1220;box-shadow:0 0 0 3px rgba(96,165,250,.15)}
 .settings-panel label{font-size:12px;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px}
 .settings-hint{font-size:11px;color:#475569;font-weight:500;margin-top:4px}
-.btn-settings{
-  background:#1e293b;border:1px solid rgba(96,165,250,0.2);padding:6px 12px;border-radius:6px;
-  cursor:pointer;font-weight:600;color:#93c5fd;margin-bottom:15px;font-size:12px;margin-right:8px;
-  transition:.2s;
-}
+.btn-settings{background:#1e293b;border:1px solid rgba(96,165,250,0.2);padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600;color:#93c5fd;margin-bottom:15px;font-size:12px;margin-right:8px;transition:.2s;}
 .btn-settings:hover{background:#334155;border-color:#60a5fa}
-.btn-reset{
-  background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.3);
-  padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;float:right;
-  transition:.2s;
-}
+.btn-reset{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;float:right;transition:.2s;}
 .btn-reset:hover{background:rgba(239,68,68,.2)}
 
-/* ===== TOAST ===== */
 .toast-wrap{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:320px}
-.toast{
-  padding:12px 16px;border-radius:8px;color:#fff;font-weight:600;font-size:13px;
-  box-shadow:0 8px 24px rgba(0,0,0,.5);animation:slideIn .3s;backdrop-filter:blur(8px);
-}
+.toast{padding:12px 16px;border-radius:8px;color:#fff;font-weight:600;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.5);animation:slideIn .3s;backdrop-filter:blur(8px);}
 .toast.success{background:linear-gradient(135deg,rgba(16,185,129,.9),rgba(52,211,153,.9));border:1px solid rgba(52,211,153,.5)}
 .toast.error{background:linear-gradient(135deg,rgba(239,68,68,.9),rgba(248,113,113,.9));border:1px solid rgba(248,113,113,.5)}
 .toast.info{background:linear-gradient(135deg,rgba(59,130,246,.9),rgba(96,165,250,.9));border:1px solid rgba(96,165,250,.5)}
 @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
 
-/* ===== SPINNER ===== */
-.spinner{
-  display:inline-block;width:12px;height:12px;border:2px solid #fff;
-  border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;
-  vertical-align:middle;margin-right:6px;
-}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:6px;}
 @keyframes spin{to{transform:rotate(360deg)}}
-
-/* ===== ANIMATIONS ===== */
 .balance-update{animation:flashBalance 0.5s ease}
 @keyframes flashBalance{0%{background:rgba(52,211,153,.25)}100%{background:transparent}}
 .saved-indicator{display:inline-block;font-size:10px;color:#34d399;font-weight:600;margin-left:6px;opacity:0;transition:opacity .3s}
 .saved-indicator.show{opacity:1}
-
-/* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-track{background:#0b1220}
 ::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}
 ::-webkit-scrollbar-thumb:hover{background:#334155}
 </style>
 </head>
-<body>
+<body class="login-mode" id="bodyTag">
 
 <div class="toast-wrap" id="toasts"></div>
 
-<!-- LOGIN -->
-<div class="login-container" id="loginView">
-  <h2>ĐĂNG NHẬP HỆ THỐNG</h2>
-  <div class="form-group">
-    <label>Tài khoản</label>
-    <input type="text" id="username" placeholder="Nhập tài khoản game...">
+<!-- ================= GIAO DIỆN ĐĂNG NHẬP (SÁNG - THEO ẢNH) ================= -->
+<div class="login-wrapper" id="loginView">
+  
+  <!-- Card Header -->
+  <div class="login-header-card">
+    <div class="logo-diamond">LC79</div>
+    <div class="header-text">
+      <h1>TOOL AUTO LC79</h1>
+      <p>Hệ thống phân tích cầu & dự đoán Tài Xỉu tự động</p>
+    </div>
   </div>
-  <div class="form-group">
-    <label>Mật khẩu</label>
-    <input type="password" id="password" placeholder="Nhập mật khẩu..." onkeydown="if(event.key==='Enter')handleLogin()">
+
+  <!-- Card Form -->
+  <div class="login-card">
+    <div class="card-title">
+      <span>➡️</span> ĐĂNG NHẬP GAME
+    </div>
+    
+    <div class="form-group">
+      <label>TÀI KHOẢN</label>
+      <input type="text" id="username" placeholder="username">
+    </div>
+    
+    <div class="form-group">
+      <label>MẬT KHẨU</label>
+      <input type="password" id="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')handleLogin()">
+    </div>
+    
+    <div class="form-group">
+      <label>NHẬP KEY BẢN QUYỀN</label>
+      <input type="text" id="licenseKey" placeholder="KEY-XXXXX" autocomplete="off" onkeydown="if(event.key==='Enter')handleLogin()">
+    </div>
+
+    <button class="btn-login-light" id="btnLogin" onclick="handleLogin()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      ĐĂNG NHẬP
+    </button>
   </div>
-  <button class="btn-login" id="btnLogin" onclick="handleLogin()">ĐĂNG NHẬP</button>
+
+  <!-- Telegram Hỗ Trợ -->
+  <div class="tg-support-light">
+    Mua key ib <a href="https://t.me/cskhleminh" target="_blank">tele</a>
+  </div>
 </div>
 
-<!-- MAIN -->
+
+<!-- ================= GIAO DIỆN CHÍNH (TỐI) ================= -->
 <div class="main-wrapper" id="mainView">
   <div class="top-header">
     <div class="logo-text">
       <h1>TOOL AUTO LC79</h1>
       <p>Hệ thống phân tích cầu & dự đoán Tài Xỉu tự động</p>
     </div>
+    <div class="badge badge-key"><div class="dot dot-active"></div> KEY: <span id="keyDisplay">—</span></div>
   </div>
 
   <div class="main-card">
@@ -289,7 +286,6 @@ tr:hover td{background:rgba(96,165,250,.04)}
       <div class="settings-hint">💾 Cài đặt được lưu tự động và áp dụng cho phiên cược kế tiếp</div>
     </div>
 
-    <!-- KHUNG DỰ ĐOÁN AI -->
     <div class="prediction-box" id="predictionBox">
       <div class="pred-result-flash" id="predResultFlash"></div>
       <div class="pred-left">
@@ -304,7 +300,6 @@ tr:hover td{background:rgba(96,165,250,.04)}
       </div>
     </div>
 
-    <!-- KHU VỰC THÔNG TIN & CHỐT LÃI -->
     <div class="info-grid">
       <div class="info-item"><span class="info-label">NICKNAME</span><div class="info-value" id="nicknameDisplay">—</div></div>
       <div class="info-item"><span class="info-label">SỐ DƯ</span><div class="info-value" id="balanceDisplay">0</div></div>
@@ -341,9 +336,11 @@ let curState = null;
 let lastBalance = 0;
 let saveTimer = null;
 let lastProcessedSession = 0;
+let currentKey = null;
 
 const STORAGE_KEY_BALANCE = 'lc79_balance';
 const STORAGE_KEY_CONFIG  = 'lc79_config';
+const STORAGE_KEY_LICENSE = 'lc79_license';
 
 function saveBalance(b){ try{ localStorage.setItem(STORAGE_KEY_BALANCE, JSON.stringify({balance:b,timestamp:Date.now()})); }catch(e){} }
 function loadBalance(){ try{ const r=localStorage.getItem(STORAGE_KEY_BALANCE); if(!r)return null; const d=JSON.parse(r); if(Date.now()-d.timestamp<864e5)return d.balance; localStorage.removeItem(STORAGE_KEY_BALANCE); }catch(e){} return null; }
@@ -384,7 +381,8 @@ async function pushConfigToServer(cfg){
         betAmount:cfg.betAmount,
         x2_loss_mode:true,
         x2_loss_limit:cfg.x2Limit,
-        target_profit:cfg.targetProfit||null
+        target_profit:cfg.targetProfit||null,
+        license_key: currentKey
       })});
     toast('💾 Đã lưu cài đặt cược','success');
   }catch(e){ toast('Lỗi lưu cài đặt: '+e.message,'error'); }
@@ -467,6 +465,20 @@ function updateBetBadge(betAmount){
   }
 }
 
+async function verifyLicenseKey(key){
+  try{
+    const r = await fetch('/api/verify_key', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ key })
+    });
+    const d = await r.json();
+    return { ok: !!d.success, message: d.message || d.error || 'Key không hợp lệ' };
+  }catch(e){
+    return { ok: false, message: 'Không thể xác thực key: ' + e.message };
+  }
+}
+
 function processResult(payload){
   if(!payload) return;
   if(payload.balance!==undefined) updateBalanceUI(payload.balance,true);
@@ -482,22 +494,45 @@ function processResult(payload){
 async function handleLogin(){
   const u=document.getElementById('username').value.trim();
   const p=document.getElementById('password').value.trim();
+  const k=document.getElementById('licenseKey').value.trim();
+
   if(!u||!p) return toast('Nhập đủ tài khoản/mật khẩu','error');
+  if(!k)     return toast('Vui lòng nhập KEY kích hoạt!','error');
 
   const btn=document.getElementById('btnLogin');
+  const originalText = btn.innerHTML;
   btn.disabled=true;
-  btn.innerHTML='<span class="spinner"></span> Đang đăng nhập...';
+  btn.innerHTML='<span class="spinner"></span> Đang xác thực KEY...';
 
+  // Xác thực key
+  const verify = await verifyLicenseKey(k);
+  if(!verify.ok){
+    toast('❌ KEY không hợp lệ: ' + verify.message, 'error');
+    btn.disabled=false; btn.innerHTML=originalText;
+    return;
+  }
+
+  // Đăng nhập
+  btn.innerHTML='<span class="spinner"></span> Đang đăng nhập...';
   try{
-    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:u,password:p,license_key:k})});
     const d=await r.json();
     if(!d.success){
       toast(d.error||'Lỗi đăng nhập','error');
-      btn.disabled=false; btn.innerText='ĐĂNG NHẬP'; return;
+      btn.disabled=false; btn.innerHTML=originalText; return;
     }
+
+    currentKey = k;
+    try{ localStorage.setItem(STORAGE_KEY_LICENSE, k); }catch(e){}
+
+    // Chuyển đổi giao diện
+    document.getElementById('bodyTag').className = 'main-mode';
     document.getElementById('loginView').style.display='none';
     document.getElementById('mainView').style.display='flex';
+    
     document.getElementById('nicknameDisplay').innerText=d.nickname;
+    document.getElementById('keyDisplay').innerText=k.slice(0,4)+'****'+k.slice(-3);
 
     const cachedBalance=loadBalance();
     updateBalanceUI(cachedBalance!==null?cachedBalance:d.balance);
@@ -514,12 +549,12 @@ async function handleLogin(){
     setTimeout(pollStats,500);
   }catch(e){
     toast('Lỗi kết nối server: '+e.message,'error');
-    btn.disabled=false; btn.innerText='ĐĂNG NHẬP';
+    btn.disabled=false; btn.innerHTML=originalText;
   }
 }
 
 function connectSocket(){
-  socket=io(window.location.origin,{transports:['websocket','polling']});
+  socket=io(window.location.origin,{transports:['websocket','polling'],auth:{license_key: currentKey}});
 
   socket.on('connect',()=>{
     document.getElementById('statusText').innerText='Đã kết nối Server';
@@ -567,7 +602,7 @@ function connectSocket(){
 
 async function pollStats(){
   try{
-    const r=await fetch('/api/stats');
+    const r=await fetch('/api/stats',{headers:{'X-License-Key': currentKey||''}});
     const d=await r.json();
     if(d.success){
       applyState(d.state);
@@ -664,6 +699,7 @@ function renderHistory(rows){
 }
 
 async function toggleAuto(){
+  if(!currentKey){ toast('Chưa xác thực KEY','error'); return; }
   const cfg=readConfigFromInputs(); saveConfig(cfg);
   const newVal=!autoOn;
   await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -672,20 +708,22 @@ async function toggleAuto(){
       betAmount:cfg.betAmount,
       x2_loss_mode:true,
       x2_loss_limit:cfg.x2Limit,
-      target_profit:cfg.targetProfit||null
+      target_profit:cfg.targetProfit||null,
+      license_key: currentKey
     })});
   toast(newVal?'✅ Đã bật chế độ Auto Cược':'⏸ Đã tắt chế độ Auto Cược',newVal?'success':'info');
   pollStats();
 }
 
 async function stopBot(){
-  await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({auto_bet_enabled:false})});
+  await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({auto_bet_enabled:false, license_key: currentKey})});
   autoOn=false; toast('Đã ngắt Bot khẩn cấp','error'); pollStats();
 }
 
 async function resetHistory(){
   if(!confirm('Xóa toàn bộ lịch sử và đưa lợi nhuận về 0?')) return;
-  await fetch('/api/reset_history',{method:'POST'});
+  await fetch('/api/reset_history',{method:'POST',headers:{'X-License-Key': currentKey||''}});
   toast('Đã xóa lịch sử','success');
   updateProfitUI(0);
   localStorage.removeItem(STORAGE_KEY_BALANCE);
@@ -704,6 +742,13 @@ setInterval(()=>{
 (function init(){
   const cfg=loadConfig();
   if(cfg) applyConfigToInputs(cfg);
+
+  try{
+    const savedKey = localStorage.getItem(STORAGE_KEY_LICENSE);
+    if(savedKey){
+      document.getElementById('licenseKey').value = savedKey;
+    }
+  }catch(e){}
 })();
 </script>
 </body>
