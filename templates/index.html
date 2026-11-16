@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TOOL AUTO LC79</title>
+<title>TOOL AUTO LC79 - FIXED</title>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -384,7 +384,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
 <div class="main-wrapper" id="mainView">
   <div class="top-header">
     <div class="logo-text">
-      <h1>TOOL AUTO LC79</h1>
+      <h1>TOOL AUTO LC79 - FIXED</h1>
       <p>Hệ thống phân tích cầu & dự đoán Tài Xỉu tự động</p>
     </div>
   </div>
@@ -433,7 +433,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
       <table>
         <thead>
           <tr>
-            <th>PHIÊN</th><th>DỰ ĐOÁN</th><th>CƯỢC</th>
+            <th>PHIÊN</th><th>CỬA ĐẶT</th><th>CƯỢC</th>
             <th>KẾT QUẢ</th><th>XÚC XẮC</th><th>KẾT LUẬN</th>
           </tr>
         </thead>
@@ -455,10 +455,10 @@ let saveTimer = null;
 let lastProcessedSession = 0;
 let mySid = null;
 
-/* 🔒 KHÓA CỬA CƯỢC THEO PHIÊN — FIX LỖI API BÁO KHÁC CƯỢC KHÁC */
-let lockedBetSession = null;   // phiên đã đặt cược
-let lockedBetSide = null;      // "TAI" hoặc "XIU" — cửa THỰC TẾ đã đặt
-let lockedBetAmount = 0;       // số tiền thực tế đã đặt
+/* 🔒 KHÓA CỬA CƯỢC THEO PHIÊN */
+let lockedBetSession = null;   
+let lockedBetSide = null;      
+let lockedBetAmount = 0;       
 
 const STORAGE_KEY_BALANCE = 'lc79_balance';
 const STORAGE_KEY_CONFIG  = 'lc79_config';
@@ -554,17 +554,21 @@ async function pushConfigToServer(cfg){
 /* ============================================
    UI HELPERS
 ============================================ */
-function showResultFlash(isWin, result, pred, actualSide){
+function showResultFlash(isWin, result, betSide, actualSide){
   const flash=document.getElementById('predResultFlash');
   const box=document.getElementById('predictionBox');
   const sideTxt = actualSide ? ` (đã đặt: ${actualSide})` : '';
+  
+  // Xác định cửa thắng dựa trên kết quả
+  const actualWinSide = result ? (['TÀI','TAI'].includes(result.toUpperCase()) ? 'TÀI' : 'XỈU') : '';
+
   if(isWin){
-    flash.innerHTML=`<div class="text-win">✓ THẮNG</div><small>Phiên trước: ${pred?String(pred).toUpperCase():'—'}${sideTxt} → ${result||'—'}</small>`;
+    flash.innerHTML=`<div class="text-win">✓ THẮNG</div><small>Phiên trước: Đặt ${betSide?betSide.toUpperCase():'—'} → Kết quả: ${result||'—'} (${actualWinSide})</small>`;
     flash.className='pred-result-flash';
     playSound('win');
     box.style.borderColor='#34d399';
   }else{
-    flash.innerHTML=`<div class="text-lose">✗ THUA</div><small>Phiên trước: ${pred?String(pred).toUpperCase():'—'}${sideTxt} → ${result||'—'}</small>`;
+    flash.innerHTML=`<div class="text-lose">✗ THUA</div><small>Phiên trước: Đặt ${betSide?betSide.toUpperCase():'—'} → Kết quả: ${result||'—'} (${actualWinSide})</small>`;
     flash.className='pred-result-flash lose';
     playSound('lose');
     box.style.borderColor='#f87171';
@@ -622,9 +626,7 @@ function updateProfitUI(profit){
 }
 
 /* ============================================
-   🔒 CẬP NHẬT PREDICTION — FIX CHÍNH
-   Quy tắc: Nếu phiên hiện tại ĐÃ ĐẶT CƯỢC → hiển thị cửa ĐÃ ĐẶT
-             Nếu chưa đặt → hiển thị dự đoán mới nhất từ API
+   CẬP NHẬT PREDICTION
 ============================================ */
 function updatePredictionUI(state){
   const el       = document.getElementById('predValue');
@@ -635,37 +637,30 @@ function updatePredictionUI(state){
 
   const sessionId = state.session_id;
   const apiPred   = state.current_prediction || state.prediction;
-  // Backend NÊN trả 2 field: current_bet (số tiền) và current_bet_side (TAI/XIU)
   const betAmt    = Number(state.current_bet || 0);
-  const betSide   = state.current_bet_side
-                    ? String(state.current_bet_side).toUpperCase()
-                    : null;
+  const betSide   = state.current_bet_side ? String(state.current_bet_side).toUpperCase() : null;
 
-  // ✅ NẾU có cược trong phiên này → KHÓA cửa theo cửa đã đặt
+  // Nếu có cược trong phiên này
   if (betAmt > 0 && betSide) {
     if (lockedBetSession !== sessionId) {
       lockedBetSession = sessionId;
       lockedBetSide    = betSide;
       lockedBetAmount  = betAmt;
     }
-    // Hiển thị cửa ĐÃ ĐẶT, không phải dự đoán mới
     el.innerText = lockedBetSide;
     el.className = 'pred-value val-locked ' + (lockedBetSide.startsWith('T') ? 'val-tai' : 'val-xiu');
     labelTxt.innerText = 'CỬA ĐÃ ĐẶT CƯỢC';
     lockIcon.style.display = 'inline';
     box.classList.add('locked');
 
-    // ⚠️ Cảnh báo nếu API đổi prediction khác cửa đã đặt (lỗi timing)
     if (apiPred && String(apiPred).toUpperCase() !== lockedBetSide) {
-      percent.innerText = `⚠️ API báo ${String(apiPred).toUpperCase()} nhưng đã đặt ${lockedBetSide} (${betAmt.toLocaleString()}đ)`;
+      percent.innerText = `⚠️ Hệ thống báo ${String(apiPred).toUpperCase()} nhưng bạn đã đặt ${lockedBetSide}`;
       percent.className = 'pred-percent locked';
     } else {
-      percent.innerText = `✓ Khớp lệnh — ${betAmt.toLocaleString()}đ`;
+      percent.innerText = `✓ Đã khớp lệnh — ${betAmt.toLocaleString()}đ`;
       percent.className = 'pred-percent locked';
     }
   } else {
-    // 🟢 Chưa đặt cược → hiển thị dự đoán mới nhất
-    // (Reset lock nếu sang phiên mới chưa đặt)
     if (lockedBetSession !== null && lockedBetSession !== sessionId) {
       lockedBetSession = null; lockedBetSide = null; lockedBetAmount = 0;
     }
@@ -713,18 +708,45 @@ function showForceModal(title, msg){
 }
 
 /* ============================================
-   RESULT PROCESSING
+   XỬ LÝ KẾT QUẢ
 ============================================ */
 function processResult(payload){
   if(!payload) return;
   if(payload.balance!==undefined) updateBalanceUI(payload.balance,true);
   if(payload.profit_loss!==undefined) updateProfitUI(payload.profit_loss);
   if(payload.history) renderHistory(payload.history);
-  if(payload.session && payload.session !== lastProcessedSession &&
+
+  // Kiểm tra nếu có kết quả của phiên mới
+  if(payload.session && payload.session > lastProcessedSession &&
      payload.is_win !== null && payload.is_win !== undefined && payload.result){
     lastProcessedSession = payload.session;
-    // ✅ Dùng side thực tế đã đặt để flash
-    showResultFlash(payload.is_win, payload.result, payload.pred, payload.bet_side || payload.pred);
+    
+    // Lấy cửa đặt thực tế từ lịch sử
+    const latestHistory = payload.history && payload.history.length ? payload.history[0] : null;
+    const actualBetSide = latestHistory ? (latestHistory.bet_side || latestHistory.pred) : payload.pred;
+
+    // Fix lỗi logic: Tự tính lại win/loss dựa trên kết quả xúc xắc để đối chiếu
+    let calculatedWin = payload.is_win;
+    if (payload.result && actualBetSide) {
+      const resultSum = payload.dice ? payload.dice.reduce((a, b) => a + b, 0) : 0;
+      const isTaiResult = resultSum >= 11;
+      const isXiuResult = resultSum <= 10;
+      
+      const isBetTai = String(actualBetSide).toUpperCase().startsWith('T');
+      const isBetXiu = String(actualBetSide).toUpperCase().startsWith('X');
+
+      if (isBetTai && isXiuResult) calculatedWin = false;
+      if (isBetXiu && isTaiResult) calculatedWin = false;
+      if ((isBetTai && isTaiResult) || (isBetXiu && isXiuResult)) calculatedWin = true;
+    }
+
+    // Ghi đè nếu Backend trả sai
+    if (calculatedWin !== payload.is_win) {
+      console.warn(`Phát hiện lỗi Backend: Hệ thống báo ${payload.is_win ? 'thắng' : 'thua'} nhưng thực tế là ${calculatedWin ? 'thắng' : 'thua'}.`);
+      payload.is_win = calculatedWin;
+    }
+
+    showResultFlash(payload.is_win, payload.result, actualBetSide, actualBetSide);
   }
 }
 
@@ -810,12 +832,11 @@ function connectSocket(sid){
   socket.on('session_update', d => {
     document.getElementById('sessionValue').innerText='#'+d.session_id;
 
-    // ✅ FIX: Gộp state lại để dùng chung updatePredictionUI
     updatePredictionUI({
       session_id: d.session_id,
       current_prediction: d.prediction,
       current_bet: d.current_bet,
-      current_bet_side: d.current_bet_side,  // backend nên trả field này
+      current_bet_side: d.current_bet_side,
       ready: d.ready,
       conf: d.conf,
       history_len: d.history_len
@@ -902,7 +923,6 @@ function applyState(s){
 
   if(s.session_id) document.getElementById('sessionValue').innerText='#'+s.session_id;
 
-  // ✅ FIX: Dùng hàm chung updatePredictionUI
   updatePredictionUI(s);
 
   if(s.base_bet_amount!==undefined && !loadConfig()){
@@ -936,7 +956,7 @@ function applyState(s){
 }
 
 /* ============================================
-   RENDER HISTORY — hiển thị rõ cửa đã đặt vs kết quả
+   RENDER LỊCH SỬ
 ============================================ */
 function renderHistory(rows){
   const tb=document.getElementById('historyBody');
@@ -947,7 +967,6 @@ function renderHistory(rows){
   }
   rows.forEach(r=>{
     const tr=document.createElement('tr');
-    // ✅ Ưu tiên bet_side (cửa THỰC TẾ đã đặt) — fallback pred (dự đoán)
     const betSide = String(r.bet_side || r.pred || '').toUpperCase();
     const predU = betSide;
     const resU = String(r.result||'').toUpperCase();
@@ -959,8 +978,11 @@ function renderHistory(rows){
         ? '<span class="val-lose">✗ THUA</span>'
         : '—';
     const dice = Array.isArray(r.dice)?r.dice.slice(0,3).join(' - '):'—';
+    
     if(r.win===true) tr.style.background='rgba(52,211,153,.06)';
     else if(r.win===false) tr.style.background='rgba(248,113,113,.06)';
+    
+    // Đã đổi tiêu đề cột từ DỰ ĐOÁN thành CỬA ĐẶT
     tr.innerHTML=`
       <td>#${r.session}</td>
       <td class="${predClass}">${predU||'—'}</td>
