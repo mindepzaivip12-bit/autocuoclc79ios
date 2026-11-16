@@ -27,8 +27,7 @@ GAME_WS_NS      = "/txmd5"
 COMMON_PARAMS   = "cp=R&cl=R&pf=web"
 
 # ===== KEY SERVER =====
-# Thay đúng link Render của bạn ở đây (không có dấu / ở cuối)
-KEY_SERVER_URL     = "https://bontooltxios.onrender.com" 
+KEY_SERVER_URL     = "https://leminhadminios.onrender.com"
 KEY_CHECK_INTERVAL = 30   # giây — kiểm tra lại key định kỳ
 
 # ==========================================
@@ -44,56 +43,31 @@ WS_CLIENTS   = {}
 API_LAST_RAW = {"data": None, "ts": 0, "error": None}
 
 # ==========================================
-# KEY SERVER HELPERS (ĐÃ ĐỒNG BỘ VỚI SERVER.JS)
+# KEY SERVER HELPERS
 # ==========================================
 def key_server_verify(key, device):
-    """
-    Hàm này dùng để kích hoạt key.
-    Gọi tới API /api/activate của Server Node.js bên kia.
-    """
     try:
-        # Gửi dữ liệu lên Server
-        payload = {"key": key}
         r = requests.post(
-            f"{KEY_SERVER_URL}/api/activate",
-            json=payload,
+            f"{KEY_SERVER_URL}/api/verify_key",
+            json={"key": key, "device": device},
             timeout=15,
         )
-        data = r.json()
-        
-        # Server Node.js trả về { success: true, msg: "..." }
-        if data.get("success"):
-            return {"success": True, "msg": data.get("msg")}
-        else:
-            return {"success": False, "error": data.get("msg", "Key không hợp lệ")}
-            
+        return r.json()
     except Exception as e:
         logger.error(f"[KeyServer] verify fail: {e}")
         return {"success": False, "error": f"Không kết nối được server key: {e}"}
 
 def key_server_check(key, device):
-    """
-    Hàm này chạy ngầm định kỳ 30s/lần để check xem Admin có Reset IP hoặc Xóa Key không.
-    Gọi lại /api/activate lần nữa để check trạng thái mới nhất.
-    """
     try:
-        payload = {"key": key}
         r = requests.post(
-            f"{KEY_SERVER_URL}/api/activate",
-            json=payload,
+            f"{KEY_SERVER_URL}/api/check_key",
+            json={"key": key, "device": device},
             timeout=15,
         )
-        data = r.json()
-        
-        if data.get("success"):
-            return {"success": True}
-        else:
-            # Nếu server báo false (hết hạn, bị khóa IP, hoặc bảo trì)
-            return {"success": False, "error": data.get("msg", "Key bị từ chối")}
-            
+        return r.json()
     except Exception as e:
         logger.error(f"[KeyServer] check fail: {e}")
-        # Grace: tránh logout nhầm khi server key tạm down (mất mạng)
+        # Grace: tránh logout nhầm khi server key tạm down
         return {"success": True, "grace": True, "error": str(e)}
 
 # ==========================================
@@ -134,22 +108,28 @@ def key_monitor_worker(sid):
         st = WEB_SESSIONS[sid]
         key        = st.get("key")
         device     = st.get("device")
+        expires_at = st.get("key_expires_at", 0)
 
         if not key or not device:
             break
 
-        # Server check (bắt trường hợp admin xóa key, reset IP, hoặc bật bảo trì)
+        # 1) Local expiry check (nhanh, không phụ thuộc server)
+        if expires_at and time.time() > expires_at:
+            force_logout(sid, "Key đã hết hạn", expired=True)
+            break
+
+        # 2) Server check (bắt trường hợp admin revoke)
         result = key_server_check(key, device)
         if not result.get("success") and not result.get("grace"):
             force_logout(
                 sid,
-                result.get("error", "Key không hợp lệ hoặc đã bị Admin Reset IP"),
-                expired=True,
+                result.get("error", "Key không hợp lệ"),
+                expired=result.get("expired", False),
             )
             break
 
 # ==========================================
-# API LỊCH SỬ
+# API LỊCH SỬ — giữ nguyên văn
 # ==========================================
 def fetch_api_raw():
     try:
@@ -214,7 +194,7 @@ def api_data_worker():
 socketio.start_background_task(api_data_worker)
 
 # ==========================================
-# DỰ ĐOÁN
+# DỰ ĐOÁN — lấy nguyên văn API
 # ==========================================
 def get_prediction():
     if API_LAST_RAW["data"] and (time.time() - API_LAST_RAW["ts"]) < 1.5:
@@ -537,6 +517,8 @@ def public_state(st):
         "loss_streak": st["loss_streak"],
         "socket_connected": st["socket_connected"],
         "history": st["history"][:15],
+        "key_expires_at": st.get("key_expires_at"),
+        "key_remaining": max(0, (st.get("key_expires_at") or 0) - time.time()),
     }
 
 # ==========================================
@@ -557,7 +539,7 @@ def stats_broadcast_worker():
 socketio.start_background_task(stats_broadcast_worker)
 
 # ==========================================
-# SOCKET JOIN
+# SOCKET JOIN (để nhận event theo room)
 # ==========================================
 @socketio.on("join_session")
 def on_join_session(data):
@@ -573,6 +555,16 @@ def on_join_session(data):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+@app.route("/api/verify_key", methods=["POST"])
+def api_verify_key():
+    """Pre-check key trước khi login (frontend gọi để hiển thị hạn)."""
+    data   = request.json or {}
+    key    = (data.get("key") or "").strip().upper()
+    device = (data.get("device") or "").strip()
+    if not key or not device:
+        return jsonify({"success": False, "error": "Thiếu key hoặc device"})
+    return jsonify(key_server_verify(key, device))
 
 @app.route("/api/login", methods=["POST"])
 def api_login():
@@ -595,6 +587,7 @@ def api_login():
         return jsonify({
             "success": False,
             "error": kr.get("error", "Key không hợp lệ"),
+            "expired": kr.get("expired", False),
         })
 
     # Login game
@@ -611,6 +604,7 @@ def api_login():
         "username": username,
         "key": key,
         "device": device,
+        "key_expires_at": kr.get("expires_at", 0),
         "profit_loss": 0,
         "auto_bet_enabled": False,
         "x2_mode": False,
@@ -640,6 +634,8 @@ def api_login():
         "sid": sid,
         "nickname": res["nickname"],
         "balance": res["money"],
+        "key_expires_at": kr.get("expires_at"),
+        "key_remaining": kr.get("remaining"),
     })
 
 @app.route("/api/config", methods=["POST"])
