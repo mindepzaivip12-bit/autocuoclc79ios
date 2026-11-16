@@ -9,7 +9,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',sans-serif}
 
-/* ===== NỀN TỐI + XANH DƯƠNG NHẠT ===== */
 body{
   background:linear-gradient(135deg,#0a0f1e 0%,#0f172a 50%,#0b1220 100%);
   min-height:100vh;display:flex;justify-content:center;align-items:center;
@@ -110,7 +109,6 @@ body::after{
 }
 .btn-apply:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,130,246,.45)}
 .btn-apply:active{transform:translateY(0)}
-.btn-apply:disabled{opacity:.6;cursor:not-allowed;transform:none}
 
 /* ===== LOGIN ===== */
 .login-container{
@@ -134,12 +132,11 @@ body::after{
 .btn-login{
   width:100%;padding:12px;background:linear-gradient(135deg,#3b82f6,#60a5fa);
   color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;
-  transition:.2s;box-shadow:0 4px 14px rgba(59,130,246,.3);
+  transition:.2s;box-shadow:0 4px 14px rgba(59,130,246,.3); margin-top: 5px;
 }
 .btn-login:hover{background:linear-gradient(135deg,#2563eb,#3b82f6);transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,130,246,.45)}
 .btn-login:disabled{opacity:.6;cursor:not-allowed;transform:none}
 
-/* ===== TELEGRAM LINK ===== */
 .tele-contact{
   display:flex;align-items:center;justify-content:center;gap:8px;
   margin-top:18px;padding:12px;border-radius:10px;
@@ -170,7 +167,6 @@ body::after{
   font-size:14px;color:#93c5fd;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:20px;
 }
 
-/* ===== BADGES ===== */
 .status-badges{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
 .badge{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600}
 .badge-online{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3)}
@@ -180,13 +176,14 @@ body::after{
 .badge-bet{background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.3)}
 .badge-bet.off{background:rgba(71,85,105,.3);color:#94a3b8;border-color:#334155}
 .badge-bet.active{background:rgba(16,185,129,.15);color:#34d399;border-color:rgba(16,185,129,.4)}
+.badge-key{background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.3)}
 .dot{width:6px;height:6px;border-radius:50%;background:#60a5fa}
 .dot-green{background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.6)}
 .dot-red{background:#f87171;box-shadow:0 0 8px rgba(248,113,113,.6)}
 .dot-gray{background:#64748b}
 .dot-active{background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.8)}
+.dot-yellow{background:#fbbf24;box-shadow:0 0 8px rgba(251,191,36,.6)}
 
-/* ===== PREDICTION BOX ===== */
 .prediction-box{
   background:linear-gradient(135deg,#0b1220 0%,#0f172a 100%);
   border:1px solid rgba(96,165,250,0.2);border-radius:12px;padding:20px;
@@ -216,7 +213,6 @@ body::after{
 .session-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:4px;display:block;letter-spacing:.5px}
 .session-value{font-size:16px;font-weight:800;color:#e2e8f0;text-shadow:0 0 10px rgba(96,165,250,.2)}
 
-/* ===== FLASH RESULT ===== */
 .pred-result-flash{
   position:absolute;top:0;left:0;width:100%;height:100%;
   background:rgba(16,185,129,0.15);
@@ -232,7 +228,6 @@ body::after{
 @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
 .pred-result-flash .text-win, .pred-result-flash .text-lose{animation:pulse 0.5s ease}
 
-/* ===== INFO GRID ===== */
 .info-grid{
   display:grid;grid-template-columns:1fr 1fr;
   border:1px solid rgba(96,165,250,0.15);border-radius:12px;margin-bottom:20px;overflow:hidden;
@@ -245,7 +240,6 @@ body::after{
 .info-value{font-size:15px;font-weight:700;color:#e2e8f0}
 .info-item.highlight{background:rgba(96,165,250,.05)!important}
 
-/* ===== BUTTONS ===== */
 .action-buttons{display:flex;gap:12px;margin-bottom:25px;flex-wrap:wrap}
 .btn-action{
   padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;
@@ -256,7 +250,6 @@ body::after{
 .btn-stop-bot{background:linear-gradient(135deg,#ef4444,#f87171);box-shadow:0 4px 14px rgba(239,68,68,.3)}
 .btn-action:hover{transform:translateY(-2px);filter:brightness(1.1)}
 
-/* ===== TABLE ===== */
 .table-title{font-size:13px;color:#93c5fd;font-weight:600;text-transform:uppercase;margin-bottom:15px;letter-spacing:.5px}
 .table-wrapper{overflow-x:auto;border-radius:8px}
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -272,7 +265,6 @@ tr:hover td{background:rgba(96,165,250,.04)}
 .val-win{color:#34d399;text-shadow:0 0 8px rgba(52,211,153,.4)}
 .val-lose{color:#f87171;text-shadow:0 0 8px rgba(248,113,113,.4)}
 
-/* ===== TOAST ===== */
 .toast-wrap{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:320px}
 .toast{
   padding:12px 16px;border-radius:8px;color:#fff;font-weight:600;font-size:13px;
@@ -283,7 +275,6 @@ tr:hover td{background:rgba(96,165,250,.04)}
 .toast.info{background:linear-gradient(135deg,rgba(59,130,246,.9),rgba(96,165,250,.9));border:1px solid rgba(96,165,250,.5)}
 @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
 
-/* ===== SPINNER ===== */
 .spinner{
   display:inline-block;width:12px;height:12px;border:2px solid #fff;
   border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;
@@ -291,45 +282,58 @@ tr:hover td{background:rgba(96,165,250,.04)}
 }
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* ===== ANIMATIONS ===== */
 .balance-update{animation:flashBalance 0.5s ease}
 @keyframes flashBalance{0%{background:rgba(52,211,153,.25)}100%{background:transparent}}
 
-/* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-track{background:#0b1220}
 ::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}
 ::-webkit-scrollbar-thumb:hover{background:#334155}
+
+/* ===== FORCE LOGOUT MODAL ===== */
+.force-modal{
+  position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);
+  z-index:10000;display:none;align-items:center;justify-content:center;padding:20px;
+}
+.force-modal.show{display:flex}
+.force-modal-box{
+  background:#111827;border:1px solid rgba(239,68,68,.4);border-radius:16px;
+  padding:30px;max-width:400px;width:100%;text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,.8);
+}
+.force-modal-box h2{color:#f87171;font-size:22px;margin-bottom:12px}
+.force-modal-box p{color:#cbd5e1;font-size:14px;margin-bottom:20px;line-height:1.6}
+.force-modal-box button{
+  padding:12px 24px;border:none;border-radius:8px;cursor:pointer;
+  background:linear-gradient(135deg,#3b82f6,#60a5fa);color:#fff;
+  font-weight:700;font-size:14px;
+}
 </style>
 </head>
 <body>
 
 <div class="toast-wrap" id="toasts"></div>
 
+<!-- FORCE LOGOUT MODAL -->
+<div class="force-modal" id="forceModal">
+  <div class="force-modal-box">
+    <h2 id="forceTitle">🔒 Phiên đã kết thúc</h2>
+    <p id="forceMsg">Key đã hết hạn hoặc bị thu hồi.</p>
+    <button onclick="location.reload()">ĐĂNG NHẬP LẠI</button>
+  </div>
+</div>
+
 <!-- HAMBURGER -->
 <div class="hamburger" id="hamburger" onclick="toggleDrawer()">
   <span></span><span></span><span></span>
 </div>
 
-<!-- DRAWER OVERLAY -->
 <div class="drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()"></div>
 
-<!-- DRAWER -->
 <div class="drawer" id="drawer">
   <div class="drawer-header">
     <h3>⚙️ CÀI ĐẶT</h3>
     <button class="drawer-close" onclick="toggleDrawer()">×</button>
-  </div>
-
-  <!-- LOGIN KEY -->
-  <div class="drawer-section">
-    <div class="drawer-section-title">🔑 LOGIN KEY</div>
-    <div class="drawer-field">
-      <label>Nhập key để mở khóa tool</label>
-      <input type="password" id="loginKeyInput" placeholder="Nhập key login..." onkeydown="if(event.key==='Enter')applyLoginKey()">
-      <div class="drawer-hint" id="keyStatusHint">Nhập key do admin cung cấp</div>
-    </div>
-    <button class="btn-apply" id="btnApplyKey" onclick="applyLoginKey()">XÁC NHẬN KEY</button>
   </div>
 
   <!-- CƯỢC CỐ ĐỊNH -->
@@ -340,26 +344,14 @@ tr:hover td{background:rgba(96,165,250,.04)}
       <input type="number" id="betAmount" value="10000" min="1000" step="1000" onchange="onConfigChange()">
       <div class="drawer-hint">Số tiền auto cược cố định mỗi phiên</div>
     </div>
-    <div class="drawer-field">
-      <label>Giới hạn gấp thếp <span class="saved-indicator" id="savedX2Limit">✓ đã lưu</span></label>
-      <input type="number" id="x2Limit" value="5" min="1" max="20" onchange="onConfigChange()">
-      <div class="drawer-hint">Số lần gấp đôi tối đa khi thua</div>
-    </div>
-    <div class="drawer-field">
-      <label>Chốt lãi (0 = Tắt) <span class="saved-indicator" id="savedTargetProfit">✓ đã lưu</span></label>
-      <input type="number" id="targetProfit" value="0" min="0" step="10000" onchange="onConfigChange()">
-      <div class="drawer-hint">Tự động dừng auto khi đạt lợi nhuận</div>
-    </div>
   </div>
 
-  <!-- HÀNH ĐỘNG -->
   <div class="drawer-section">
     <div class="drawer-section-title">🛠️ HÀNH ĐỘNG</div>
     <button class="btn-apply" style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3);box-shadow:none;margin-bottom:10px" onclick="resetHistory()">🗑 XÓA LỊCH SỬ</button>
     <button class="btn-apply" style="background:rgba(71,85,105,.3);color:#94a3b8;border:1px solid #334155;box-shadow:none" onclick="logout()">🚪 ĐĂNG XUẤT</button>
   </div>
 
-  <!-- LIÊN HỆ -->
   <div class="drawer-section">
     <div class="drawer-section-title">📞 LIÊN HỆ ADMIN</div>
     <a href="https://t.me/cskhleminh" target="_blank" class="tele-contact" style="margin-top:0">
@@ -378,7 +370,12 @@ tr:hover td{background:rgba(96,165,250,.04)}
   </div>
   <div class="form-group">
     <label>Mật khẩu</label>
-    <input type="password" id="password" placeholder="Nhập mật khẩu..." onkeydown="if(event.key==='Enter')handleLogin()">
+    <input type="password" id="password" placeholder="Nhập mật khẩu...">
+  </div>
+  <div class="form-group">
+    <label>Key bản quyền</label>
+    <input type="password" id="loginKeyInput" placeholder="Nhập key login..." onkeydown="if(event.key==='Enter')handleLogin()">
+    <div class="drawer-hint" id="keyStatusHint" style="margin-top:4px">Nhập key do admin cung cấp</div>
   </div>
   <button class="btn-login" id="btnLogin" onclick="handleLogin()">ĐĂNG NHẬP</button>
 
@@ -404,6 +401,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
       <div class="badge badge-online off" id="socketBadge"><div class="dot dot-gray" id="socketDot"></div> Socket: OFF</div>
       <div class="badge badge-auto off" id="autoStatusBadge"><div class="dot dot-gray"></div> AUTO: OFF</div>
       <div class="badge badge-bet off" id="betStatusBadge"><div class="dot dot-gray"></div> CƯỢC: CHỜ</div>
+      <div class="badge badge-key" id="keyBadge"><div class="dot dot-yellow"></div> KEY: —</div>
     </div>
 
     <div class="prediction-box" id="predictionBox">
@@ -460,71 +458,41 @@ let lastProcessedSession = 0;
 const STORAGE_KEY_BALANCE   = 'lc79_balance';
 const STORAGE_KEY_CONFIG    = 'lc79_config';
 const STORAGE_KEY_LOGIN_KEY = 'lc79_login_key';
+const STORAGE_KEY_DEVICE    = 'lc79_device_id';
 
-// Key đã xác thực thành công ở server (lưu tạm trong session)
-let verifiedKey = '';
+let keyExpiresAt = 0;
 
-// ============ LOGIN KEY — GỬI SERVER XÁC THỰC ============
-function getSavedLoginKey(){ try{ return localStorage.getItem(STORAGE_KEY_LOGIN_KEY)||''; }catch(e){ return ''; } }
-function setSavedLoginKey(k){ try{ localStorage.setItem(STORAGE_KEY_LOGIN_KEY, k); }catch(e){} }
-
-async function applyLoginKey(){
-  const k = document.getElementById('loginKeyInput').value.trim();
-  if(!k){
-    document.getElementById('keyStatusHint').innerText = '⚠ Vui lòng nhập key';
-    document.getElementById('keyStatusHint').style.color = '#fbbf24';
-    return;
-  }
-  const btn = document.getElementById('btnApplyKey');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Đang xác thực...';
-
+// ============ DEVICE ID ============
+function getDeviceId(){
   try{
-    const r = await fetch('/api/verify_key', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ key: k })
-    });
-    const d = await r.json();
-
-    if(d && d.success){
-      setSavedLoginKey(k);
-      verifiedKey = k;
-      document.getElementById('keyStatusHint').innerText = '✅ Key hợp lệ — đã lưu';
-      document.getElementById('keyStatusHint').style.color = '#34d399';
-      toast('✅ Key hợp lệ, đã mở khóa tool','success');
-      applyKeyGate();
-    }else{
-      setSavedLoginKey('');
-      verifiedKey = '';
-      document.getElementById('keyStatusHint').innerText = '❌ ' + (d && d.error ? d.error : 'Key không hợp lệ');
-      document.getElementById('keyStatusHint').style.color = '#f87171';
-      toast((d && d.error) || 'Key không hợp lệ','error');
-      applyKeyGate();
+    let id = localStorage.getItem(STORAGE_KEY_DEVICE);
+    if(!id){
+      id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+      id = 'web-' + id;
+      localStorage.setItem(STORAGE_KEY_DEVICE, id);
     }
+    return id;
   }catch(e){
-    document.getElementById('keyStatusHint').innerText = '❌ Lỗi kết nối server';
-    document.getElementById('keyStatusHint').style.color = '#f87171';
-    toast('Lỗi kết nối server: ' + e.message,'error');
-  }finally{
-    btn.disabled = false;
-    btn.innerText = 'XÁC NHẬN KEY';
+    return 'web-fallback-' + Date.now();
   }
 }
 
-function applyKeyGate(){
-  const savedKey = getSavedLoginKey();
-  const has = !!(savedKey || verifiedKey);
-  const btn = document.getElementById('btnLogin');
-  if(!has){
-    btn.disabled = true;
-    btn.innerText = '🔒 NHẬP KEY TRƯỚC';
-    btn.style.background = 'linear-gradient(135deg,#475569,#64748b)';
-  }else{
-    btn.disabled = false;
-    btn.innerText = 'ĐĂNG NHẬP';
-    btn.style.background = '';
-  }
+// ============ LOGIN KEY ============
+function getSavedLoginKey(){ try{ return localStorage.getItem(STORAGE_KEY_LOGIN_KEY)||''; }catch(e){ return ''; } }
+function setSavedLoginKey(k){ try{ localStorage.setItem(STORAGE_KEY_LOGIN_KEY, k); }catch(e){} }
+
+function formatRemaining(seconds){
+  if(!seconds || seconds <= 0) return '—';
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if(d > 0) return `${d}d ${h}h`;
+  if(h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
 }
 
 // ============ DRAWER ============
@@ -546,14 +514,10 @@ function saveConfig(cfg){ try{ localStorage.setItem(STORAGE_KEY_CONFIG, JSON.str
 function applyConfigToInputs(cfg){
   if(!cfg)return;
   if(cfg.betAmount!==undefined)    document.getElementById('betAmount').value    = cfg.betAmount;
-  if(cfg.x2Limit!==undefined)      document.getElementById('x2Limit').value      = cfg.x2Limit;
-  if(cfg.targetProfit!==undefined) document.getElementById('targetProfit').value = cfg.targetProfit;
 }
 function readConfigFromInputs(){
   return {
     betAmount:    parseInt(document.getElementById('betAmount').value)    || 10000,
-    x2Limit:      parseInt(document.getElementById('x2Limit').value)      || 5,
-    targetProfit: parseInt(document.getElementById('targetProfit').value) || 0
   };
 }
 function showSavedIndicator(id){
@@ -564,8 +528,6 @@ function onConfigChange(){
   const cfg=readConfigFromInputs();
   saveConfig(cfg);
   showSavedIndicator('savedBetAmount');
-  showSavedIndicator('savedX2Limit');
-  showSavedIndicator('savedTargetProfit');
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>pushConfigToServer(cfg),500);
 }
@@ -575,9 +537,8 @@ async function pushConfigToServer(cfg){
       body:JSON.stringify({
         auto_bet_enabled:autoOn,
         betAmount:cfg.betAmount,
-        x2_loss_mode:true,
-        x2_loss_limit:cfg.x2Limit,
-        target_profit:cfg.targetProfit||null
+        x2_loss_mode:false, // Tắt gấp thếp
+        target_profit:null  // Tắt chốt lãi
       })});
     toast('💾 Đã lưu cài đặt cược','success');
   }catch(e){ toast('Lỗi lưu cài đặt: '+e.message,'error'); }
@@ -660,6 +621,18 @@ function updateBetBadge(betAmount){
     badge.innerHTML='<div class="dot dot-gray"></div> CƯỢC: CHỜ';
   }
 }
+function updateKeyBadge(expiresAt){
+  const badge = document.getElementById('keyBadge');
+  if(!expiresAt){ badge.innerHTML='<div class="dot dot-yellow"></div> KEY: —'; return; }
+  const remaining = Math.max(0, expiresAt - Math.floor(Date.now()/1000));
+  if(remaining <= 0){
+    badge.innerHTML='<div class="dot dot-red"></div> KEY: HẾT HẠN';
+    badge.className='badge badge-online off';
+    return;
+  }
+  badge.className='badge badge-key';
+  badge.innerHTML=`<div class="dot dot-yellow"></div> KEY: ${formatRemaining(remaining)}`;
+}
 
 function processResult(payload){
   if(!payload) return;
@@ -675,15 +648,12 @@ function processResult(payload){
 
 // ============ LOGIN ============
 async function handleLogin(){
-  const savedKey = getSavedLoginKey();
-  if(!savedKey && !verifiedKey){
-    toast('Vui lòng nhập key ở menu ☰ trước','error');
-    toggleDrawer();
-    return;
-  }
-  const u=document.getElementById('username').value.trim();
-  const p=document.getElementById('password').value.trim();
-  if(!u||!p) return toast('Nhập đủ tài khoản/mật khẩu','error');
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value.trim();
+  const k = document.getElementById('loginKeyInput').value.trim();
+  
+  if(!u || !p) return toast('Nhập đủ tài khoản/mật khẩu','error');
+  if(!k) return toast('Vui lòng nhập key bản quyền','error');
 
   const btn=document.getElementById('btnLogin');
   btn.disabled=true;
@@ -693,16 +663,35 @@ async function handleLogin(){
     const r=await fetch('/api/login',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({username:u,password:p,login_key:(verifiedKey||savedKey)})
+      body:JSON.stringify({
+        username: u,
+        password: p,
+        key: k,
+        device: getDeviceId()
+      })
     });
     const d=await r.json();
     if(!d.success){
       toast(d.error||'Lỗi đăng nhập','error');
-      btn.disabled=false; btn.innerText='ĐĂNG NHẬP'; return;
+      btn.disabled=false; btn.innerText='ĐĂNG NHẬP'; 
+      document.getElementById('keyStatusHint').innerText = '❌ ' + (d.error || 'Sai thông tin');
+      document.getElementById('keyStatusHint').style.color = '#f87171';
+      return;
     }
+    
+    // Thành công
+    setSavedLoginKey(k);
+    document.getElementById('keyStatusHint').innerText = '✅ Đăng nhập thành công';
+    document.getElementById('keyStatusHint').style.color = '#34d399';
+    
     document.getElementById('loginView').style.display='none';
     document.getElementById('mainView').style.display='flex';
     document.getElementById('nicknameDisplay').innerText=d.nickname;
+
+    if(d.key_expires_at){
+      keyExpiresAt = d.key_expires_at;
+      updateKeyBadge(keyExpiresAt);
+    }
 
     const cachedBalance=loadBalance();
     updateBalanceUI(cachedBalance!==null?cachedBalance:d.balance);
@@ -713,7 +702,7 @@ async function handleLogin(){
       setTimeout(()=>pushConfigToServer(cachedCfg),300);
     }
 
-    connectSocket();
+    connectSocket(d.sid);
     toast('Đăng nhập thành công!','success');
     setTimeout(pollStats,500);
   }catch(e){
@@ -723,12 +712,13 @@ async function handleLogin(){
 }
 
 // ============ SOCKET ============
-function connectSocket(){
+function connectSocket(sid){
   socket=io(window.location.origin,{transports:['websocket','polling']});
 
   socket.on('connect',()=>{
     document.getElementById('statusText').innerText='Đã kết nối Server';
     document.getElementById('statusText').style.color='#34d399';
+    if(sid) socket.emit('join_session', { sid: sid });
   });
   socket.on('disconnect',()=>{
     document.getElementById('statusText').innerText='Mất kết nối Server';
@@ -736,6 +726,14 @@ function connectSocket(){
   });
 
   socket.on('toast',d=>toast(d.msg,d.type));
+
+  socket.on('force_logout', d => {
+    const modal = document.getElementById('forceModal');
+    document.getElementById('forceTitle').innerText = d.expired ? '🔒 Key đã hết hạn' : '🔒 Phiên bị thu hồi';
+    document.getElementById('forceMsg').innerText = d.reason || 'Key không còn hiệu lực.';
+    modal.classList.add('show');
+    if(socket){ try{ socket.disconnect(); }catch(e){} }
+  });
 
   socket.on('session_update',d=>{
     document.getElementById('sessionValue').innerText='#'+d.session_id;
@@ -757,6 +755,7 @@ function connectSocket(){
 
   socket.on('stats_update',s=>{
     applyState(s);
+    if(s.key_expires_at) updateKeyBadge(s.key_expires_at);
     if(Array.isArray(s.history) && s.history.length){
       const newest=s.history[0];
       if(newest && newest.session > lastProcessedSession &&
@@ -777,6 +776,7 @@ async function pollStats(){
     const d=await r.json();
     if(d.success){
       applyState(d.state);
+      if(d.state.key_expires_at) updateKeyBadge(d.state.key_expires_at);
       const s=d.state;
       if(Array.isArray(s.history) && s.history.length){
         const newest=s.history[0];
@@ -816,7 +816,7 @@ function applyState(s){
   }
 
   if(s.base_bet_amount!==undefined && !loadConfig()){
-    const cfg={betAmount:s.base_bet_amount,x2Limit:s.x2_loss_limit||5,targetProfit:s.target_profit||0};
+    const cfg={betAmount:s.base_bet_amount};
     applyConfigToInputs(cfg); saveConfig(cfg);
   }
 
@@ -879,9 +879,8 @@ async function toggleAuto(){
     body:JSON.stringify({
       auto_bet_enabled:newVal,
       betAmount:cfg.betAmount,
-      x2_loss_mode:true,
-      x2_loss_limit:cfg.x2Limit,
-      target_profit:cfg.targetProfit||null
+      x2_loss_mode:false, // Tắt gấp thếp
+      target_profit:null  // Tắt chốt lãi
     })});
   toast(newVal?'✅ Đã bật chế độ Auto Cược':'⏸ Đã tắt chế độ Auto Cược',newVal?'success':'info');
   pollStats();
@@ -910,6 +909,7 @@ async function logout(){
 
 setInterval(()=>{
   if(socket && socket.connected) pollStats();
+  if(keyExpiresAt) updateKeyBadge(keyExpiresAt);
 }, 3000);
 
 // ============ INIT ============
@@ -917,35 +917,9 @@ setInterval(()=>{
   const cfg=loadConfig();
   if(cfg) applyConfigToInputs(cfg);
 
-  // Khôi phục key đã lưu và xác thực lại với server
   const savedKey = getSavedLoginKey();
   if(savedKey){
     document.getElementById('loginKeyInput').value = savedKey;
-    // Xác thực ngầm — không chặn UI
-    fetch('/api/verify_key', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ key: savedKey })
-    }).then(r=>r.json()).then(d=>{
-      if(d && d.success){
-        verifiedKey = savedKey;
-        document.getElementById('keyStatusHint').innerText = '✅ Key hợp lệ — đã lưu';
-        document.getElementById('keyStatusHint').style.color = '#34d399';
-        applyKeyGate();
-      }else{
-        localStorage.removeItem(STORAGE_KEY_LOGIN_KEY);
-        document.getElementById('loginKeyInput').value = '';
-        document.getElementById('keyStatusHint').innerText = '⚠ Key đã lưu không còn hợp lệ';
-        document.getElementById('keyStatusHint').style.color = '#fbbf24';
-        applyKeyGate();
-      }
-    }).catch(()=>{
-      // Mất mạng — tạm cho phép dùng key đã lưu
-      verifiedKey = savedKey;
-      applyKeyGate();
-    });
-  } else {
-    applyKeyGate();
   }
 })();
 </script>
