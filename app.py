@@ -24,209 +24,111 @@
         }
 
         * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Inter', sans-serif;
-            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box; margin: 0; padding: 0;
+            font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            padding: 12px;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            overflow-x: hidden;
+            background-color: var(--bg-color); color: var(--text-main);
+            padding: 12px; min-height: 100vh; display: flex;
+            flex-direction: column; align-items: center; overflow-x: hidden;
         }
 
-        .container {
-            width: 100%;
-            max-width: 480px;
-        }
+        .container { width: 100%; max-width: 480px; }
 
-        /* ===== HIỆU ỨNG GIAO DIỆN ĐẸP ===== */
-        /* 1. Viền phát sáng cho các khối */
+        /* HIỆU ỨNG */
         @keyframes borderGlow {
             0% { box-shadow: 0 0 5px rgba(90, 95, 224, 0.2); }
             50% { box-shadow: 0 0 15px rgba(90, 95, 224, 0.6); }
             100% { box-shadow: 0 0 5px rgba(90, 95, 224, 0.2); }
         }
         .glow-border {
-            border: 1px solid transparent;
-            background-clip: padding-box;
-            position: relative;
-            animation: borderGlow 2.5s infinite alternate;
+            border: 1px solid transparent; background-clip: padding-box;
+            position: relative; animation: borderGlow 2.5s infinite alternate;
         }
-
-        /* 2. Hiệu ứng dòng mới chèn vào (Trượt nhẹ và hiện ra) */
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-10px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-        .new-row {
-            animation: slideIn 0.3s ease-out;
-        }
-
-        /* 3. Hiệu ứng nền nháy sáng khi thắng/thua */
-        @keyframes flashWin {
-            0% { background-color: rgba(0, 200, 81, 0.3); }
-            100% { background-color: rgba(0, 200, 81, 0.05); }
-        }
-        @keyframes flashLose {
-            0% { background-color: rgba(255, 68, 68, 0.3); }
-            100% { background-color: rgba(255, 68, 68, 0.05); }
-        }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+        .new-row { animation: slideIn 0.3s ease-out; }
+        @keyframes flashWin { 0% { background-color: rgba(0, 200, 81, 0.3); } 100% { background-color: rgba(0, 200, 81, 0.05); } }
+        @keyframes flashLose { 0% { background-color: rgba(255, 68, 68, 0.3); } 100% { background-color: rgba(255, 68, 68, 0.05); } }
         .row-win { animation: flashWin 1s ease-out; background-color: rgba(0, 200, 81, 0.05); }
         .row-lose { animation: flashLose 1s ease-out; background-color: rgba(255, 68, 68, 0.05); }
-
-        /* 4. Hiệu ứng Pulse cho nút Auto */
-        @keyframes pulseGreen {
-            0% { box-shadow: 0 0 0 0 rgba(0, 200, 81, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(0, 200, 81, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 200, 81, 0); }
-        }
+        @keyframes pulseGreen { 0% { box-shadow: 0 0 0 0 rgba(0, 200, 81, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(0, 200, 81, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 200, 81, 0); } }
         .btn-auto-off { background: var(--success); animation: pulseGreen 2s infinite; }
         .btn-auto-on { background: var(--danger); box-shadow: 0 0 10px rgba(255, 68, 68, 0.4); }
 
-        /* ===== HEADER ===== */
-        .header {
-            display: flex; align-items: center; gap: 10px;
-            margin-bottom: 12px; background: var(--card-bg);
-            padding: 10px 14px; border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-        }
-        .logo {
-            width: 36px; height: 36px;
-            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
-            border-radius: 8px; display: flex; align-items: center; justify-content: center;
-            font-weight: 800; color: #c0392b; font-size: 13px;
-        }
+        /* HEADER */
+        .header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; background: var(--card-bg); padding: 10px 14px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+        .logo { width: 36px; height: 36px; background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #c0392b; font-size: 13px; }
         .header-text h1 { font-size: 15px; color: var(--primary); font-weight: 800; }
         .header-text p { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
         .menu-icon { margin-left: auto; font-size: 18px; cursor: pointer; padding: 6px; }
 
-        /* ===== CARDS ===== */
-        .card {
-            background: var(--card-bg); border-radius: 14px; padding: 14px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 10px;
-        }
+        /* CARDS */
+        .card { background: var(--card-bg); border-radius: 14px; padding: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 10px; }
 
-        /* Form */
+        /* FORM */
         .form-group { margin-bottom: 10px; }
         .form-group label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
-        .form-control {
-            width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
-            font-size: 13px; outline: none; background: #FAFAFA;
-        }
+        .form-control { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; outline: none; background: #FAFAFA; }
         .form-control:focus { border-color: var(--primary); background: #fff; }
-
-        .btn {
-            width: 100%; padding: 12px; border: none; border-radius: 8px;
-            color: white; font-size: 13px; font-weight: 700; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 6px;
-        }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; color: white; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
         .btn:active { transform: scale(0.98); }
-        
-        /* ===== DASHBOARD ===== */
-        #dashboard { display: none; }
 
-        .top-bar {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 10px; background: var(--card-bg); padding: 8px 12px; border-radius: 10px;
-        }
+        /* DASHBOARD */
+        #dashboard { display: none; }
+        .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; background: var(--card-bg); padding: 8px 12px; border-radius: 10px; }
         .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); display: inline-block; margin-right: 4px; }
         .status-dot.online { background: var(--success); }
         .badge { font-size: 9px; padding: 3px 6px; border-radius: 20px; font-weight: 600; text-transform: uppercase; }
         .badge-green { background: var(--green-light); color: var(--success); }
         .badge-gray { background: #f0f0f0; color: #888; }
-        
-        /* Prediction Box */
-        .pred-box {
-            background: var(--purple-light); border-radius: 10px; padding: 12px;
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 10px; opacity: 0.6; transition: opacity 0.3s; border: 1px solid #e0d4ff;
-        }
+
+        /* PREDICTION */
+        .pred-box { background: var(--purple-light); border-radius: 10px; padding: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; opacity: 0.6; transition: opacity 0.3s; border: 1px solid #e0d4ff; }
         .pred-box.active { opacity: 1; box-shadow: 0 0 15px rgba(90, 95, 224, 0.15); }
         .pred-box .label { font-size: 10px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px; }
         .pred-box .value { font-size: 24px; font-weight: 800; color: var(--primary); }
         .pred-box .session { font-size: 11px; color: var(--text-muted); font-weight: 600; text-align: right; }
 
-        /* Stats Grid */
+        /* STATS */
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
         .stat-box { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
         .stat-box .label { font-size: 9px; color: var(--text-muted); margin-bottom: 2px; font-weight: 600;}
         .stat-box .value { font-size: 13px; font-weight: 700; }
-
-        /* Action Buttons */
         .action-btns { display: flex; gap: 8px; margin-top: 10px; }
-        
-        /* LỊCH SỬ CƯỢC */
+
+        /* HISTORY */
         .history-table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 11px; table-layout: fixed; }
-        .history-table th {
-            text-align: left; padding: 6px 2px; color: var(--text-muted); font-weight: 600;
-            border-bottom: 1px solid var(--border); font-size: 10px; white-space: nowrap;
-        }
-        .history-table td {
-            padding: 8px 2px; border-bottom: 1px solid #f9f9f9; font-weight: 500;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;
-        }
-        
+        .history-table th { text-align: left; padding: 6px 2px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); font-size: 10px; white-space: nowrap; }
+        .history-table td { padding: 8px 2px; border-bottom: 1px solid #f9f9f9; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
         .text-success { color: var(--success); font-weight: 800; font-size: 12px; }
         .text-danger { color: var(--danger); font-weight: 800; font-size: 12px; }
         .text-primary { color: var(--primary); font-weight: 700; }
         .text-muted { color: var(--text-muted); }
-
         .empty-history { text-align: center; padding: 15px; color: var(--text-muted); font-style: italic; }
 
-        /* ===== SIDEBAR ===== */
-        .sidebar {
-            position: fixed; top: 0; right: -300px; width: 280px; height: 100vh;
-            background: var(--sidebar-bg); z-index: 1000; transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: 20px; box-shadow: -5px 0 20px rgba(0,0,0,0.2); color: var(--sidebar-text);
-            display: flex; flex-direction: column;
-        }
+        /* SIDEBAR */
+        .sidebar { position: fixed; top: 0; right: -300px; width: 280px; height: 100vh; background: var(--sidebar-bg); z-index: 1000; transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1); padding: 20px; box-shadow: -5px 0 20px rgba(0,0,0,0.2); color: var(--sidebar-text); display: flex; flex-direction: column; }
         .sidebar.active { right: 0; }
         .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; color: white; }
         .sidebar-header h3 { font-size: 14px; }
         .close-btn { font-size: 18px; cursor: pointer; color: var(--sidebar-text); }
-        
-        .sidebar-stats {
-            background: rgba(255,255,255,0.05); border-radius: 10px;
-            padding: 12px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.05);
-        }
+        .sidebar-stats { background: rgba(255,255,255,0.05); border-radius: 10px; padding: 12px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.05); }
         .sidebar-item { display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center; }
         .sidebar-item:last-child { margin-bottom: 0; }
         .sidebar-item .label { font-size: 11px; }
         .sidebar-item .value { font-size: 13px; font-weight: 700; color: white; }
         .sidebar-item.profit .value { color: var(--success); text-shadow: 0 0 8px rgba(0,200,81,0.3); }
         .sidebar-item.loss .value { color: var(--danger); text-shadow: 0 0 8px rgba(255,68,68,0.3); }
-
         .sidebar-form { margin-bottom: 20px; }
         .sidebar-form label { color: var(--sidebar-text); font-size: 11px; margin-bottom: 6px; display: block; }
-        .sidebar-form input {
-            background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1);
-            color: white; padding: 10px; width: 100%; border-radius: 8px; outline: none; font-size: 13px;
-        }
-
-        .overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); z-index: 999;
-            display: none; opacity: 0; transition: opacity 0.3s;
-        }
+        .sidebar-form input { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px; width: 100%; border-radius: 8px; outline: none; font-size: 13px; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); z-index: 999; display: none; opacity: 0; transition: opacity 0.3s; }
         .overlay.active { display: block; opacity: 1; }
 
-        /* ===== TOAST ===== */
-        #toast-container {
-            position: fixed; top: 15px; left: 50%; transform: translateX(-50%); z-index: 9999;
-            display: flex; flex-direction: column; gap: 8px; width: 90%; max-width: 350px; pointer-events: none;
-        }
-        .toast {
-            padding: 10px 16px; border-radius: 8px; color: white; font-size: 13px; font-weight: 500;
-            text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: slideDown 0.3s;
-        }
+        /* TOAST */
+        #toast-container { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; width: 90%; max-width: 350px; pointer-events: none; }
+        .toast { padding: 10px 16px; border-radius: 8px; color: white; font-size: 13px; font-weight: 500; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: slideDown 0.3s; }
         .toast.success { background: var(--success); }
         .toast.error { background: var(--danger); }
         .toast.info { background: var(--primary); }
@@ -243,22 +145,11 @@
             <h3><i class="fa-solid fa-gear"></i> CÀI ĐẶT & THỐNG KÊ</h3>
             <i class="fa-solid fa-xmark close-btn" id="close-sidebar"></i>
         </div>
-        
         <div class="sidebar-stats">
-            <div class="sidebar-item">
-                <span class="label">Số dư hiện tại:</span>
-                <span class="value" id="sidebar-balance">0</span>
-            </div>
-            <div class="sidebar-item profit">
-                <span class="label">Số dư chốt lãi:</span>
-                <span class="value" id="sidebar-profit">+0</span>
-            </div>
-            <div class="sidebar-item loss">
-                <span class="label">Số dư thua lỗ:</span>
-                <span class="value" id="sidebar-loss">-0</span>
-            </div>
+            <div class="sidebar-item"><span class="label">Số dư hiện tại:</span><span class="value" id="sidebar-balance">0</span></div>
+            <div class="sidebar-item profit"><span class="label">Số dư chốt lãi:</span><span class="value" id="sidebar-profit">+0</span></div>
+            <div class="sidebar-item loss"><span class="label">Số dư thua lỗ:</span><span class="value" id="sidebar-loss">-0</span></div>
         </div>
-
         <div class="sidebar-form">
             <label><i class="fa-solid fa-money-bill-wave"></i> Mức cược cố định (VNĐ)</label>
             <input type="number" id="bet_amount" class="form-control" value="10000" step="1000" min="1000">
@@ -284,22 +175,9 @@
                 <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #555; margin-bottom: 12px; font-size: 12px;">
                     <i class="fa-solid fa-sliders" style="color: var(--primary);"></i> BẢNG ĐIỀU KHIỂN
                 </div>
-                
-                <div class="form-group">
-                    <label>Tài khoản</label>
-                    <input type="text" id="username" class="form-control" placeholder="Nhập tài khoản game">
-                </div>
-                
-                <div class="form-group">
-                    <label>Mật khẩu</label>
-                    <input type="password" id="password" class="form-control" placeholder="Nhập mật khẩu">
-                </div>
-                
-                <div class="form-group">
-                    <label>Nhập Key Bản Quyền</label>
-                    <input type="text" id="license_key" class="form-control" placeholder="Dán key vào đây...">
-                </div>
-
+                <div class="form-group"><label>Tài khoản</label><input type="text" id="username" class="form-control" placeholder="Nhập tài khoản game"></div>
+                <div class="form-group"><label>Mật khẩu</label><input type="password" id="password" class="form-control" placeholder="Nhập mật khẩu"></div>
+                <div class="form-group"><label>Nhập Key Bản Quyền</label><input type="text" id="license_key" class="form-control" placeholder="Dán key vào đây..."></div>
                 <button id="btn_login" class="btn" style="background: var(--primary);">ĐĂNG NHẬP</button>
             </div>
         </div>
@@ -326,22 +204,10 @@
                 </div>
 
                 <div class="stats-grid">
-                    <div class="stat-box">
-                        <div class="label">NICKNAME</div>
-                        <div class="value text-primary" id="nickname-display">---</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="label">SỐ DƯ</div>
-                        <div class="value" id="balance-display">0</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="label">CƯỢC PHIÊN</div>
-                        <div class="value" id="bet-display">10,000</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="label">WIN / LOSE</div>
-                        <div class="value" id="winlose-display">0 / 0</div>
-                    </div>
+                    <div class="stat-box"><div class="label">NICKNAME</div><div class="value text-primary" id="nickname-display">---</div></div>
+                    <div class="stat-box"><div class="label">SỐ DƯ</div><div class="value" id="balance-display">0</div></div>
+                    <div class="stat-box"><div class="label">CƯỢC PHIÊN</div><div class="value" id="bet-display">10,000</div></div>
+                    <div class="stat-box"><div class="label">WIN / LOSE</div><div class="value" id="winlose-display">0 / 0</div></div>
                     <div class="stat-box" style="grid-column: span 2;">
                         <div class="label">TRẠNG THÁI</div>
                         <div class="value" id="status-text" style="color: var(--text-muted);">Chờ lệnh</div>
@@ -354,7 +220,7 @@
                 </div>
             </div>
 
-            <!-- BẢNG LỊCH SỬ -->
+            <!-- HISTORY TABLE -->
             <div class="card">
                 <div style="font-size: 12px; font-weight: 700; color: #555; margin-bottom: 8px; text-transform: uppercase;">LỊCH SỬ CƯỢC</div>
                 <table class="history-table">
@@ -402,33 +268,22 @@
             return 'DEV-' + Math.abs(h).toString(16);
         }
 
-        // LOGIC MỞ/ĐÓNG SIDEBAR
+        // SIDEBAR
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('overlay');
-        
-        document.getElementById('open-sidebar').addEventListener('click', () => {
-            sidebar.classList.add('active');
-            overlay.classList.add('active');
-        });
-
-        function closeSidebar() {
-            sidebar.classList.remove('active');
-            overlay.classList.remove('active');
-        }
-        
+        document.getElementById('open-sidebar').addEventListener('click', () => { sidebar.classList.add('active'); overlay.classList.add('active'); });
+        function closeSidebar() { sidebar.classList.remove('active'); overlay.classList.remove('active'); }
         document.getElementById('close-sidebar').addEventListener('click', closeSidebar);
         overlay.addEventListener('click', closeSidebar);
 
-        // ĐĂNG NHẬP
+        // LOGIN
         document.getElementById('btn_login').addEventListener('click', async function() {
             const btn = this;
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
             const key = document.getElementById('license_key').value.trim();
 
-            if (!username || !password || !key) {
-                showToast('Vui lòng nhập đủ thông tin!', 'warning'); return;
-            }
+            if (!username || !password || !key) { showToast('Vui lòng nhập đủ thông tin!', 'warning'); return; }
 
             btn.disabled = true;
             btn.innerHTML = 'ĐANG KIỂM TRA...';
@@ -453,7 +308,6 @@
                 
                 document.getElementById('nickname-display').innerText = data.nickname || 'Thành viên';
                 updateBalance(data.balance || 0);
-                
                 toggleAutoUI(false);
                 socket.emit('join_session', { sid: data.sid });
 
@@ -463,55 +317,36 @@
             }
         });
 
-        // CẬP NHẬT SỐ DƯ & TÍNH LÃI LỖ
+        // BALANCE UPDATE
         let currentBalance = 0;
         let initialBalance = 0;
-        
         function updateBalance(newBalance) {
             currentBalance = newBalance;
             if (initialBalance === 0) initialBalance = newBalance; 
-            
             document.getElementById('balance-display').innerText = newBalance.toLocaleString();
             document.getElementById('sidebar-balance').innerText = newBalance.toLocaleString();
             
             const diff = newBalance - initialBalance;
             const profitEl = document.getElementById('sidebar-profit');
             const lossEl = document.getElementById('sidebar-loss');
-            
-            if (diff > 0) {
-                profitEl.innerText = '+' + diff.toLocaleString();
-                lossEl.innerText = '-0';
-            } else if (diff < 0) {
-                profitEl.innerText = '+0';
-                lossEl.innerText = diff.toLocaleString();
-            } else {
-                profitEl.innerText = '+0';
-                lossEl.innerText = '-0';
-            }
+            if (diff > 0) { profitEl.innerText = '+' + diff.toLocaleString(); lossEl.innerText = '-0'; }
+            else if (diff < 0) { profitEl.innerText = '+0'; lossEl.innerText = diff.toLocaleString(); }
+            else { profitEl.innerText = '+0'; lossEl.innerText = '-0'; }
         }
 
-        // CÀI ĐẶT CƯỢC (TỪ SIDEBAR)
+        // CONFIG
         const betInput = document.getElementById('bet_amount');
         const betDisplay = document.getElementById('bet-display');
-        
         const savedBet = localStorage.getItem('lc79_bet_amount');
-        if (savedBet) {
-            betInput.value = savedBet;
-            betDisplay.innerText = parseInt(savedBet).toLocaleString();
-        }
-
+        if (savedBet) { betInput.value = savedBet; betDisplay.innerText = parseInt(savedBet).toLocaleString(); }
         betInput.addEventListener('input', function() {
             const val = this.value;
             localStorage.setItem('lc79_bet_amount', val);
             betDisplay.innerText = parseInt(val || 0).toLocaleString();
-            fetch('/api/config', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ betAmount: val })
-            });
+            fetch('/api/config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ betAmount: val }) });
         });
 
-        // BẬT/TẮT AUTO
+        // AUTO TOGGLE
         const btnAuto = document.getElementById('btn_auto');
         const statusBadge = document.getElementById('status-auto-badge');
         const statusText = document.getElementById('status-text');
@@ -522,101 +357,78 @@
 
         function toggleAutoUI(isRunning) {
             isAutoRunning = isRunning;
-            
             if (isRunning) {
-                btnAuto.className = 'btn btn-auto-on';
-                btnAuto.innerHTML = '<i class="fa-solid fa-stop"></i> TẮT AUTO';
-                statusBadge.className = 'badge badge-green';
-                statusBadge.innerText = 'AUTO - ON';
-                statusText.innerText = 'Đang chạy';
-                statusText.style.color = 'var(--success)';
+                btnAuto.className = 'btn btn-auto-on'; btnAuto.innerHTML = '<i class="fa-solid fa-stop"></i> TẮT AUTO';
+                statusBadge.className = 'badge badge-green'; statusBadge.innerText = 'AUTO - ON';
+                statusText.innerText = 'Đang chạy'; statusText.style.color = 'var(--success)';
                 predBox.classList.add('active');
-                
-                if (historyBody.querySelector('.empty-history')) {
-                    historyBody.innerHTML = '';
-                }
-                
+                if (historyBody.querySelector('.empty-history')) historyBody.innerHTML = '';
                 showToast('🚀 Đã bật chế độ Auto!', 'success');
                 socket.emit('toggle_auto', { status: true });
             } else {
-                btnAuto.className = 'btn btn-auto-off';
-                btnAuto.innerHTML = '<i class="fa-solid fa-play"></i> BẬT AUTO';
-                statusBadge.className = 'badge badge-gray';
-                statusBadge.innerText = 'AUTO - OFF';
-                statusText.innerText = 'Chờ lệnh';
-                statusText.style.color = 'var(--text-muted)';
-                predBox.classList.remove('active');
-                predDisplay.innerText = '--';
-                sessionDisplay.innerText = '#------';
-                
+                btnAuto.className = 'btn btn-auto-off'; btnAuto.innerHTML = '<i class="fa-solid fa-play"></i> BẬT AUTO';
+                statusBadge.className = 'badge badge-gray'; statusBadge.innerText = 'AUTO - OFF';
+                statusText.innerText = 'Chờ lệnh'; statusText.style.color = 'var(--text-muted)';
+                predBox.classList.remove('active'); predDisplay.innerText = '--'; sessionDisplay.innerText = '#------';
                 showToast('🛑 Đã tắt chế độ Auto!', 'info');
                 socket.emit('toggle_auto', { status: false });
             }
         }
+        btnAuto.addEventListener('click', () => toggleAutoUI(!isAutoRunning));
 
-        btnAuto.addEventListener('click', () => {
-            toggleAutoUI(!isAutoRunning);
-        });
-
-        // ĐĂNG XUẤT
         document.getElementById('btn_logout').addEventListener('click', async function() {
             if (!confirm('Bạn có chắc muốn ngắt bot và đăng xuất?')) return;
-            await fetch('/api/logout', { method: 'POST' });
-            location.reload();
+            await fetch('/api/logout', { method: 'POST' }); location.reload();
         });
 
-        // ================= LẮNG NGHE SOCKET (API) =================
-        
-        socket.on('force_logout', (data) => {
-            showToast('🔒 ' + data.reason, 'error');
-            setTimeout(() => location.reload(), 2000);
-        });
+        // ================= LẮNG NGHE API TỪ SERVER =================
 
+        socket.on('force_logout', (data) => { showToast('🔒 ' + data.reason, 'error'); setTimeout(() => location.reload(), 2000); });
         socket.on('toast', (data) => showToast(data.msg, data.type || 'info'));
+        socket.on('stats_update', (st) => { updateBalance(st.balance || 0); });
 
-        // Cập nhật số dư thời gian thực
-        socket.on('stats_update', (st) => {
-            updateBalance(st.balance || 0);
-        });
-
-        // Cập nhật thông tin phiên mới (Khi Auto chạy)
         socket.on('session_update', (data) => {
             if (!isAutoRunning) return;
-
             if (data.session_id) sessionDisplay.innerText = '#' + data.session_id;
-            
             if (data.prediction) {
                 predDisplay.innerText = data.prediction.toUpperCase();
                 predDisplay.style.color = data.prediction.toUpperCase().includes('T') ? 'var(--primary)' : 'var(--danger)';
             }
         });
 
-        // NHẬN KẾT QUẢ TỰ ĐỘNG TỪ API - HIỆU ỨNG ĐẸP
+        // XỬ LÝ KẾT QUẢ TỪ API - ĐÃ FIX LỖI BÁO THUA ẢO
         socket.on('result_update', (data) => {
+            // 1. Nếu Auto đang tắt thì bỏ qua
             if (!isAutoRunning) return;
 
+            // 2. BỘ LỌC CHẶN RÁC: Nếu API trả về thiếu ID phiên hoặc Dự đoán thì lập tức bỏ qua không hiển thị
+            if (!data.session_id || !data.prediction) {
+                console.log("Bỏ qua phiên rác (thiếu data):", data);
+                return;
+            }
+
+            // 3. Nếu số tiền cược <= 0 thì cũng bỏ qua
+            const betAmount = data.bet_amount || parseInt(betInput.value) || 0;
+            if (betAmount <= 0) return;
+
+            // 4. Bắt đầu xử lý khi API trả về data chuẩn
             const tr = document.createElement('tr');
-            
-            // Xác định Thắng/Thua dựa trên API báo
             const isWin = data.result === 'WIN';
             const resultClass = isWin ? 'text-success' : 'text-danger';
             const resultText = isWin ? 'THẮNG' : 'THUA';
             
-            const prediction = data.prediction ? data.prediction.toUpperCase() : '---';
+            const prediction = data.prediction.toUpperCase();
             const predColor = prediction === 'TÀI' ? 'text-primary' : 'text-danger';
             
-            const sessionId = data.session_id || '???';
-            const betAmount = data.bet_amount || parseInt(betInput.value) || 0;
+            const sessionId = data.session_id;
             
-            // API trả về tiền thắng hoặc tính toán dựa trên kết quả
-            // Nếu API có trả data.win_amount thì dùng, không thì tự tính (isWin thì +bet, thua thì 0)
+            // API báo thắng thì lấy tiền, không thì 0
             const winAmount = data.win_amount !== undefined ? data.win_amount : (isWin ? betAmount : 0);
-            
             const winDisplay = isWin 
                 ? `<span class="text-success">+${winAmount.toLocaleString()}</span>` 
                 : `<span class="text-muted">0</span>`;
 
-            // Gắn hiệu ứng nháy sáng + trượt vào dòng
+            // Gắn hiệu ứng
             tr.className = `${isWin ? 'row-win' : 'row-lose'} new-row`;
 
             tr.innerHTML = `
@@ -629,14 +441,14 @@
             
             historyBody.insertBefore(tr, historyBody.firstChild);
             
-            // Cập nhật tỷ lệ Win/Lose
+            // Cập nhật WIN/LOSE
             let winLoseDisplay = document.getElementById('winlose-display');
             let currentWin = parseInt(winLoseDisplay.innerText.split('/')[0]) || 0;
             let currentLose = parseInt(winLoseDisplay.innerText.split('/')[1]) || 0;
             if (isWin) currentWin++; else currentLose++;
             winLoseDisplay.innerText = `${currentWin} / ${currentLose}`;
             
-            // Tự động cập nhật số dư ngay lập tức (nếu API stats_update đến chậm)
+            // Cập nhật số dư ngay lập tức
             let simulatedBalance = currentBalance + (isWin ? winAmount : -betAmount);
             updateBalance(simulatedBalance);
 
