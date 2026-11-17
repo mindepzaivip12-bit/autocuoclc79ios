@@ -349,6 +349,15 @@ tr:hover td{background:rgba(96,165,250,.04)}
   </div>
 
   <div class="drawer-section">
+    <div class="drawer-section-title">🎯 CHỐT LÃI TỰ ĐỘNG</div>
+    <div class="drawer-field">
+      <label>Số tiền lãi muốn chốt <span class="saved-indicator" id="savedTargetProfit">✓ đã lưu</span></label>
+      <input type="number" id="targetProfit" value="0" min="0" step="1000" onchange="onConfigChange()">
+      <div class="drawer-hint">Đạt đủ số lãi này → tự động TẮT Auto (0 = không dùng)</div>
+    </div>
+  </div>
+
+  <div class="drawer-section">
     <div class="drawer-section-title">🛠️ HÀNH ĐỘNG</div>
     <button class="btn-apply" style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3);box-shadow:none;margin-bottom:10px" onclick="resetHistory()">🗑 XÓA LỊCH SỬ</button>
     <button class="btn-apply" style="background:rgba(71,85,105,.3);color:#94a3b8;border:1px solid #334155;box-shadow:none" onclick="logout()">🚪 ĐĂNG XUẤT</button>
@@ -384,7 +393,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
 <div class="main-wrapper" id="mainView">
   <div class="top-header">
     <div class="logo-text">
-      <h1>TOOL AUTO LC79 - FIXED</h1>
+      <h1>TOOL AUTO LC79 </h1>
       <p>Hệ thống phân tích cầu & dự đoán Tài Xỉu tự động</p>
     </div>
   </div>
@@ -418,7 +427,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
       <div class="info-item"><span class="info-label">NICKNAME</span><div class="info-value" id="nicknameDisplay">—</div></div>
       <div class="info-item"><span class="info-label">SỐ DƯ</span><div class="info-value" id="balanceDisplay">0</div></div>
       <div class="info-item"><span class="info-label">CƯỢC PHIÊN</span><div class="info-value" id="betDisplay">0</div></div>
-      <div class="info-item highlight"><span class="info-label">LỢI NHUẬN (CHỐT LÃI)</span><div class="info-value" id="plDisplay" style="font-size:18px;">0</div></div>
+      <div class="info-item highlight"><span class="info-label">CHỐT LÃI</span><div class="info-value" id="plDisplay" style="font-size:18px;">0</div></div>
       <div class="info-item"><span class="info-label">TỔNG WIN / LOSE</span><div class="info-value"><span class="val-win" id="winCount">0</span> / <span class="val-lose" id="loseCount">0</span></div></div>
       <div class="info-item"><span class="info-label">TRẠNG THÁI AUTO</span><div class="info-value" id="statusText">Chờ kết nối...</div></div>
     </div>
@@ -434,7 +443,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
         <thead>
           <tr>
             <th>PHIÊN</th><th>CỬA ĐẶT</th><th>CƯỢC</th>
-            <th>KẾT QUẢ</th><th>XÚC XẮC</th><th>KẾT LUẬN</th>
+            <th>KẾT QUẢ</th><th>XÚC XẮC</th><th>WIN/LOSE</th>
           </tr>
         </thead>
         <tbody id="historyBody"></tbody>
@@ -454,11 +463,14 @@ let lastBalance = 0;
 let saveTimer = null;
 let lastProcessedSession = 0;
 let mySid = null;
+let wakeLock = null;           // 🔆 Giữ màn hình / tab luôn hoạt động
+let heartbeatTimer = null;     // 💓 Giữ auto sống khi tắt màn hình
+let targetProfitReached = false; // 🎯 Đã chốt lãi chưa
 
 /* 🔒 KHÓA CỬA CƯỢC THEO PHIÊN */
-let lockedBetSession = null;   
-let lockedBetSide = null;      
-let lockedBetAmount = 0;       
+let lockedBetSession = null;
+let lockedBetSide = null;
+let lockedBetAmount = 0;
 
 const STORAGE_KEY_BALANCE = 'lc79_balance';
 const STORAGE_KEY_CONFIG  = 'lc79_config';
@@ -511,9 +523,13 @@ function saveConfig(cfg){ try{ localStorage.setItem(STORAGE_KEY_CONFIG, JSON.str
 function applyConfigToInputs(cfg){
   if(!cfg)return;
   if(cfg.betAmount!==undefined) document.getElementById('betAmount').value = cfg.betAmount;
+  if(cfg.targetProfit!==undefined) document.getElementById('targetProfit').value = cfg.targetProfit;
 }
 function readConfigFromInputs(){
-  return { betAmount: parseInt(document.getElementById('betAmount').value) || 10000 };
+  return {
+    betAmount: parseInt(document.getElementById('betAmount').value) || 10000,
+    targetProfit: parseInt(document.getElementById('targetProfit').value) || 0
+  };
 }
 function showSavedIndicator(id){
   const el=document.getElementById(id); if(!el)return;
@@ -523,6 +539,7 @@ function onConfigChange(){
   const cfg=readConfigFromInputs();
   saveConfig(cfg);
   showSavedIndicator('savedBetAmount');
+  showSavedIndicator('savedTargetProfit');
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>pushConfigToServer(cfg),500);
 }
@@ -538,7 +555,11 @@ async function pushConfigToServer(cfg){
     const r = await fetch('/api/config',{
       method:'POST',
       headers: apiHeaders(),
-      body:JSON.stringify({ auto_bet_enabled: autoOn, betAmount: cfg.betAmount })
+      body:JSON.stringify({
+        auto_bet_enabled: autoOn,
+        betAmount: cfg.betAmount,
+        targetProfit: cfg.targetProfit
+      })
     });
     const d = await r.json();
     if(!d.success){
@@ -558,8 +579,7 @@ function showResultFlash(isWin, result, betSide, actualSide){
   const flash=document.getElementById('predResultFlash');
   const box=document.getElementById('predictionBox');
   const sideTxt = actualSide ? ` (đã đặt: ${actualSide})` : '';
-  
-  // Xác định cửa thắng dựa trên kết quả
+
   const actualWinSide = result ? (['TÀI','TAI'].includes(result.toUpperCase()) ? 'TÀI' : 'XỈU') : '';
 
   if(isWin){
@@ -640,7 +660,6 @@ function updatePredictionUI(state){
   const betAmt    = Number(state.current_bet || 0);
   const betSide   = state.current_bet_side ? String(state.current_bet_side).toUpperCase() : null;
 
-  // Nếu có cược trong phiên này
   if (betAmt > 0 && betSide) {
     if (lockedBetSession !== sessionId) {
       lockedBetSession = sessionId;
@@ -708,30 +727,58 @@ function showForceModal(title, msg){
 }
 
 /* ============================================
+   🎯 KIỂM TRA CHỐT LÃI TỰ ĐỘNG
+============================================ */
+async function checkTargetProfit(profit){
+  const cfg = loadConfig();
+  const target = Number(cfg?.targetProfit || 0);
+  if(target <= 0) return;                        // Không dùng chốt lãi
+  if(!autoOn) return;                            // Auto đang tắt thì thôi
+  if(targetProfitReached) return;                // Đã chốt rồi, không chốt lại
+
+  if(profit >= target){
+    targetProfitReached = true;
+    toast(`🎯 Đã đạt mục tiêu lãi ${target.toLocaleString()}đ → TỰ ĐỘNG TẮT AUTO`, 'success');
+
+    // Tắt auto local + server
+    autoOn = false;
+    try{
+      await fetch('/api/config',{
+        method:'POST',
+        headers: apiHeaders(),
+        body:JSON.stringify({ auto_bet_enabled:false, betAmount: cfg.betAmount, targetProfit: target })
+      });
+    }catch(e){}
+    pollStats();
+  }
+}
+
+/* ============================================
    XỬ LÝ KẾT QUẢ
 ============================================ */
 function processResult(payload){
   if(!payload) return;
   if(payload.balance!==undefined) updateBalanceUI(payload.balance,true);
-  if(payload.profit_loss!==undefined) updateProfitUI(payload.profit_loss);
+  if(payload.profit_loss!==undefined){
+    updateProfitUI(payload.profit_loss);
+    // Kiểm tra chốt lãi
+    checkTargetProfit(Number(payload.profit_loss || 0));
+  }
   if(payload.history) renderHistory(payload.history);
 
-  // Kiểm tra nếu có kết quả của phiên mới
   if(payload.session && payload.session > lastProcessedSession &&
      payload.is_win !== null && payload.is_win !== undefined && payload.result){
     lastProcessedSession = payload.session;
-    
-    // Lấy cửa đặt thực tế từ lịch sử
+
     const latestHistory = payload.history && payload.history.length ? payload.history[0] : null;
     const actualBetSide = latestHistory ? (latestHistory.bet_side || latestHistory.pred) : payload.pred;
 
-    // Fix lỗi logic: Tự tính lại win/loss dựa trên kết quả xúc xắc để đối chiếu
     let calculatedWin = payload.is_win;
     if (payload.result && actualBetSide) {
       const resultSum = payload.dice ? payload.dice.reduce((a, b) => a + b, 0) : 0;
       const isTaiResult = resultSum >= 11;
       const isXiuResult = resultSum <= 10;
-      
+
       const isBetTai = String(actualBetSide).toUpperCase().startsWith('T');
       const isBetXiu = String(actualBetSide).toUpperCase().startsWith('X');
 
@@ -740,7 +787,6 @@ function processResult(payload){
       if ((isBetTai && isTaiResult) || (isBetXiu && isXiuResult)) calculatedWin = true;
     }
 
-    // Ghi đè nếu Backend trả sai
     if (calculatedWin !== payload.is_win) {
       console.warn(`Phát hiện lỗi Backend: Hệ thống báo ${payload.is_win ? 'thắng' : 'thua'} nhưng thực tế là ${calculatedWin ? 'thắng' : 'thua'}.`);
       payload.is_win = calculatedWin;
@@ -793,6 +839,8 @@ async function handleLogin(){
     }
 
     connectSocket(mySid);
+    startHeartbeat();       // 💓 Bật heartbeat
+    requestWakeLock();      // 🔆 Yêu cầu giữ màn hình
     toast('Đăng nhập thành công!','success');
     setTimeout(pollStats,500);
   }catch(e){
@@ -902,7 +950,10 @@ function applyState(s){
   curState=s; autoOn=!!s.auto_bet_enabled;
 
   if(s.balance!==undefined) updateBalanceUI(s.balance,true);
-  if(s.profit_loss!==undefined) updateProfitUI(s.profit_loss);
+  if(s.profit_loss!==undefined){
+    updateProfitUI(s.profit_loss);
+    checkTargetProfit(Number(s.profit_loss || 0));
+  }
 
   let winCount = s.win_count;
   let loseCount = s.lose_count;
@@ -978,11 +1029,10 @@ function renderHistory(rows){
         ? '<span class="val-lose">✗ THUA</span>'
         : '—';
     const dice = Array.isArray(r.dice)?r.dice.slice(0,3).join(' - '):'—';
-    
+
     if(r.win===true) tr.style.background='rgba(52,211,153,.06)';
     else if(r.win===false) tr.style.background='rgba(248,113,113,.06)';
-    
-    // Đã đổi tiêu đề cột từ DỰ ĐOÁN thành CỬA ĐẶT
+
     tr.innerHTML=`
       <td>#${r.session}</td>
       <td class="${predClass}">${predU||'—'}</td>
@@ -1004,7 +1054,11 @@ async function toggleAuto(){
     const r = await fetch('/api/config',{
       method:'POST',
       headers: apiHeaders(),
-      body:JSON.stringify({ auto_bet_enabled:newVal, betAmount:cfg.betAmount })
+      body:JSON.stringify({
+        auto_bet_enabled:newVal,
+        betAmount:cfg.betAmount,
+        targetProfit:cfg.targetProfit
+      })
     });
     const d = await r.json();
     if(!d.success){
@@ -1013,6 +1067,10 @@ async function toggleAuto(){
         showForceModal('Phiên đăng nhập đã hết', 'Vui lòng đăng nhập lại.');
       }
       return;
+    }
+    if(newVal){
+      targetProfitReached = false;   // Reset khi bật auto lại
+      requestWakeLock();
     }
     toast(newVal?'✅ Đã bật chế độ Auto Cược':'⏸ Đã tắt chế độ Auto Cược',newVal?'success':'info');
     pollStats();
@@ -1026,7 +1084,7 @@ async function stopBot(){
       headers: apiHeaders(),
       body:JSON.stringify({auto_bet_enabled:false})
     });
-    autoOn=false; toast('Đã ngắt Bot khẩn cấp','error'); pollStats();
+    autoOn=false; targetProfitReached=false; toast('Đã ngắt Bot khẩn cấp','error'); pollStats();
   }catch(e){ toast('Lỗi: '+e.message,'error'); }
 }
 
@@ -1036,6 +1094,7 @@ async function resetHistory(){
     await fetch('/api/reset_history',{method:'POST', headers: apiHeaders()});
     toast('Đã xóa lịch sử','success');
     updateProfitUI(0);
+    targetProfitReached = false;
     localStorage.removeItem(STORAGE_KEY_BALANCE);
     lastProcessedSession=0;
     lockedBetSession=null; lockedBetSide=null; lockedBetAmount=0;
@@ -1046,9 +1105,61 @@ async function logout(){
   if(!confirm('Đăng xuất khỏi tài khoản?')) return;
   try{ await fetch('/api/logout',{method:'POST', headers: apiHeaders()}); }catch(e){}
   if(socket){ try{ socket.disconnect(); }catch(e){} }
+  stopHeartbeat();
+  releaseWakeLock();
   clearSid();
   location.reload();
 }
+
+/* ============================================
+   💓 HEARTBEAT - GIỮ AUTO CHẠY KHI TẮT MÀN HÌNH
+============================================ */
+function startHeartbeat(){
+  stopHeartbeat();
+  heartbeatTimer = setInterval(()=>{
+    // Gửi nhịp tim định kỳ để server biết client còn sống
+    if(mySid){
+      fetch('/api/heartbeat',{
+        method:'POST',
+        headers: apiHeaders(),
+        body:JSON.stringify({ autoOn: autoOn, ts: Date.now() })
+      }).catch(()=>{});
+    }
+    // Nếu tab bị ẩn mà auto vẫn bật, vẫn poll nhẹ để giữ nhịp
+    if(document.hidden && autoOn) {
+      pollStats();
+    }
+  }, 15000); // 15s một lần, không quá nặng
+}
+function stopHeartbeat(){
+  if(heartbeatTimer){ clearInterval(heartbeatTimer); heartbeatTimer = null; }
+}
+
+/* ============================================
+   🔆 WAKE LOCK - GIỮ MÀN HÌNH / TAB THỨC
+============================================ */
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator && !wakeLock){
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', ()=>{
+        // Nếu bị release (do ẩn tab), tự xin lại khi quay lại
+      });
+    }
+  }catch(e){ /* Thiết bị không hỗ trợ hoặc từ chối, bỏ qua */ }
+}
+function releaseWakeLock(){
+  try{ if(wakeLock){ wakeLock.release(); wakeLock = null; } }catch(e){}
+}
+
+/* Khi quay lại tab: xin lại wake lock + đồng bộ trạng thái ngay */
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible'){
+    requestWakeLock();
+    // Đồng bộ lại trạng thái ngay lập tức
+    if(mySid) setTimeout(pollStats, 100);
+  }
+});
 
 /* ============================================
    INIT + HEARTBEAT
@@ -1073,6 +1184,8 @@ setInterval(()=>{
           document.getElementById('nicknameDisplay').innerText = d.state.nickname || '—';
           applyState(d.state);
           connectSocket(savedSid);
+          startHeartbeat();
+          requestWakeLock();
           toast('🔄 Đã khôi phục phiên làm việc','success');
         } else {
           clearSid();
