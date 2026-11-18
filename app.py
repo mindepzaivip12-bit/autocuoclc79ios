@@ -41,17 +41,61 @@ API_LAST_RAW = {
     "ts": 0,
     "error": None,
 }
-API_RAW_LOCK = threading.Lock()
+
+# ==========================================
+# ✅ HÀM CHUẨN HÓA SIDE — NGUỒN SỰ THẬT DUY NHẤT
+# ==========================================
+def normalize_side(value):
+    """
+    Chuẩn hóa MỌI dạng dự đoán/kết quả về 'TAI' / 'XIU' / None.
+    Xử lý: 'Tài', 'TÀI', 'TAI', 'T', 'Xỉu', 'XỈU', 'XIU', 'X',
+           'Tài 11', 'Xỉu - 3-4-5', số 1/0, bool, tiếng Anh...
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        # bool không đáng tin — bỏ qua
+        return None
+    if isinstance(value, (int, float)):
+        # 1 = Tài, 0 = Xỉu (quy ước phổ biến) — chấp nhận
+        if value == 1:
+            return "TAI"
+        if value == 0:
+            return "XIU"
+        return None
+
+    s = str(value).strip().upper()
+    if not s:
+        return None
+
+    # ✅ KIỂM TRA XIU TRƯỚC — tránh "XỈU" bị nhầm thành TAI
+    # (vì "XỈU" không chứa "TÀI", nhưng cẩn thận vẫn hơn)
+    if "XỈU" in s or "XIU" in s:
+        return "XIU"
+
+    if "TÀI" in s or "TAI" in s:
+        return "TAI"
+
+    # Fallback ký tự đầu (chỉ khi chuỗi ngắn, tránh nhầm)
+    if len(s) <= 3:
+        if s.startswith("T"):
+            return "TAI"
+        if s.startswith("X"):
+            return "XIU"
+
+    # Tiếng Anh
+    if "HIGH" in s or "BIG" in s:
+        return "TAI"
+    if "LOW" in s or "SMALL" in s:
+        return "XIU"
+
+    return None
+
 
 # ==========================================
 # GỌI API LỊCH SỬ
 # ==========================================
-def fetch_api_raw(force=False):
-    """force=True: bỏ qua cache, luôn gọi API mới"""
-    if not force:
-        with API_RAW_LOCK:
-            if API_LAST_RAW["data"] and (time.time() - API_LAST_RAW["ts"]) < 1.0:
-                return API_LAST_RAW["data"]
+def fetch_api_raw():
     try:
         url = f"{API_HISTORY_URL}?{COMMON_PARAMS}&at=&_t={int(time.time()*1000)}"
         r = requests.get(url, timeout=5,
@@ -59,14 +103,12 @@ def fetch_api_raw(force=False):
                                   "User-Agent": "Mozilla/5.0"})
         r.raise_for_status()
         data = r.json()
-        with API_RAW_LOCK:
-            API_LAST_RAW["data"] = data
-            API_LAST_RAW["ts"] = time.time()
-            API_LAST_RAW["error"] = None
+        API_LAST_RAW["data"] = data
+        API_LAST_RAW["ts"] = time.time()
+        API_LAST_RAW["error"] = None
         return data
     except Exception as e:
-        with API_RAW_LOCK:
-            API_LAST_RAW["error"] = str(e)
+        API_LAST_RAW["error"] = str(e)
         logger.error(f"[API] Fetch fail: {e}")
         return None
 
@@ -78,7 +120,7 @@ def api_data_worker():
     last_session_logged = None
 
     while True:
-        data = fetch_api_raw(force=True)
+        data = fetch_api_raw()
         if data:
             session_id = data.get("phien")
             result_str = data.get("ket_qua") or ""
@@ -86,15 +128,11 @@ def api_data_worker():
             do_tin_cay = data.get("do_tin_cay")
 
             if session_id and result_str and session_id != last_session_logged:
-                side = None
-                if "tài" in result_str.lower() or "tai" in result_str.lower():
-                    side = "Tài"
-                elif "xỉu" in result_str.lower() or "xiu" in result_str.lower():
-                    side = "Xỉu"
+                side = normalize_side(result_str)
 
                 dices = []
                 try:
-                    parts = result_str.split()
+                    parts = str(result_str).split()
                     if len(parts) > 1:
                         dices = [int(x) for x in parts[1].split("-")]
                 except Exception:
@@ -115,115 +153,57 @@ def api_data_worker():
                                         f"du_doan={du_doan} | conf={do_tin_cay}")
                     last_session_logged = session_id
 
-        socketio.sleep(1.0)
+        socketio.sleep(1.5)
 
 socketio.start_background_task(api_data_worker)
 
 # ==========================================
-# 🔥 FIX: DỰ ĐOÁN PHẢI KHỚP PHIÊN
+# DỰ ĐOÁN — CHỈ TRẢ KHI API CÓ du_doan
 # ==========================================
-def get_prediction_for_session(new_session_id):
-    """
-    Lấy dự đoán từ API cho ĐÚNG phiên new_session_id.
-    
-    Logic:
-    - API trả về: phien=X, du_doan=Y
-    - du_doan=Y là dự đoán cho phiên X+1 (API dự đoán phiên TIẾP THEO dựa trên kết quả phiên X)
-    - Vậy để có dự đoán cho new_session_id: cần API trả phien = new_session_id - 1
-    - Nếu API trả phien = new_session_id: du_doan đã là cho phiên new_session_id+1 → KHÔNG DÙNG
-    - Nếu API trả phien khác → không dùng
-    
-    Trả về dict:
-        side: "TAI" / "XIU" / None
-        conf: độ tin cậy
-        api_session: phiên API đang trả
-        valid: True nếu dự đoán khớp phiên hiện tại
-    """
-    try:
-        new_sid_int = int(new_session_id)
-    except (TypeError, ValueError):
-        # Không parse được (id chữ...) → dùng fallback heuristic cũ
-        data = fetch_api_raw(force=True)
-        if not data:
-            return {"side": None, "conf": None, "api_session": None, "valid": False, "raw": None}
-        return _extract_side(data, new_session_id)
-
-    # Luôn fetch mới để tránh cache cũ
-    data = fetch_api_raw(force=True)
-    if not data:
-        return {"side": None, "conf": None, "api_session": None, "valid": False, "raw": None}
-
-    api_session = data.get("phien")
-    try:
-        api_sid_int = int(api_session)
-    except (TypeError, ValueError):
-        return {"side": None, "conf": None, "api_session": api_session, "valid": False, "raw": data}
-
-    # 🔥 ĐIỀU KIỆN CHÍNH: API phải đang trả kết quả phiên NGAY TRƯỚC new_session
-    if api_sid_int == new_sid_int - 1:
-        # API đã cập nhật kết quả phiên trước → du_doan là cho phiên hiện tại ✅
-        side, conf = _parse_du_doan(data.get("du_doan"), data.get("do_tin_cay"))
-        return {
-            "side": side,
-            "conf": conf,
-            "api_session": api_session,
-            "valid": side is not None,
-            "raw": data,
-        }
-    elif api_sid_int == new_sid_int:
-        # API đã nhảy sang phiên hiện tại → du_doan là cho phiên SAU → KHÔNG DÙNG
-        logger.warning(f"[Pred] API phien={api_session} == new={new_session_id} "
-                       f"→ du_doan đã là cho phiên sau, bỏ qua")
-        return {"side": None, "conf": None, "api_session": api_session, "valid": False, "raw": data}
-    elif api_sid_int < new_sid_int - 1:
-        # API còn cũ (trễ) → không dùng
-        logger.warning(f"[Pred] API phien={api_session} quá cũ so với new={new_session_id}")
-        return {"side": None, "conf": None, "api_session": api_session, "valid": False, "raw": data}
+def get_prediction():
+    now = time.time()
+    if API_LAST_RAW["data"] and (now - API_LAST_RAW["ts"]) < 1.5:
+        data = API_LAST_RAW["data"]
     else:
-        # API đã đi trước (hiếm) → không dùng
-        logger.warning(f"[Pred] API phien={api_session} > new={new_session_id} → bỏ qua")
-        return {"side": None, "conf": None, "api_session": api_session, "valid": False, "raw": data}
+        data = fetch_api_raw()
 
+    if not data:
+        return {
+            "side": None, "conf": None, "ready": False,
+            "api_ok": False,
+            "api_error": API_LAST_RAW.get("error") or "API không phản hồi",
+            "api_session": None,
+            "raw": None,
+        }
 
-def _parse_du_doan(du_doan, do_tin_cay):
-    if not du_doan:
-        return None, do_tin_cay
-    s = str(du_doan).strip().upper()
-    if s.startswith("T"):
-        return "TAI", do_tin_cay
-    if s.startswith("X"):
-        return "XIU", do_tin_cay
-    # fallback: chứa chữ
-    if "TÀI" in s or "TAI" in s:
-        return "TAI", do_tin_cay
-    if "XỈU" in s or "XIU" in s:
-        return "XIU", do_tin_cay
-    return None, do_tin_cay
+    du_doan = data.get("du_doan")
+    do_tin_cay = data.get("do_tin_cay")
 
+    # ✅ Dùng normalize_side thay vì startswith
+    side_out = normalize_side(du_doan)
 
-def _extract_side(data, new_session_id):
-    """Fallback khi id phiên không phải số"""
-    side, conf = _parse_du_doan(data.get("du_doan"), data.get("do_tin_cay"))
     return {
-        "side": side,
-        "conf": conf,
+        "side": side_out,
+        "conf": do_tin_cay,
+        "ready": side_out is not None,
+        "api_ok": True,
+        "api_error": None,
         "api_session": data.get("phien"),
-        "valid": side is not None,
         "raw": data,
     }
 
-
 # ==========================================
-# PARSE KẾT QUẢ
+# PARSE KẾT QUẢ — dùng chung normalize_side
 # ==========================================
 def parse_result_side(result_raw):
     if not result_raw:
         return None
+    side = normalize_side(result_raw)
+    if side:
+        return side
+
+    # Fallback: tính tổng xúc xắc
     s = str(result_raw).strip().upper()
-    if "TÀI" in s or "TAI" in s:
-        return "TAI"
-    if "XỈU" in s or "XIU" in s:
-        return "XIU"
     nums = [int(x) for x in re.findall(r"\d+", s)]
     if len(nums) >= 3:
         total = sum(nums[:3])
@@ -276,7 +256,7 @@ def login_game(username, password):
         return {"_error": f"Lỗi kết nối: {e}"}
 
 # ==========================================
-# 🔥 CƯỢC CỐ ĐỊNH
+# 🔥 CƯỢC CỐ ĐỊNH — KHÔNG NHÂN ĐÔI
 # ==========================================
 def calc_next_bet(st):
     return int(st["base_bet_amount"])
@@ -333,34 +313,43 @@ def game_socket_worker(sid, jwt_token):
         st["session_id"] = new_id
         st["has_bet_this_session"] = False
         st["waiting_for_result"] = False
-        st["current_bet"] = calc_next_bet(st)
+        # ✅ Reset bet_type mỗi session
+        st["current_bet_type"] = None
+        st["current_bet_session"] = None
 
         if check_target_profit():
             return
 
-        # 🔥 LẤY DỰ ĐOÁN KHỚP PHIÊN
-        pred = get_prediction_for_session(new_id)
+        st["current_bet"] = calc_next_bet(st)
+        pred = get_prediction()
+
+        api_session = pred.get("api_session")
+        pred_side = pred["side"]
+
+        # Chỉ nhận dự đoán khi API nói về phiên hiện tại hoặc phiên liền trước
+        if pred_side and api_session:
+            try:
+                diff = int(new_id) - int(api_session)
+            except (TypeError, ValueError):
+                diff = 0
+            if diff not in (0, 1):
+                logger.warning(f"[{sid}] ⚠ API session {api_session} lệch xa new {new_id} → bỏ dự đoán")
+                pred_side = None
+
+        st["current_prediction"] = pred_side
         st["last_api_raw"] = pred.get("raw")
 
-        if pred["valid"]:
-            st["current_prediction"] = pred["side"]           # "TAI"/"XIU"
-            st["prediction_for_session"] = new_id             # lưu phiên mà pred áp dụng
-            logger.info(f"[{sid}] 🎯 Session {new_id} | Bet={st['current_bet']:,}đ | "
-                        f"API_session={pred['api_session']} | Pred={pred['side']} | conf={pred['conf']}")
-        else:
-            st["current_prediction"] = None
-            st["prediction_for_session"] = None
-            logger.warning(f"[{sid}] ⚠ Session {new_id}: API chưa có dự đoán khớp "
-                           f"(api_session={pred['api_session']}) → KHÔNG cược")
+        logger.info(f"[{sid}] 🎯 Session {new_id} | Bet cố định={st['current_bet']:,}đ | "
+                    f"API_session={api_session} | Pred={pred_side} | conf={pred['conf']}")
 
         socketio.emit("session_update", {
             "session_id": new_id,
-            "prediction": st["current_prediction"],
+            "prediction": pred_side,
             "conf": pred["conf"],
-            "ready": pred["valid"],
-            "api_ok": pred["raw"] is not None,
-            "api_error": API_LAST_RAW.get("error") if not pred["raw"] else None,
-            "api_session": pred["api_session"],
+            "ready": pred["ready"] and pred_side is not None,
+            "api_ok": pred["api_ok"],
+            "api_error": pred["api_error"],
+            "api_session": api_session,
             "history_len": len(GLOBAL_HISTORY),
             "current_bet": st["current_bet"],
             "auto_bet_enabled": st["auto_bet_enabled"],
@@ -378,26 +367,16 @@ def game_socket_worker(sid, jwt_token):
         if not st["session_id"]:
             return
 
-        # 🔥 BẮT BUỘC: pred phải được tính cho ĐÚNG session hiện tại
-        pred = st.get("current_prediction")
-        pred_for = st.get("prediction_for_session")
-
-        if not pred:
-            logger.warning(f"[{sid}] ⚠ Không có pred cho phiên {st['session_id']} → KHÔNG cược")
+        # ✅ Lấy prediction HIỆN TẠI và chuẩn hóa lại (an toàn)
+        pred_raw = st.get("current_prediction")
+        bet_type = normalize_side(pred_raw)
+        if not bet_type:
+            logger.warning(f"[{sid}] ⚠ API chưa báo dự đoán → KHÔNG cược phiên {st['session_id']}")
             return
 
-        if pred_for != st["session_id"]:
-            logger.warning(f"[{sid}] ⚠ pred thuộc phiên {pred_for}, hiện tại {st['session_id']} "
-                           f"→ KHÔNG cược (tránh lệch)")
-            return
-
-        pred_str = str(pred).strip().upper()
-        if pred_str.startswith("T"):
-            bet_type = "TAI"
-        elif pred_str.startswith("X"):
-            bet_type = "XIU"
-        else:
-            logger.warning(f"[{sid}] ⚠ Dự đoán không hợp lệ: {pred}")
+        # ✅ Đảm bảo prediction thuộc session hiện tại (chống race condition)
+        pred_session = st.get("session_id")
+        if not pred_session:
             return
 
         bet_amount = int(st["base_bet_amount"])
@@ -408,13 +387,16 @@ def game_socket_worker(sid, jwt_token):
             st["has_bet_this_session"] = True
             st["waiting_for_result"] = True
             st["current_bet"] = bet_amount
+            # ✅ LƯU bet_type + session đã cược để tính win/loss chính xác
+            st["current_bet_type"] = bet_type
+            st["current_bet_session"] = pred_session
+
             logger.info(f"[{sid}] 🚀 BET {bet_amount:,} → {bet_type} "
-                        f"(session {st['session_id']}, API pred {pred})")
+                        f"(session {pred_session}, API báo {pred_raw})")
             socketio.emit("toast", {
                 "type": "info",
                 "msg": f"🚀 Cược {bet_amount:,}đ vào {bet_type} (theo API)"
             }, to=sid)
-            socketio.emit("stats_update", public_state(st), to=sid)
         except Exception as e:
             logger.error(f"[{sid}] Bet error: {e}")
 
@@ -437,36 +419,37 @@ def game_socket_worker(sid, jwt_token):
         session_of_result = data.get("id") or st.get("session_id")
 
         result_side = parse_result_side(result_raw)
-        pred = st.get("current_prediction")
-        pred_for = st.get("prediction_for_session")
         is_win = None
         profit_delta = 0
 
-        # Chỉ tính thắng/thua khi: đã cược phiên này + pred khớp phiên + parse được result
-        if (st.get("waiting_for_result") and pred and result_side
-                and pred_for == session_of_result):
-            pred_key = ("TAI" if str(pred).strip().upper().startswith("T")
-                        else "XIU" if str(pred).strip().upper().startswith("X")
-                        else None)
-            if pred_key:
-                is_win = (pred_key == result_side)
-                bet_amt = int(st["current_bet"])
-                if is_win:
-                    profit_delta = int(bet_amt * 0.98)
-                    st["win_streak"] += 1
-                    st["loss_streak"] = 0
-                    st["win_count"] += 1
-                else:
-                    profit_delta = -bet_amt
-                    st["win_streak"] = 0
-                    st["loss_streak"] += 1
-                    st["lose_count"] += 1
-                st["profit_loss"] += profit_delta
-                st["waiting_for_result"] = False
+        # ✅ Tính win/loss dựa trên bet_type ĐÃ CƯỢC (không phải prediction mới)
+        bet_type_used = st.get("current_bet_type")
+        bet_session = st.get("current_bet_session")
 
+        # Chỉ tính khi: đã cược + cùng session + parse được result
+        if (st.get("waiting_for_result")
+                and bet_type_used
+                and result_side
+                and str(session_of_result) == str(bet_session)):
+            is_win = (bet_type_used == result_side)
+            bet_amt = int(st["current_bet"])
+            if is_win:
+                profit_delta = int(bet_amt * 0.98)
+                st["win_streak"] += 1
+                st["loss_streak"] = 0
+                st["win_count"] += 1
+            else:
+                profit_delta = -bet_amt
+                st["win_streak"] = 0
+                st["loss_streak"] += 1
+                st["lose_count"] += 1
+            st["profit_loss"] += profit_delta
+            st["waiting_for_result"] = False
+
+        # Lưu history
         st["history"].insert(0, {
             "session": session_of_result,
-            "pred": pred,
+            "pred": bet_type_used or st.get("current_prediction"),
             "bet": st["current_bet"] if is_win is not None else 0,
             "result": result_side or result_raw,
             "dice": dices,
@@ -475,11 +458,11 @@ def game_socket_worker(sid, jwt_token):
         st["history"] = st["history"][:30]
 
         logger.info(f"[{sid}] 📊 Result {session_of_result}: {result_side} "
-                    f"| pred={pred} (for {pred_for}) | win={is_win} | profit={st['profit_loss']:,}")
+                    f"| bet_type={bet_type_used} | win={is_win} | profit={st['profit_loss']:,}")
 
         socketio.emit("result_update", {
             "session": session_of_result,
-            "pred": pred,
+            "pred": bet_type_used,
             "result": result_side or result_raw,
             "dices": dices,
             "is_win": is_win,
@@ -534,7 +517,7 @@ def public_state(st):
         "current_bet": st["current_bet"],
         "target_profit": st["target_profit"],
         "current_prediction": st["current_prediction"],
-        "prediction_for_session": st.get("prediction_for_session"),
+        "current_bet_type": st.get("current_bet_type"),
         "session_id": st["session_id"],
         "win_count": st["win_count"],
         "lose_count": st["lose_count"],
@@ -596,7 +579,8 @@ def api_login():
         "current_bet": 10000,
         "target_profit": None,
         "current_prediction": None,
-        "prediction_for_session": None,
+        "current_bet_type": None,
+        "current_bet_session": None,
         "waiting_for_result": False,
         "has_bet_this_session": False,
         "session_id": None,
@@ -662,12 +646,16 @@ def api_stats():
 
 @app.route("/api/debug_api")
 def api_debug_api():
-    data = fetch_api_raw(force=True)
+    data = fetch_api_raw()
     return jsonify({
         "ok": data is not None,
         "error": API_LAST_RAW.get("error"),
         "ts": API_LAST_RAW.get("ts"),
         "raw": API_LAST_RAW.get("data"),
+        "normalized": {
+            "du_doan": normalize_side((data or {}).get("du_doan")),
+            "ket_qua": normalize_side((data or {}).get("ket_qua")),
+        },
         "summary": {
             "phien": (data or {}).get("phien"),
             "ket_qua": (data or {}).get("ket_qua"),
