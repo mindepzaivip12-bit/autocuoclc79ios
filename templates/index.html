@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TOOL AUTO LC79 - FIXED</title>
+<title>Auto LC79 - Minh Dz</title>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -11,7 +11,7 @@
 
 body{
   background:linear-gradient(135deg,#0a0f1e 0%,#0f172a 50%,#0b1220 100%);
-  min-height:100vh;display:flex;justify-content:center;align-items:center;
+  min-height:100vh;display:flex;justify-content:center;align-items:flex-start;
   padding:20px;color:#cbd5e1;
 }
 body::before{
@@ -116,6 +116,7 @@ body::after{
   background:#111827;width:100%;max-width:400px;border-radius:16px;padding:30px;
   box-shadow:0 10px 40px rgba(0,0,0,.6),0 0 0 1px rgba(96,165,250,0.15);
   border:1px solid rgba(96,165,250,0.1);
+  margin-top: 10vh;
 }
 .login-container h2{
   text-align:center;color:#93c5fd;margin-bottom:20px;
@@ -148,7 +149,7 @@ body::after{
 .tele-contact svg{width:18px;height:18px;fill:#60a5fa}
 
 /* ===== MAIN ===== */
-.main-wrapper{display:none;width:100%;max-width:900px;flex-direction:column;gap:15px;position:relative;z-index:1}
+.main-wrapper{display:none;width:100%;max-width:900px;flex-direction:column;gap:15px;position:relative;z-index:1; margin-top: 20px;}
 .top-header{
   background:#111827;border-radius:12px;padding:15px 25px;
   display:flex;justify-content:space-between;align-items:center;
@@ -335,7 +336,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
 
 <div class="drawer" id="drawer">
   <div class="drawer-header">
-    <h3>⚙️ CÀI ĐẶT</h3>
+    <h3>⚙️ CÀI ĐẶT HỆ THỐNG</h3>
     <button class="drawer-close" onclick="toggleDrawer()">×</button>
   </div>
 
@@ -393,13 +394,13 @@ tr:hover td{background:rgba(96,165,250,.04)}
 <div class="main-wrapper" id="mainView">
   <div class="top-header">
     <div class="logo-text">
-      <h1>TOOL AUTO LC79 </h1>
+      <h1>AUTO LC79 - MINH DZ</h1>
       <p>Hệ thống phân tích cầu & dự đoán Tài Xỉu tự động</p>
     </div>
   </div>
 
   <div class="main-card">
-    <div class="section-title"><span>📊</span> BẢNG ĐIỀU KHIỂN</div>
+    <div class="section-title"><span>📊</span> TRUNG TÂM AUTO BET</div>
 
     <div class="status-badges">
       <div class="badge badge-online off" id="socketBadge"><div class="dot dot-gray" id="socketDot"></div> Socket: OFF</div>
@@ -463,9 +464,9 @@ let lastBalance = 0;
 let saveTimer = null;
 let lastProcessedSession = 0;
 let mySid = null;
-let wakeLock = null;           // 🔆 Giữ màn hình / tab luôn hoạt động
-let heartbeatTimer = null;     // 💓 Giữ auto sống khi tắt màn hình
-let targetProfitReached = false; // 🎯 Đã chốt lãi chưa
+let wakeLock = null;
+let heartbeatTimer = null;
+let targetProfitReached = false;
 
 /* 🔒 KHÓA CỬA CƯỢC THEO PHIÊN */
 let lockedBetSession = null;
@@ -732,15 +733,14 @@ function showForceModal(title, msg){
 async function checkTargetProfit(profit){
   const cfg = loadConfig();
   const target = Number(cfg?.targetProfit || 0);
-  if(target <= 0) return;                        // Không dùng chốt lãi
-  if(!autoOn) return;                            // Auto đang tắt thì thôi
-  if(targetProfitReached) return;                // Đã chốt rồi, không chốt lại
+  if(target <= 0) return;
+  if(!autoOn) return;
+  if(targetProfitReached) return;
 
   if(profit >= target){
     targetProfitReached = true;
     toast(`🎯 Đã đạt mục tiêu lãi ${target.toLocaleString()}đ → TỰ ĐỘNG TẮT AUTO`, 'success');
 
-    // Tắt auto local + server
     autoOn = false;
     try{
       await fetch('/api/config',{
@@ -761,7 +761,6 @@ function processResult(payload){
   if(payload.balance!==undefined) updateBalanceUI(payload.balance,true);
   if(payload.profit_loss!==undefined){
     updateProfitUI(payload.profit_loss);
-    // Kiểm tra chốt lãi
     checkTargetProfit(Number(payload.profit_loss || 0));
   }
   if(payload.history) renderHistory(payload.history);
@@ -839,8 +838,8 @@ async function handleLogin(){
     }
 
     connectSocket(mySid);
-    startHeartbeat();       // 💓 Bật heartbeat
-    requestWakeLock();      // 🔆 Yêu cầu giữ màn hình
+    startHeartbeat();
+    requestWakeLock();
     toast('Đăng nhập thành công!','success');
     setTimeout(pollStats,500);
   }catch(e){
@@ -1069,7 +1068,7 @@ async function toggleAuto(){
       return;
     }
     if(newVal){
-      targetProfitReached = false;   // Reset khi bật auto lại
+      targetProfitReached = false;
       requestWakeLock();
     }
     toast(newVal?'✅ Đã bật chế độ Auto Cược':'⏸ Đã tắt chế độ Auto Cược',newVal?'success':'info');
@@ -1112,12 +1111,11 @@ async function logout(){
 }
 
 /* ============================================
-   💓 HEARTBEAT - GIỮ AUTO CHẠY KHI TẮT MÀN HÌNH
+   💓 HEARTBEAT & WAKE LOCK
 ============================================ */
 function startHeartbeat(){
   stopHeartbeat();
   heartbeatTimer = setInterval(()=>{
-    // Gửi nhịp tim định kỳ để server biết client còn sống
     if(mySid){
       fetch('/api/heartbeat',{
         method:'POST',
@@ -1125,44 +1123,36 @@ function startHeartbeat(){
         body:JSON.stringify({ autoOn: autoOn, ts: Date.now() })
       }).catch(()=>{});
     }
-    // Nếu tab bị ẩn mà auto vẫn bật, vẫn poll nhẹ để giữ nhịp
     if(document.hidden && autoOn) {
       pollStats();
     }
-  }, 15000); // 15s một lần, không quá nặng
+  }, 15000);
 }
 function stopHeartbeat(){
   if(heartbeatTimer){ clearInterval(heartbeatTimer); heartbeatTimer = null; }
 }
 
-/* ============================================
-   🔆 WAKE LOCK - GIỮ MÀN HÌNH / TAB THỨC
-============================================ */
 async function requestWakeLock(){
   try{
     if('wakeLock' in navigator && !wakeLock){
       wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', ()=>{
-        // Nếu bị release (do ẩn tab), tự xin lại khi quay lại
-      });
+      wakeLock.addEventListener('release', ()=>{});
     }
-  }catch(e){ /* Thiết bị không hỗ trợ hoặc từ chối, bỏ qua */ }
+  }catch(e){}
 }
 function releaseWakeLock(){
   try{ if(wakeLock){ wakeLock.release(); wakeLock = null; } }catch(e){}
 }
 
-/* Khi quay lại tab: xin lại wake lock + đồng bộ trạng thái ngay */
 document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState === 'visible'){
     requestWakeLock();
-    // Đồng bộ lại trạng thái ngay lập tức
     if(mySid) setTimeout(pollStats, 100);
   }
 });
 
 /* ============================================
-   INIT + HEARTBEAT
+   INIT
 ============================================ */
 setInterval(()=>{
   if(socket && socket.connected) pollStats();
