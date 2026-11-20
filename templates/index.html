@@ -87,13 +87,57 @@ body::after{
 .drawer-field label{
   display:block;font-size:12px;font-weight:600;color:#94a3b8;margin-bottom:5px;
 }
-.drawer-field input{
+.drawer-field input[type="number"]{
   width:100%;padding:10px 12px;background:#0b1220;color:#e2e8f0;
   border:1px solid #1e293b;border-radius:8px;outline:none;transition:.2s;font-size:13px;
 }
 .drawer-field input::placeholder{color:#475569}
 .drawer-field input:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(96,165,250,.15)}
 .drawer-hint{font-size:11px;color:#475569;margin-top:4px;font-weight:500}
+
+/* Toggle Switch */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+.switch input { 
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #1e293b;
+  transition: .4s;
+  border-radius: 24px;
+  border: 1px solid #334155;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #94a3b8;
+  transition: .4s;
+  border-radius: 50%;
+}
+input:checked + .slider {
+  background-color: #3b82f6;
+  border-color: #60a5fa;
+}
+input:checked + .slider:before {
+  transform: translateX(20px);
+  background-color: #fff;
+}
 
 .saved-indicator{
   display:inline-block;font-size:10px;color:#34d399;font-weight:600;
@@ -328,6 +372,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
   </div>
 </div>
 
+<!-- NÚT 3 GẠCH (HAMBURGER) -->
 <div class="hamburger" id="hamburger" onclick="toggleDrawer()">
   <span></span><span></span><span></span>
 </div>
@@ -341,7 +386,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
   </div>
 
   <div class="drawer-section">
-    <div class="drawer-section-title"> CƯỢC CỐ ĐỊNH</div>
+    <div class="drawer-section-title">CƯỢC CỐ ĐỊNH</div>
     <div class="drawer-field">
       <label>Tiền cược mỗi phiên <span class="saved-indicator" id="savedBetAmount">✓ đã lưu</span></label>
       <input type="number" id="betAmount" value="10000" min="1000" step="1000" onchange="onConfigChange()">
@@ -350,11 +395,32 @@ tr:hover td{background:rgba(96,165,250,.04)}
   </div>
 
   <div class="drawer-section">
-    <div class="drawer-section-title"> CHỐT LÃI TỰ ĐỘNG</div>
+    <div class="drawer-section-title">CHỐT LÃI TỰ ĐỘNG</div>
     <div class="drawer-field">
       <label>Số tiền lãi muốn chốt <span class="saved-indicator" id="savedTargetProfit">✓ đã lưu</span></label>
       <input type="number" id="targetProfit" value="0" min="0" step="1000" onchange="onConfigChange()">
       <div class="drawer-hint">CHỐT LÃI TỰ ĐỘNG TẮT</div>
+    </div>
+  </div>
+
+  <!-- TÍNH NĂNG GẤP X2 -->
+  <div class="drawer-section">
+    <div class="drawer-section-title">CẤU HÌNH GẤP X2 (MARTINGALE)</div>
+    <div class="drawer-field" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <label style="margin-bottom:0">Bật gấp x2 sau mỗi phiên thua</label>
+      <label class="switch">
+        <input type="checkbox" id="toggleMartingale" onchange="onConfigChange()">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="drawer-field">
+      <label>Tiền cược gốc mỗi phiên (khi thắng)</label>
+      <input type="number" id="baseBetAmount" value="1000" min="1000" step="1000" onchange="onConfigChange()">
+    </div>
+    <div class="drawer-field">
+      <label>Mức cược thấp nhất (khi gãy >2 tay)</label>
+      <input type="number" id="minBetAmount" value="1000" min="1000" step="1000" onchange="onConfigChange()">
+      <div class="drawer-hint">Tự động reset về mức này nếu thua liên tiếp 3 tay</div>
     </div>
   </div>
 
@@ -413,14 +479,14 @@ tr:hover td{background:rgba(96,165,250,.04)}
       <div class="pred-left">
         <span class="pred-label" id="predLabel">
           <span id="predLabelText">DỰ ĐOÁN PHIÊN HIỆN TẠI</span>
-          <span class="lock-icon" id="lockIcon" style="display:none">🔒</span>
+          <span class="lock-icon" id="lockIcon" style="display:none">🐼</span>
         </span>
         <div class="pred-value" id="predValue">—</div>
         <div class="pred-percent" id="predPercent">(Đang chờ dữ liệu...)</div>
       </div>
       <div class="pred-right">
         <span class="session-label">PHIÊN</span>
-        <span class="session-value" id="sessionValue">#—</span>
+        <span class="session-value" id="sessionValue">#</span>
       </div>
     </div>
 
@@ -473,6 +539,10 @@ let lockedBetSession = null;
 let lockedBetSide = null;
 let lockedBetAmount = 0;
 
+/* 🎲 QUẢN LÝ GẤP X2 */
+let lossStreak = 0; // Chuỗi thua liên tiếp
+let currentBetAmount = 0; // Mức cược hiện tại đang áp dụng
+
 const STORAGE_KEY_BALANCE = 'lc79_balance';
 const STORAGE_KEY_CONFIG  = 'lc79_config';
 const STORAGE_KEY_DEVICE  = 'lc79_device_id';
@@ -517,25 +587,35 @@ function toggleDrawer(){
 }
 
 /* ============================================
-   CONFIG
+   CONFIG & GẤP X2 LOGIC
 ============================================ */
 function loadConfig(){ try{ const r=localStorage.getItem(STORAGE_KEY_CONFIG); return r?JSON.parse(r):null; }catch(e){ return null; } }
 function saveConfig(cfg){ try{ localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify({...cfg,timestamp:Date.now()})); }catch(e){} }
+
 function applyConfigToInputs(cfg){
   if(!cfg)return;
   if(cfg.betAmount!==undefined) document.getElementById('betAmount').value = cfg.betAmount;
   if(cfg.targetProfit!==undefined) document.getElementById('targetProfit').value = cfg.targetProfit;
+  if(cfg.martingaleEnabled!==undefined) document.getElementById('toggleMartingale').checked = cfg.martingaleEnabled;
+  if(cfg.baseBetAmount!==undefined) document.getElementById('baseBetAmount').value = cfg.baseBetAmount;
+  if(cfg.minBetAmount!==undefined) document.getElementById('minBetAmount').value = cfg.minBetAmount;
 }
+
 function readConfigFromInputs(){
   return {
     betAmount: parseInt(document.getElementById('betAmount').value) || 10000,
-    targetProfit: parseInt(document.getElementById('targetProfit').value) || 0
+    targetProfit: parseInt(document.getElementById('targetProfit').value) || 0,
+    martingaleEnabled: document.getElementById('toggleMartingale').checked,
+    baseBetAmount: parseInt(document.getElementById('baseBetAmount').value) || 1000,
+    minBetAmount: parseInt(document.getElementById('minBetAmount').value) || 1000
   };
 }
+
 function showSavedIndicator(id){
   const el=document.getElementById(id); if(!el)return;
   el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1500);
 }
+
 function onConfigChange(){
   const cfg=readConfigFromInputs();
   saveConfig(cfg);
@@ -543,6 +623,7 @@ function onConfigChange(){
   showSavedIndicator('savedTargetProfit');
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>pushConfigToServer(cfg),500);
+  updateBetCalculation();
 }
 
 function apiHeaders(){
@@ -559,7 +640,11 @@ async function pushConfigToServer(cfg){
       body:JSON.stringify({
         auto_bet_enabled: autoOn,
         betAmount: cfg.betAmount,
-        targetProfit: cfg.targetProfit
+        targetProfit: cfg.targetProfit,
+        // Gửi thêm cấu hình gấp x2 nếu backend hỗ trợ
+        martingaleEnabled: cfg.martingaleEnabled,
+        baseBetAmount: cfg.baseBetAmount,
+        minBetAmount: cfg.minBetAmount
       })
     });
     const d = await r.json();
@@ -571,6 +656,29 @@ async function pushConfigToServer(cfg){
     }
     toast('💾 Đã lưu cài đặt cược','success');
   }catch(e){ toast('Lỗi lưu cài đặt: '+e.message,'error'); }
+}
+
+// Tính toán mức cược dựa trên chuỗi thua
+function updateBetCalculation() {
+  const cfg = readConfigFromInputs();
+  if (!cfg.martingaleEnabled) {
+    currentBetAmount = cfg.betAmount;
+    return;
+  }
+
+  if (lossStreak === 0) {
+    currentBetAmount = cfg.baseBetAmount;
+  } else if (lossStreak <= 2) {
+    // Thua 1 hoặc 2 tay: x2 mỗi lần
+    currentBetAmount = cfg.baseBetAmount * Math.pow(2, lossStreak);
+  } else {
+    // Thua quá 2 tay (tức 3 lần thua liên tiếp trở lên): reset về mức thấp nhất
+    currentBetAmount = cfg.minBetAmount;
+    // Reset lossStreak về 0 để bắt đầu lại chu kỳ mới
+    lossStreak = 0; 
+    toast('🔄 Đã gãy quá 2 tay, tự động reset về mức cược thấp nhất: ' + cfg.minBetAmount.toLocaleString() + 'đ', 'warn');
+  }
+  document.getElementById('betAmount').value = currentBetAmount;
 }
 
 /* ============================================
@@ -674,7 +782,7 @@ function updatePredictionUI(state){
     box.classList.add('locked');
 
     if (apiPred && String(apiPred).toUpperCase() !== lockedBetSide) {
-      percent.innerText = `⚠️ Hệ thống báo ${String(apiPred).toUpperCase()} nhưng bạn đã đặt ${lockedBetSide}`;
+      percent.innerText = `Hệ thống báo ${String(apiPred).toUpperCase()} nhưng bạn đã đặt ${lockedBetSide}`;
       percent.className = 'pred-percent locked';
     } else {
       percent.innerText = `✓ Đã khớp lệnh — ${betAmt.toLocaleString()}đ`;
@@ -789,6 +897,28 @@ function processResult(payload){
     if (calculatedWin !== payload.is_win) {
       console.warn(`Phát hiện lỗi Backend: Hệ thống báo ${payload.is_win ? 'thắng' : 'thua'} nhưng thực tế là ${calculatedWin ? 'thắng' : 'thua'}.`);
       payload.is_win = calculatedWin;
+    }
+
+    // 🎲 CẬP NHẬT CHUỖI THUA & TÍNH LẠI CƯỢC
+    const cfg = readConfigFromInputs();
+    if (cfg.martingaleEnabled) {
+      if (payload.is_win) {
+        lossStreak = 0; // Thắng -> reset chuỗi
+        toast('🏆 Thắng : ' + cfg.baseBetAmount.toLocaleString() + 'đ', 'success');
+      } else {
+        lossStreak++; // Thua -> tăng chuỗi
+        if (lossStreak > 2) {
+          lossStreak = 0; // Gãy quá 2 tay -> reset về 0 (sẽ tính mức min)
+          toast('💀 Gãy quá 2 tay! Tự động reset về mức cược thấp nhất: ' + cfg.minBetAmount.toLocaleString() + 'đ', 'error');
+        } else {
+          toast('📉 Thua! Chuỗi thua: ' + lossStreak + '. Tăng cược lên: ' + (cfg.baseBetAmount * Math.pow(2, lossStreak)).toLocaleString() + 'đ', 'warn');
+        }
+      }
+      updateBetCalculation();
+      // Cập nhật lại giá trị ô input
+      document.getElementById('betAmount').value = currentBetAmount;
+      saveConfig(readConfigFromInputs());
+      pushConfigToServer(readConfigFromInputs());
     }
 
     showResultFlash(payload.is_win, payload.result, actualBetSide, actualBetSide);
@@ -1056,7 +1186,10 @@ async function toggleAuto(){
       body:JSON.stringify({
         auto_bet_enabled:newVal,
         betAmount:cfg.betAmount,
-        targetProfit:cfg.targetProfit
+        targetProfit:cfg.targetProfit,
+        martingaleEnabled: cfg.martingaleEnabled,
+        baseBetAmount: cfg.baseBetAmount,
+        minBetAmount: cfg.minBetAmount
       })
     });
     const d = await r.json();
@@ -1069,6 +1202,8 @@ async function toggleAuto(){
     }
     if(newVal){
       targetProfitReached = false;
+      lossStreak = 0; // Reset chuỗi thua khi bật auto
+      updateBetCalculation();
       requestWakeLock();
     }
     toast(newVal?'✅ Đã bật chế độ Auto Cược':'⏸ Đã tắt chế độ Auto Cược',newVal?'success':'info');
@@ -1083,7 +1218,7 @@ async function stopBot(){
       headers: apiHeaders(),
       body:JSON.stringify({auto_bet_enabled:false})
     });
-    autoOn=false; targetProfitReached=false; toast('Đã ngắt Bot khẩn cấp','error'); pollStats();
+    autoOn=false; targetProfitReached=false; lossStreak=0; toast('Đã ngắt Bot khẩn cấp','error'); pollStats();
   }catch(e){ toast('Lỗi: '+e.message,'error'); }
 }
 
@@ -1094,9 +1229,11 @@ async function resetHistory(){
     toast('Đã xóa lịch sử','success');
     updateProfitUI(0);
     targetProfitReached = false;
+    lossStreak = 0;
     localStorage.removeItem(STORAGE_KEY_BALANCE);
     lastProcessedSession=0;
     lockedBetSession=null; lockedBetSide=null; lockedBetAmount=0;
+    updateBetCalculation();
   }catch(e){ toast('Lỗi: '+e.message,'error'); }
 }
 
