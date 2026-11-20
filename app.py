@@ -20,7 +20,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet',
 # ==========================================
 API_LOGIN_URL   = "https://apifo88daigia.tele68.com/api"
 API_LOBBY_URL   = "https://wlb.tele68.com/v1/lobby/auth/login"
-API_HISTORY_URL = "https://leminhapidzhehe.onrender.com/lc79md5"
+API_HISTORY_URL = "https://apibetvipbominh.onrender.com/lc79md5"
 GAME_WS_URL     = "https://wtxmd52.tele68.com"
 GAME_WS_PATH    = "txmd5/"
 GAME_WS_NS      = "/txmd5"
