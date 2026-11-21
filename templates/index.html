@@ -79,6 +79,7 @@ body::after{content:'';position:fixed;bottom:-20%;right:-20%;width:60%;height:60
 .btn-toggle-auto{background:linear-gradient(135deg,#10b981,#34d399)}
 .btn-toggle-auto.off{background:linear-gradient(135deg,#ec4899,#f472b6)}
 .btn-stop-bot{background:linear-gradient(135deg,#ef4444,#f87171)}
+.btn-debug{background:linear-gradient(135deg,#f59e0b,#fbbf24)}
 .table-title{font-size:13px;color:#db2777;font-weight:700;text-transform:uppercase;margin-bottom:15px}
 .table-wrapper{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px;min-width:480px}
@@ -145,6 +146,7 @@ td{padding:12px 8px;border-bottom:1px solid #fce7f3;font-weight:600;color:#6b728
     <div class="action-buttons">
       <button class="btn-action btn-toggle-auto off" id="btnToggleAuto" onclick="toggleAuto()"><span>▶</span> BẬT AUTO</button>
       <button class="btn-action btn-stop-bot" onclick="stopBot()"><span>⛔</span> NGẮT BOT</button>
+      <button class="btn-action btn-debug" onclick="debugAPI()"><span>🔍</span> Debug API</button>
     </div>
     <div class="table-title">LỊCH SỬ CƯỢC</div>
     <div class="table-wrapper">
@@ -242,91 +244,91 @@ async function handleLogin(){
   }
 }
 
-// 🔌 KẾT NỐI SOCKET WEB (ĐÃ FIX)
+// 🔌 KẾT NỐI SOCKET
 function connectSocket(sid){
   if(socket) socket.disconnect();
   socket=io(window.location.origin,{transports:['websocket','polling'],reconnection:true,reconnectionAttempts:Infinity});
   
-  socket.on('connect',()=>{ 
-    console.log("Socket Connected");
-    setTimeout(pollStats,300); 
+  socket.on('connect',()=>{ setTimeout(pollStats,300); });
+  
+  // Bắt mọi sự kiện có thể chứa data
+  ['session_update','prediction','result_update','stats_update','data_update'].forEach(evt => {
+      socket.on(evt, d => {
+          console.log(`[SOCKET] ${evt}:`, d);
+          processIncomingData(d);
+      });
   });
 
-  // Bắt sự kiện session_update (thường chứa dự đoán)
-  socket.on('session_update',d=>{
-    console.log("Session Update:", d); // Log để debug
-    handlePredictionData(d);
-  });
-
-  // Bắt sự kiện result_update (kết quả phiên trước)
-  socket.on('result_update',d=>{
-    console.log("Result Update:", d);
-    if(d.balance) document.getElementById('balanceDisplay').innerText=Number(d.balance).toLocaleString();
-    if(d.profit_loss!==undefined){
-      const pl=document.getElementById('plDisplay');
-      pl.innerText=(d.profit_loss>=0?'+':'')+Number(d.profit_loss).toLocaleString();
-      pl.style.color=d.profit_loss>=0?'#059669':'#dc2626';
-    }
-    if(d.history) renderHistory(d.history);
-  });
-
-  socket.on('stats_update',s=>applyState(s));
   socket.on('toast',d=>toast(d.msg,d.type));
 }
 
-// Hàm xử lý dữ liệu dự đoán linh hoạt
-function handlePredictionData(d){
-  if(!d) return;
+// Hàm quét toàn bộ key để tìm dự đoán & phiên
+function processIncomingData(d){
+    if(!d || typeof d !== 'object') return;
 
-  // 1. Cập nhật phiên
-  if(d.session_id || d.session){
-    document.getElementById('sessionValue').innerText = '#' + (d.session_id || d.session);
-  }
+    // Nếu có object con data
+    let root = d.data ? d.data : d;
 
-  // 2. Lấy giá trị dự đoán từ nhiều key khác nhau
-  let pred = d.prediction || d.du_doan || d.pred || d.result || d.bet;
-  
-  // Nếu server trả về object lồng nhau (ví dụ d.data.prediction)
-  if(!pred && d.data) {
-      pred = d.data.prediction || d.data.du_doan || d.data.pred || d.data.result;
-  }
+    // 1. Tìm Phiên
+    let session = root.session_id || root.sessionId || root.session || root.id || root.issue || root.period || root.ky || root.phien;
+    if(session) {
+        document.getElementById('sessionValue').innerText = '#' + session;
+    }
 
-  const pEl = document.getElementById('predValue');
-  const pPercent = document.getElementById('predPercent');
-
-  if(pred){
-    // Chuẩn hóa chuỗi (Tài/Xỉu/T/X)
-    let predStr = String(pred).toUpperCase();
-    if(predStr === 'T' || predStr === 'TAI' || predStr === 'TÀI') predStr = 'TÀI';
-    if(predStr === 'X' || predStr === 'XIU' || predStr === 'XỈU') predStr = 'XỈU';
-
-    pEl.innerText = predStr;
+    // 2. Tìm Dự đoán (Quét mọi trường hợp)
+    let pred = root.prediction || root.pred || root.du_doan || root.duDoan || root.result || root.bet || root.cua || root.choose;
     
-    // Đổi màu theo kết quả
-    if(predStr.includes('TÀI') || predStr.includes('TAI')){
-        pEl.className = 'pred-value val-tai';
-    } else if(predStr.includes('XỈU') || predStr.includes('XIU')){
-        pEl.className = 'pred-value val-xiu';
-    } else {
-        pEl.className = 'pred-value'; // Mặc định
+    // Nếu kết quả trả về dạng "TAI"/"XIU"/"T"/"X"
+    if(pred) {
+        let pStr = String(pred).toUpperCase().trim();
+        let displayVal = pStr;
+        if(pStr === 'T' || pStr === 'TAI' || pStr === 'TÀI') displayVal = 'TÀI';
+        if(pStr === 'X' || pStr === 'XIU' || pStr === 'XỈU') displayVal = 'XỈU';
+
+        const pEl = document.getElementById('predValue');
+        pEl.innerText = displayVal;
+        
+        if(displayVal.includes('TÀI')) pEl.className = 'pred-value val-tai';
+        else if(displayVal.includes('XỈU')) pEl.className = 'pred-value val-xiu';
+        else pEl.className = 'pred-value';
+
+        // Hiển thị độ tin cậy
+        let conf = root.conf || root.confidence || root.rate || root.percent || root.tin_cay;
+        if(conf) document.getElementById('predPercent').innerText = `(Độ tin cậy: ${conf}%)`;
+        else document.getElementById('predPercent').innerText = '(Đã có dự đoán)';
     }
 
-    // Hiển thị độ tin cậy nếu có
-    if(d.conf || d.confidence || d.rate){
-        pPercent.innerText = `(Độ tin cậy: ${d.conf || d.confidence || d.rate}%)`;
-    } else {
-        pPercent.innerText = '(Đã có dự đoán)';
-    }
-  } else {
-    // Nếu không có dự đoán
-    // pEl.innerText = '—'; // Giữ nguyên hoặc reset
-    pPercent.innerText = '(Đang chờ dữ liệu...)';
-  }
+    // 3. Cập nhật tiền cược hiện tại
+    let curBet = root.current_bet || root.bet_amount || root.cuoc || root.money;
+    if(curBet !== undefined) document.getElementById('betDisplay').innerText = Number(curBet).toLocaleString();
 
-  // 3. Cập nhật tiền cược hiện tại nếu có
-  if(d.current_bet !== undefined){
-      document.getElementById('betDisplay').innerText = Number(d.current_bet).toLocaleString();
-  }
+    // 4. Cập nhật số dư / lãi nếu có
+    if(root.balance !== undefined) document.getElementById('balanceDisplay').innerText = Number(root.balance).toLocaleString();
+    if(root.profit_loss !== undefined) {
+        const pl = document.getElementById('plDisplay');
+        pl.innerText = (root.profit_loss >= 0 ? '+' : '') + Number(root.profit_loss).toLocaleString();
+        pl.style.color = root.profit_loss >= 0 ? '#059669' : '#dc2626';
+    }
+
+    // 5. Cập nhật lịch sử
+    if(root.history) renderHistory(root.history);
+    
+    // 6. Cập nhật trạng thái auto
+    if(root.auto_bet_enabled !== undefined) {
+        autoOn = !!root.auto_bet_enabled;
+        updateAutoUI();
+    }
+}
+
+function updateAutoUI(){
+    const btn=document.getElementById('btnToggleAuto'), badge=document.getElementById('autoStatusBadge');
+    if(autoOn){
+        btn.innerHTML='<span>⏸</span> TẮT AUTO'; btn.classList.remove('off');
+        badge.className='badge badge-auto'; badge.innerHTML='<div class="dot dot-green"></div> AUTO: ON';
+    } else {
+        btn.innerHTML='<span>▶</span> BẬT AUTO'; btn.classList.add('off');
+        badge.className='badge badge-auto off'; badge.innerHTML='<div class="dot dot-gray"></div> AUTO: OFF';
+    }
 }
 
 async function pollStats(){
@@ -334,48 +336,31 @@ async function pollStats(){
     const r=await fetch('/api/stats');
     if(!r.ok) return;
     const d=await r.json();
+    console.log("[POLL] API /api/stats:", d);
     if(d.success && d.state) applyState(d.state);
-  }catch(e){}
+    else if(d.state) applyState(d.state);
+    else applyState(d); // Nếu API trả về trực tiếp
+  }catch(e){ console.error("Poll error:", e); }
 }
 
 function applyState(s){
-  if(!s) return; autoOn=!!s.auto_bet_enabled;
+  if(!s) return;
   
+  // Cập nhật Socket Badge
   const sb=document.getElementById('socketBadge');
-  if(s.socket_connected){ 
-    sb.className='badge badge-online'; sb.innerHTML='<div class="dot dot-green"></div> Socket: ON'; 
-    document.getElementById('statusText').innerText='Đã kết nối'; document.getElementById('statusText').style.color='#059669'; 
-  } else { 
-    sb.className='badge badge-online off'; sb.innerHTML='<div class="dot dot-red"></div> Socket: OFF'; 
-    document.getElementById('statusText').innerText='Đang kết nối...'; document.getElementById('statusText').style.color='#d97706'; 
-  }
-  
-  const btn=document.getElementById('btnToggleAuto'), badge=document.getElementById('autoStatusBadge');
-  if(autoOn){
-    btn.innerHTML='<span>⏸</span> TẮT AUTO'; btn.classList.remove('off');
-    badge.className='badge badge-auto'; badge.innerHTML='<div class="dot dot-green"></div> AUTO: ON';
+  if(s.socket_connected){
+    sb.className='badge badge-online'; sb.innerHTML='<div class="dot dot-green"></div> Socket: ON';
+    document.getElementById('statusText').innerText='Đã kết nối'; document.getElementById('statusText').style.color='#059669';
   } else {
-    btn.innerHTML='<span>▶</span> BẬT AUTO'; btn.classList.add('off');
-    badge.className='badge badge-auto off'; badge.innerHTML='<div class="dot dot-gray"></div> AUTO: OFF';
-  }
-  
-  if(s.balance!==undefined) document.getElementById('balanceDisplay').innerText=Number(s.balance).toLocaleString();
-  if(s.profit_loss!==undefined){
-    const pl=document.getElementById('plDisplay');
-    pl.innerText=(s.profit_loss>=0?'+':'')+Number(s.profit_loss).toLocaleString();
-    pl.style.color=s.profit_loss>=0?'#059669':'#dc2626';
-  }
-  document.getElementById('winCount').innerText=s.win_count||0;
-  document.getElementById('loseCount').innerText=s.lose_count||0;
-  document.getElementById('betDisplay').innerText=(s.current_bet||0).toLocaleString();
-  
-  // Cập nhật phiên & dự đoán từ state (nếu có)
-  if(s.session_id) document.getElementById('sessionValue').innerText='#'+s.session_id;
-  if(s.prediction || s.du_doan || s.result){
-      handlePredictionData(s); // Tái sử dụng hàm xử lý
+    sb.className='badge badge-online off'; sb.innerHTML='<div class="dot dot-red"></div> Socket: OFF';
+    document.getElementById('statusText').innerText='Đang kết nối...'; document.getElementById('statusText').style.color='#d97706';
   }
 
-  if(s.history) renderHistory(s.history);
+  // Xử lý toàn bộ data qua hàm quét
+  processIncomingData(s);
+  
+  document.getElementById('winCount').innerText=s.win_count||0;
+  document.getElementById('loseCount').innerText=s.lose_count||0;
 }
 
 function renderHistory(rows){
@@ -383,9 +368,22 @@ function renderHistory(rows){
   if(!rows||!rows.length){ tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:#d8b4c8;padding:20px">Chưa có lịch sử</td></tr>'; return; }
   rows.forEach(r=>{
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>#${r.session}</td><td>${r.pred||'—'}</td><td>${Number(r.bet||0).toLocaleString()}</td><td>${r.result||'—'}</td><td>${r.win===true?'<span style="color:#059669">✓ THẮNG</span>':r.win===false?'<span style="color:#dc2626">✗ THUA</span>':'—'}</td>`;
+    tr.innerHTML=`<td>#${r.session||r.session_id||'—'}</td><td>${r.pred||r.prediction||r.du_doan||'—'}</td><td>${Number(r.bet||r.bet_amount||0).toLocaleString()}</td><td>${r.result||'—'}</td><td>${r.win===true?'<span style="color:#059669">✓ THẮNG</span>':r.win===false?'<span style="color:#dc2626">✗ THUA</span>':'—'}</td>`;
     tb.appendChild(tr);
   });
+}
+
+// 🔍 DEBUG API
+async function debugAPI(){
+    try {
+        const r = await fetch('/api/stats');
+        const d = await r.json();
+        console.log("=== DEBUG API /api/stats ===");
+        console.log(d);
+        alert("Đã in dữ liệu API ra Console (F12).\n\nDữ liệu: " + JSON.stringify(d, null, 2).substring(0, 500) + "...");
+    } catch(e) {
+        alert("Lỗi gọi API: " + e.message);
+    }
 }
 
 // ⚙️ CÁC HÀM CONFIG
@@ -399,18 +397,18 @@ async function stopBot(){
   toast('Đã ngắt Bot','error'); pollStats();
 }
 async function onConfigChange(){
-  const amt=parseInt(document.getElementById('betAmount').value)||10000; 
-  await fetch('/api/config',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({betAmount:amt})}); 
+  const amt=parseInt(document.getElementById('betAmount').value)||10000;
+  await fetch('/api/config',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({betAmount:amt})});
   toast('Đã lưu cài đặt','success');
 }
 async function resetHistory(){
   if(!confirm('Xoá toàn bộ lịch sử cược?')) return;
-  await fetch('/api/config',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({reset_history:true})}); 
+  await fetch('/api/config',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({reset_history:true})});
   toast('Đã xoá lịch sử','success'); pollStats();
 }
 async function logout(){
-  if(!confirm('Đăng xuất?'))return; 
-  try{await fetch('/api/logout',{method:'POST'});}catch(e){} 
+  if(!confirm('Đăng xuất?'))return;
+  try{await fetch('/api/logout',{method:'POST'});}catch(e){}
   location.reload();
 }
 
