@@ -12,12 +12,8 @@ body{background:linear-gradient(135deg,#fff5f7 0%,#ffe4ec 50%,#fdf2f8 100%);min-
 body::before{content:'';position:fixed;top:-20%;left:-20%;width:60%;height:60%;background:radial-gradient(circle,rgba(244,114,182,0.15) 0%,transparent 70%);pointer-events:none;z-index:0}
 body::after{content:'';position:fixed;bottom:-20%;right:-20%;width:60%;height:60%;background:radial-gradient(circle,rgba(251,207,232,0.25) 0%,transparent 70%);pointer-events:none;z-index:0}
 #bgMusic { display: none; }
-
-/* 🌸 HOA RƠI */
 .flower{position:fixed;top:-50px;pointer-events:none;z-index:999;animation:fall linear forwards;opacity:0.7}
 @keyframes fall { 0% { transform: translateY(-10vh) rotate(0deg); } 100% { transform: translateY(110vh) rotate(360deg); } }
-
-/* UI */
 .hamburger{position:fixed;top:20px;left:20px;z-index:1001;width:48px;height:48px;border-radius:12px;cursor:pointer;background:#fff;border:1px solid rgba(244,114,182,0.3);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;box-shadow:0 4px 20px rgba(244,114,182,.2);transition:.2s}
 .hamburger:hover{background:#fdf2f8;border-color:#f472b6;transform:translateY(-2px)}
 .hamburger span{display:block;width:22px;height:2px;background:#f472b6;border-radius:2px;transition:.3s}
@@ -210,7 +206,7 @@ function setKeyExpiry(ts){
   update(); if(keyTimer) clearInterval(keyTimer); keyTimer = setInterval(update, 30000);
 }
 
-// 🔑 ĐĂNG NHẬP
+// 🔑 ĐĂNG NHẬP - ĐÃ FIX LỖI 404/403
 async function handleLogin(){
   const u=document.getElementById('username').value.trim();
   const p=document.getElementById('password').value.trim();
@@ -223,20 +219,31 @@ async function handleLogin(){
   btn.disabled=true; btn.innerText='Đang đăng nhập...';
   
   try{
-    const r=await fetch('/api/login',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p, key:k})});
+    const r = await fetch('/api/login', {
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'}, 
+        body: JSON.stringify({username:u, password:p, key:k})
+    });
     
-    // 🛡️ BẮT LỖI HTTP (Fix lỗi hiện 404, 500)
+    // 🛡️ XỬ LÝ LỖI CHUẨN - KHÔNG HIỆN "HTTP 404 (Mã: 403)" NỮA
     if(!r.ok){
-       const errText = await r.text();
-       let msg = 'Lỗi Server';
-       try { msg = JSON.parse(errText).error || msg; } catch(e){}
-       throw new Error(`${msg} (Mã: ${r.status})`);
+       let msg = `Lỗi Server (${r.status})`;
+       try { 
+           const errData = await r.json(); 
+           msg = errData.error || errData.message || msg; 
+       } catch(e){
+           // Nếu server trả HTML thì bắt lỗi tại đây
+           if(r.status === 403) msg = 'Key không hợp lệ hoặc đã hết hạn!';
+           else if(r.status === 404) msg = 'Không tìm thấy API (404). Kiểm tra lại Server!';
+           else if(r.status === 500) msg = 'Lỗi Server (500). Vui lòng thử lại sau!';
+       }
+       throw new Error(msg);
     }
 
-    const d=await r.json();
+    const d = await r.json();
     
     if(!d.success){ 
-      toast(d.error||'Lỗi đăng nhập','error'); 
+      toast(d.error || d.message || 'Lỗi đăng nhập', 'error'); 
       btn.disabled=false; btn.innerText='ĐĂNG NHẬP'; 
       return; 
     }
@@ -252,7 +259,7 @@ async function handleLogin(){
     toast('Đăng nhập thành công!','success');
     setTimeout(pollStats,500);
   }catch(e){
-    toast(e.message||'Lỗi kết nối server','error'); 
+    toast(e.message || 'Lỗi kết nối server', 'error'); 
     btn.disabled=false; btn.innerText='ĐĂNG NHẬP';
   }
 }
