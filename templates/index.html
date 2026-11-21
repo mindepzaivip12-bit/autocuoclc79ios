@@ -249,7 +249,6 @@ function connectSocket(sid){
   
   socket.on('connect',()=>{ setTimeout(pollStats,300); });
   
-  // Bắt mọi sự kiện có thể chứa data
   ['session_update','prediction','result_update','stats_update','data_update'].forEach(evt => {
       socket.on(evt, d => {
           console.log(`[SOCKET] ${evt}:`, d);
@@ -260,21 +259,52 @@ function connectSocket(sid){
   socket.on('toast',d=>toast(d.msg,d.type));
 }
 
-// Hàm quét toàn bộ key để tìm dự đoán & phiên (Đã nâng cấp)
+// 🔍 HÀM QUÉT ĐỆ QUY TÌM TÀI/XỈU VÀ PHIÊN
+function findPrediction(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    for (let key in obj) {
+        const val = obj[key];
+        if (typeof val === 'string') {
+            const v = val.toUpperCase().trim();
+            if (v === 'TÀI' || v === 'TAI' || v === 'T' || v === 'XỈU' || v === 'XIU' || v === 'X') {
+                return val; // Trả về giá trị gốc để xử lý
+            }
+        } else if (typeof val === 'object') {
+            const found = findPrediction(val);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
+function findSession(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    const keys = ['session_id','sessionId','session','id','issue','period','ky','phien','Phien','Session'];
+    for (let k of keys) {
+        if (obj[k]) return obj[k];
+    }
+    for (let key in obj) {
+        if (typeof obj[key] === 'object') {
+            const found = findSession(obj[key]);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
 function processIncomingData(d){
     if(!d || typeof d !== 'object') return;
 
-    // Nếu có object con data, gộp vào root để dễ quét
     let root = d.data && typeof d.data === 'object' ? { ...d, ...d.data } : d;
 
-    // 1. Tìm Phiên (Quét rất nhiều tên biến)
-    let session = root.session_id || root.sessionId || root.session || root.id || root.issue || root.period || root.ky || root.phien || root.Phien || root.Session;
+    // 1. Tìm Phiên
+    let session = findSession(root);
     if(session) {
         document.getElementById('sessionValue').innerText = '#' + session;
     }
 
-    // 2. Tìm Dự đoán (Quét mọi trường hợp)
-    let pred = root.prediction || root.pred || root.du_doan || root.duDoan || root.result || root.bet || root.cua || root.choose || root.DuDoan || root.KetQua;
+    // 2. Tìm Dự đoán (Dùng hàm đệ quy quét sạch)
+    let pred = findPrediction(root);
     
     if(pred) {
         let pStr = String(pred).toUpperCase().trim();
@@ -289,7 +319,6 @@ function processIncomingData(d){
         else if(displayVal.includes('XỈU')) pEl.className = 'pred-value val-xiu';
         else pEl.className = 'pred-value';
 
-        // Hiển thị độ tin cậy
         let conf = root.conf || root.confidence || root.rate || root.percent || root.tin_cay || root.do_tin_cay;
         if(conf) document.getElementById('predPercent').innerText = `(Độ tin cậy: ${conf}%)`;
         else document.getElementById('predPercent').innerText = '(Đã có dự đoán)';
@@ -299,7 +328,7 @@ function processIncomingData(d){
     let curBet = root.current_bet || root.bet_amount || root.cuoc || root.money || root.tien_cuoc;
     if(curBet !== undefined) document.getElementById('betDisplay').innerText = Number(curBet).toLocaleString();
 
-    // 4. Cập nhật số dư / lãi nếu có
+    // 4. Cập nhật số dư / lãi
     if(root.balance !== undefined) document.getElementById('balanceDisplay').innerText = Number(root.balance).toLocaleString();
     if(root.profit_loss !== undefined) {
         const pl = document.getElementById('plDisplay');
@@ -352,7 +381,6 @@ function applyState(s){
     document.getElementById('statusText').innerText='Đang kết nối...'; document.getElementById('statusText').style.color='#d97706';
   }
 
-  // Xử lý toàn bộ data qua hàm quét
   processIncomingData(s);
   
   document.getElementById('winCount').innerText=s.win_count||s.winCount||0;
@@ -363,7 +391,6 @@ function renderHistory(rows){
   const tb=document.getElementById('historyBody'); tb.innerHTML='';
   if(!rows||!rows.length){ tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:#d8b4c8;padding:20px">Chưa có lịch sử</td></tr>'; return; }
   rows.forEach(r=>{
-    const tr=document.createElement('tr');
     tr.innerHTML=`<td>#${r.session||r.session_id||r.id||'—'}</td><td>${r.pred||r.prediction||r.du_doan||r.cua||'—'}</td><td>${Number(r.bet||r.bet_amount||r.cuoc||0).toLocaleString()}</td><td>${r.result||r.ket_qua||'—'}</td><td>${r.win===true?'<span style="color:#059669">✓ THẮNG</span>':r.win===false?'<span style="color:#dc2626">✗ THUA</span>':'—'}</td>`;
     tb.appendChild(tr);
   });
