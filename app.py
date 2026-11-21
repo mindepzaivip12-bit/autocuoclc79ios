@@ -21,6 +21,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet',
 API_LOGIN_URL   = "https://apifo88daigia.tele68.com/api"
 API_LOBBY_URL   = "https://wlb.tele68.com/v1/lobby/auth/login"
 API_HISTORY_URL = "https://leminhlcdz.onrender.com/lc79md5"
+API_ADMIN_URL   = os.environ.get("ADMIN_API_URL", "https://lc79vipadmin-5orx.onrender.com").rstrip("/")
 GAME_WS_URL     = "https://wtxmd52.tele68.com"
 GAME_WS_PATH    = "txmd5/"
 GAME_WS_NS      = "/txmd5"
@@ -36,7 +37,8 @@ GLOBAL_HISTORY_LOCK = threading.Lock()
 WEB_SESSIONS = {}
 WS_CLIENTS   = {}
 
-API_LAST_RAW = {"data": None, "ts": 0, "error": None}
+API_LAST_RAW   = {"data": None, "ts": 0, "error": None}
+ADMIN_LAST_RAW = {"data": None, "ts": 0, "error": None, "last_push_ts": 0}
 
 # ==========================================
 # ✅ HÀM CHUẨN HÓA SIDE
@@ -69,6 +71,170 @@ def normalize_side(value):
     return None
 
 # ==========================================
+# ✅ LIÊN KẾT RENDER ADMIN API
+# ==========================================
+def _admin_headers():
+    headers = {
+        "Cache-Control": "no-store",
+        "User-Agent": "Mozilla/5.0",
+        "Content-Type": "application/json",
+    }
+    admin_key = os.environ.get("ADMIN_API_KEY", "").strip()
+    if admin_key:
+        headers["Authorization"] = f"Bearer {admin_key}"
+        headers["X-Admin-Key"] = admin_key
+    return headers
+
+def fetch_admin_config(username=None, sid=None):
+    """Lấy cấu hình / trạng thái điều khiển từ Render Admin."""
+    endpoints = ["/api/config", "/api/bot/config", "/config", "/"]
+    params = {"_t": int(time.time() * 1000)}
+    if username:
+        params["username"] = username
+    if sid:
+        params["sid"] = sid
+
+    for ep in endpoints:
+        try:
+            url = f"{API_ADMIN_URL}{ep}"
+            r = requests.get(url, params=params, timeout=5, headers=_admin_headers())
+            if r.status_code == 404:
+                continue
+            r.raise_for_status()
+            ctype = r.headers.get("Content-Type", "")
+            data = r.json() if "application/json" in ctype or r.text.strip().startswith("{") else {"raw_text": r.text}
+            if isinstance(data, dict) and "data" in data and isinstance(data["data"], dict):
+                payload = data["data"]
+            elif isinstance(data, dict):
+                payload = data
+            else:
+                continue
+
+            ADMIN_LAST_RAW["data"] = payload
+            ADMIN_LAST_RAW["ts"] = time.time()
+            ADMIN_LAST_RAW["error"] = None
+            return payload
+        except Exception as e:
+            ADMIN_LAST_RAW["error"] = str(e)
+            continue
+    return ADMIN_LAST_RAW.get("data")
+
+def apply_admin_config_to_session(st, sid, admin_cfg):
+    """Áp dụng cấu hình từ Admin vào session nếu có thay đổi."""
+    if not isinstance(admin_cfg, dict):
+        return False
+    changed = False
+
+    if "betAmount" in admin_cfg or "base_bet_amount" in admin_cfg:
+        raw_amt = admin_cfg.get("betAmount", admin_cfg.get("base_bet_amount"))
+        try:
+            new_amt = int(raw_amt)
+            if new_amt >= 1000 and new_amt != st["base_bet_amount"]:
+                st["base_bet_amount"] = new_amt
+                if not st.get("has_bet_this_session"):
+                    st["current_bet"] = new_amt
+                changed = True
+        except (TypeError, ValueError):
+            pass
+
+    if "auto_bet_enabled" in admin_cfg:
+        new_auto = bool(admin_cfg["auto_bet_enabled"])
+        if new_auto != st["auto_bet_enabled"]:
+            st["auto_bet_enabled"] = new_auto
+            st["has_bet_this_session"] = not new_auto
+            changed = True
+
+    if "x2_mode" in admin_cfg:
+        new_x2 = bool(admin_cfg["x2_mode"])
+        if new_x2 != st["x2_mode"]:
+            st["x2_mode"] = new_x2
+            if new_x2:
+                st["x2_loss_mode"] = False
+            changed = True
+
+    if "x2_loss_mode" in admin_cfg:
+        new_x2_loss = bool(admin_cfg["x2_loss_mode"])
+        if new_x2_loss != st["x2_loss_mode"]:
+            st["x2_loss_mode"] = new_x2_loss
+            if new_x2_loss:
+                st["x2_mode"] = False
+            changed = True
+
+    if "x2_loss_limit" in admin_cfg and admin_cfg["x2_loss_limit"]:
+        try:
+            new_lim = int(admin_cfg["x2_loss_limit"])
+            if new_lim > 0 and new_lim != st["x2_loss_limit"]:
+                st["x2_loss_limit"] = new_lim
+                changed = True
+        except (TypeError, ValueError):
+            pass
+
+    if "target_profit" in admin_cfg:
+        tp = admin_cfg["target_profit"]
+        new_tp = int(tp) if tp not in (None, "", 0) else None
+        if new_tp != st["target_profit"]:
+            st["target_profit"] = new_tp
+            changed = True
+
+    if changed:
+        logger.info(f"[Admin Sync {sid}] ⚙️ Applied remote config: {admin_cfg}")
+    return changed
+
+def push_telemetry_to_admin(event_name="heartbeat", sid=None, st=None, extra=None):
+    """Đẩy trạng thái bot / session / kết quả lên Render Admin."""
+    payload = {
+        "event": event_name,
+        "ts": int(time.time()),
+        "sid": sid,
+        "history_len": len(GLOBAL_HISTORY),
+        "api_ok": API_LAST_RAW.get("error") is None and API_LAST_RAW.get("data") is not None,
+        "api_session": (API_LAST_RAW.get("data") or {}).get("phien"),
+    }
+    if st:
+        payload.update({
+            "nickname": st.get("nickname"),
+            "username": st.get("username"),
+            "balance": st.get("balance"),
+            "profit_loss": st.get("profit_loss"),
+            "auto_bet_enabled": st.get("auto_bet_enabled"),
+            "x2_mode": st.get("x2_mode"),
+            "x2_loss_mode": st.get("x2_loss_mode"),
+            "x2_loss_limit": st.get("x2_loss_limit"),
+            "base_bet_amount": st.get("base_bet_amount"),
+            "current_bet": st.get("current_bet"),
+            "target_profit": st.get("target_profit"),
+            "current_prediction": st.get("current_prediction"),
+            "session_id": st.get("session_id"),
+            "win_count": st.get("win_count"),
+            "lose_count": st.get("lose_count"),
+            "win_streak": st.get("win_streak"),
+            "loss_streak": st.get("loss_streak"),
+            "socket_connected": st.get("socket_connected"),
+        })
+    if extra:
+        payload["extra"] = extra
+
+    endpoints = ["/api/telemetry", "/api/bot/report", "/api/status", "/api/sync"]
+    for ep in endpoints:
+        try:
+            r = requests.post(f"{API_ADMIN_URL}{ep}", json=payload, timeout=4, headers=_admin_headers())
+            if r.status_code in (200, 201, 202, 204):
+                ADMIN_LAST_RAW["last_push_ts"] = time.time()
+                try:
+                    resp_json = r.json()
+                    if isinstance(resp_json, dict):
+                        cfg = resp_json.get("config") or resp_json.get("data")
+                        if isinstance(cfg, dict) and sid and st:
+                            if apply_admin_config_to_session(st, sid, cfg):
+                                socketio.emit("stats_update", public_state(st), to=sid)
+                except Exception:
+                    pass
+                return True
+        except Exception:
+            continue
+    return False
+
+# ==========================================
 # GỌI API LỊCH SỬ
 # ==========================================
 def fetch_api_raw():
@@ -94,6 +260,7 @@ def fetch_api_raw():
 def api_data_worker():
     logger.info("[API Worker] started")
     last_session_logged = None
+    tick_counter = 0
 
     while True:
         data = fetch_api_raw()
@@ -127,6 +294,20 @@ def api_data_worker():
                             logger.info(f"[API] 📥 {session_id}: {side} {dices} | "
                                         f"du_doan={du_doan} | conf={do_tin_cay}")
                     last_session_logged = session_id
+
+        # Đồng bộ định kỳ với Render Admin (~mỗi 6s)
+        tick_counter += 1
+        if tick_counter % 4 == 0:
+            admin_cfg = fetch_admin_config()
+            if isinstance(admin_cfg, dict):
+                for sid, st in list(WEB_SESSIONS.items()):
+                    if apply_admin_config_to_session(st, sid, admin_cfg):
+                        socketio.emit("stats_update", public_state(st), to=sid)
+            if WEB_SESSIONS:
+                for sid, st in list(WEB_SESSIONS.items()):
+                    push_telemetry_to_admin("heartbeat", sid=sid, st=st)
+            else:
+                push_telemetry_to_admin("heartbeat_idle")
 
         socketio.sleep(1.5)
 
@@ -235,7 +416,6 @@ def calc_next_bet(st):
     
     # X2 theo CHUỖI THẮNG
     if st.get("x2_mode") and st["win_streak"] > 0:
-        # 2^win_streak, giới hạn 5 lần
         multiplier = min(2 ** st["win_streak"], 32)
         return base * multiplier
     
@@ -270,6 +450,7 @@ def game_socket_worker(sid, jwt_token):
                 "msg": f"🏆 CHỐT LÃI! +{st['profit_loss']:,}đ — Auto đã tắt"
             }, to=sid)
             socketio.emit("stats_update", public_state(st), to=sid)
+            push_telemetry_to_admin("target_profit_reached", sid=sid, st=st)
             return True
         return False
 
@@ -279,6 +460,7 @@ def game_socket_worker(sid, jwt_token):
         st["socket_connected"] = True
         socketio.emit("toast", {"type": "success", "msg": "Đã kết nối socket game"}, to=sid)
         socketio.emit("stats_update", public_state(st), to=sid)
+        push_telemetry_to_admin("socket_connected", sid=sid, st=st)
 
     @sio.event(namespace=GAME_WS_NS)
     def connect_error(data):
@@ -291,6 +473,7 @@ def game_socket_worker(sid, jwt_token):
         logger.warning(f"[{sid}] ❌ DISCONNECTED")
         st["socket_connected"] = False
         socketio.emit("stats_update", public_state(st), to=sid)
+        push_telemetry_to_admin("socket_disconnected", sid=sid, st=st)
 
     # ==========================================
     # 🆕 NEW SESSION
@@ -300,12 +483,15 @@ def game_socket_worker(sid, jwt_token):
         new_id = data.get("id") or data.get("sessionId") or "N/A"
         logger.info(f"[{sid}] 🆕 New session: {new_id}")
 
-        # Reset state cho session mới
+        admin_cfg = fetch_admin_config(username=st.get("username"), sid=sid)
+        if isinstance(admin_cfg, dict):
+            apply_admin_config_to_session(st, sid, admin_cfg)
+
         st["session_id"] = new_id
         st["has_bet_this_session"] = False
         st["current_bet_type"] = None
         st["current_bet_session"] = None
-        st["current_prediction"] = None  # ✅ Reset để tránh dùng pred cũ
+        st["current_prediction"] = None
 
         if check_target_profit():
             return
@@ -314,7 +500,6 @@ def game_socket_worker(sid, jwt_token):
         api_session = pred.get("api_session")
         pred_side = pred["side"]
 
-        # Chỉ nhận dự đoán khi API cùng phiên hoặc phiên liền trước
         if pred_side and api_session:
             try:
                 diff = int(new_id) - int(api_session)
@@ -323,13 +508,12 @@ def game_socket_worker(sid, jwt_token):
             if diff not in (0, 1):
                 logger.warning(f"[{sid}] ⚠ API session {api_session} lệch xa new {new_id} → bỏ")
                 pred_side = None
-                api_session = None  # ✅ Clear luôn api_session để không dùng nhầm
+                api_session = None
 
         st["current_prediction"] = pred_side
-        st["current_pred_session"] = api_session  # ✅ Lưu session của prediction
+        st["current_pred_session"] = api_session
         st["last_api_raw"] = pred.get("raw")
 
-        # ✅ Tính bet dựa trên streak hiện tại (x2 nếu bật)
         st["current_bet"] = calc_next_bet(st) if st["auto_bet_enabled"] else int(st["base_bet_amount"])
 
         logger.info(f"[{sid}] 🎯 Session {new_id} | Bet={st['current_bet']:,}đ | "
@@ -356,36 +540,26 @@ def game_socket_worker(sid, jwt_token):
     def on_tick_update(data):
         if data.get("state") != "BETTING":
             return
-        
-        # ✅ CHECK 1: Auto phải đang bật
         if not st["auto_bet_enabled"]:
             return
-        
-        # ✅ CHECK 2: Chưa cược phiên này
         if st["has_bet_this_session"]:
             return
-        
-        # ✅ CHECK 3: Phải có session_id
         if not st["session_id"]:
             return
-        
-        # ✅ CHECK 4: Phải có prediction
+
         pred_raw = st.get("current_prediction")
         bet_type = normalize_side(pred_raw)
         if not bet_type:
             logger.warning(f"[{sid}] ⚠ API chưa báo dự đoán → KHÔNG cược phiên {st['session_id']}")
             return
-        
-        # ✅ CHECK 5: Prediction phải thuộc session hiện tại
+
         pred_session = st.get("current_pred_session")
         if pred_session and str(pred_session) != str(st["session_id"]):
-            # Prediction thuộc session cũ → thử refresh
             logger.info(f"[{sid}] 🔄 Pred session {pred_session} != current {st['session_id']} → refresh")
             new_pred = get_prediction()
             new_pred_side = normalize_side(new_pred.get("side"))
             new_api_session = new_pred.get("api_session")
-            
-            # Chỉ chấp nhận nếu API session khớp
+
             if new_pred_side and new_api_session:
                 try:
                     diff = int(st["session_id"]) - int(new_api_session)
@@ -419,6 +593,11 @@ def game_socket_worker(sid, jwt_token):
                 "type": "info",
                 "msg": f"🚀 Cược {bet_amount:,}đ vào {bet_type}"
             }, to=sid)
+            push_telemetry_to_admin("bet_placed", sid=sid, st=st, extra={
+                "bet_type": bet_type,
+                "bet_amount": bet_amount,
+                "session_id": st["session_id"],
+            })
         except Exception as e:
             logger.error(f"[{sid}] Bet error: {e}")
 
@@ -443,7 +622,6 @@ def game_socket_worker(sid, jwt_token):
         dices = data.get("dices") or data.get("dice") or []
         session_of_result = data.get("id") or st.get("session_id")
 
-        # ✅ CHECK: Tránh xử lý trùng session
         if st.get("last_result_session") == str(session_of_result):
             logger.info(f"[{sid}] ⏭ Skip duplicate result session {session_of_result}")
             return
@@ -456,7 +634,6 @@ def game_socket_worker(sid, jwt_token):
         bet_type_used = st.get("current_bet_type")
         bet_session = st.get("current_bet_session")
 
-        # ✅ Chỉ tính win/loss khi: đã cược + cùng session + parse được
         if (st.get("waiting_for_result")
                 and bet_type_used
                 and result_side
@@ -475,11 +652,7 @@ def game_socket_worker(sid, jwt_token):
                 st["lose_count"] += 1
             st["profit_loss"] += profit_delta
             st["waiting_for_result"] = False
-            
-            # ✅ Clear bet_type sau khi tính để tránh session sau dùng nhầm
-            # (không clear ngay vì cần cho history — clear ở new_session)
 
-        # Lưu history
         st["history"].insert(0, {
             "session": session_of_result,
             "pred": bet_type_used or st.get("current_prediction"),
@@ -507,6 +680,13 @@ def game_socket_worker(sid, jwt_token):
         }, to=sid)
 
         socketio.emit("stats_update", public_state(st), to=sid)
+        push_telemetry_to_admin("session_result", sid=sid, st=st, extra={
+            "session": session_of_result,
+            "result": result_side or result_raw,
+            "dices": dices,
+            "is_win": is_win,
+            "profit_delta": profit_delta,
+        })
         check_target_profit()
 
     try:
@@ -557,8 +737,10 @@ def public_state(st):
         "win_streak": st["win_streak"],
         "loss_streak": st["loss_streak"],
         "socket_connected": st["socket_connected"],
-        "waiting_for_result": st.get("waiting_for_result", False),  # ✅ Thêm
-        "has_bet_this_session": st.get("has_bet_this_session", False),  # ✅ Thêm
+        "waiting_for_result": st.get("waiting_for_result", False),
+        "has_bet_this_session": st.get("has_bet_this_session", False),
+        "admin_url": API_ADMIN_URL,
+        "admin_ok": ADMIN_LAST_RAW.get("error") is None and ADMIN_LAST_RAW.get("data") is not None,
         "history": st["history"][:15],
     }
 
@@ -614,12 +796,12 @@ def api_login():
         "current_bet": 10000,
         "target_profit": None,
         "current_prediction": None,
-        "current_pred_session": None,   # ✅ Thêm
+        "current_pred_session": None,
         "current_bet_type": None,
         "current_bet_session": None,
         "waiting_for_result": False,
         "has_bet_this_session": False,
-        "last_result_session": None,    # ✅ Thêm
+        "last_result_session": None,
         "session_id": None,
         "win_count": 0,
         "lose_count": 0,
@@ -627,6 +809,11 @@ def api_login():
         "history": [],
         "last_api_raw": None,
     }
+
+    admin_cfg = fetch_admin_config(username=username, sid=sid)
+    if isinstance(admin_cfg, dict):
+        apply_admin_config_to_session(WEB_SESSIONS[sid], sid, admin_cfg)
+    push_telemetry_to_admin("login", sid=sid, st=WEB_SESSIONS[sid])
 
     socketio.start_background_task(game_socket_worker, sid, res["token"])
 
@@ -655,18 +842,15 @@ def api_config():
         except (TypeError, ValueError):
             pass
 
-    # ✅ XỬ LÝ AUTO ON/OFF — RESET STATE KHI TẮT
     if "auto_bet_enabled" in data:
         new_auto = bool(data["auto_bet_enabled"])
         if new_auto != st["auto_bet_enabled"]:
             st["auto_bet_enabled"] = new_auto
             if not new_auto:
-                # ✅ TẮT AUTO: KHÔNG reset bet đang chờ (vẫn tính kết quả)
-                # Nhưng KHÔNG cược thêm phiên mới
-                st["has_bet_this_session"] = True  # Chặn cược phiên hiện tại
+                st["has_bet_this_session"] = True
                 logger.info(f"[Config {sid}] ⏸ AUTO OFF")
             else:
-                st["has_bet_this_session"] = False  # Cho phép cược phiên mới
+                st["has_bet_this_session"] = False
                 logger.info(f"[Config {sid}] ▶️ AUTO ON")
             socketio.emit("toast", {
                 "type": "info",
@@ -687,6 +871,7 @@ def api_config():
         tp = data["target_profit"]
         st["target_profit"] = int(tp) if tp else None
 
+    push_telemetry_to_admin("config_updated", sid=sid, st=st)
     socketio.emit("stats_update", public_state(st), to=sid)
     return jsonify({"success": True, "state": public_state(st)})
 
@@ -696,6 +881,26 @@ def api_stats():
     if not sid or sid not in WEB_SESSIONS:
         return jsonify({"success": False})
     return jsonify({"success": True, "state": public_state(WEB_SESSIONS[sid])})
+
+@app.route("/api/admin_sync", methods=["GET", "POST"])
+def api_admin_sync():
+    sid = session.get("sid")
+    st = WEB_SESSIONS.get(sid) if sid else None
+    cfg = fetch_admin_config(username=st.get("username") if st else None, sid=sid)
+    applied = False
+    if st and isinstance(cfg, dict):
+        applied = apply_admin_config_to_session(st, sid, cfg)
+        socketio.emit("stats_update", public_state(st), to=sid)
+    pushed = push_telemetry_to_admin("manual_sync", sid=sid, st=st)
+    return jsonify({
+        "success": True,
+        "admin_url": API_ADMIN_URL,
+        "applied": applied,
+        "pushed": pushed,
+        "admin_error": ADMIN_LAST_RAW.get("error"),
+        "admin_data": ADMIN_LAST_RAW.get("data"),
+        "state": public_state(st) if st else None,
+    })
 
 @app.route("/api/debug_api")
 def api_debug_api():
@@ -715,6 +920,13 @@ def api_debug_api():
             "du_doan": (data or {}).get("du_doan"),
             "do_tin_cay": (data or {}).get("do_tin_cay"),
         } if data else None,
+        "admin": {
+            "url": API_ADMIN_URL,
+            "error": ADMIN_LAST_RAW.get("error"),
+            "ts": ADMIN_LAST_RAW.get("ts"),
+            "last_push_ts": ADMIN_LAST_RAW.get("last_push_ts"),
+            "data": ADMIN_LAST_RAW.get("data"),
+        },
     })
 
 @app.route("/api/reset_history", methods=["POST"])
@@ -728,12 +940,16 @@ def api_reset_history():
         st["profit_loss"] = 0
         st["win_streak"] = 0
         st["loss_streak"] = 0
+        push_telemetry_to_admin("reset_history", sid=sid, st=st)
         socketio.emit("stats_update", public_state(st), to=sid)
     return jsonify({"success": True})
 
 @app.route("/api/logout", methods=["POST"])
 def api_logout():
     sid = session.get("sid")
+    st = WEB_SESSIONS.get(sid)
+    if st:
+        push_telemetry_to_admin("logout", sid=sid, st=st)
     if sid in WS_CLIENTS:
         try:
             WS_CLIENTS[sid].disconnect()
