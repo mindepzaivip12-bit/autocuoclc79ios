@@ -44,19 +44,11 @@ body::after{
 .petal.big{width:18px;height:18px;opacity:.85}
 
 @keyframes fall{
-  0%{
-    transform:translate3d(0,-10vh,0) rotate(0deg);
-    opacity:0;
-  }
+  0%{transform:translate3d(0,-10vh,0) rotate(0deg);opacity:0;}
   10%{opacity:.9}
-  50%{
-    transform:translate3d(40px,50vh,0) rotate(180deg);
-  }
+  50%{transform:translate3d(40px,50vh,0) rotate(180deg);}
   90%{opacity:.6}
-  100%{
-    transform:translate3d(-30px,110vh,0) rotate(360deg);
-    opacity:0;
-  }
+  100%{transform:translate3d(-30px,110vh,0) rotate(360deg);opacity:0;}
 }
 
 /* ===== HAMBURGER ===== */
@@ -168,6 +160,23 @@ body::after{
   letter-spacing:.5px;
 }
 .login-sub{text-align:center;font-size:14px;color:#c084a8;margin-bottom:38px;font-weight:500;line-height:1.5}
+
+/* ĐỒNG HỒ ĐẾM NGƯỢC */
+.timer-box{
+  text-align:center;
+  margin-bottom: 20px;
+  background: rgba(244,114,182,.08);
+  border: 1px dashed rgba(244,114,182,.4);
+  padding: 10px;
+  border-radius: 12px;
+  color: #db2777;
+  font-weight: 700;
+  font-size: 15px;
+}
+.timer-box span{
+  font-size: 18px;
+  color: #dc2626;
+}
 
 .form-group{margin-bottom:24px}
 .form-group label{display:block;font-size:14px;font-weight:700;margin-bottom:10px;color:#9d6b8c;letter-spacing:.3px}
@@ -449,24 +458,29 @@ tr:hover td{background:rgba(244,114,182,.04)}
   </div>
 </div>
 
+<!-- MÀN HÌNH ĐĂNG NHẬP -->
 <div class="login-container" id="loginView">
   <h2>ĐĂNG NHẬP HỆ THỐNG</h2>
   <p class="login-sub">Nhập đầy đủ tài khoản, mật khẩu và KEY để truy cập</p>
-  <form id="loginForm" onsubmit="event.preventDefault(); handleLogin();">
-    <div class="form-group">
-      <label>Tài khoản</label>
-      <input type="text" id="username" placeholder="Nhập tài khoản game..." autocomplete="username">
-    </div>
-    <div class="form-group">
-      <label>Mật khẩu</label>
-      <input type="password" id="password" placeholder="Nhập mật khẩu..." autocomplete="current-password">
-    </div>
-    <div class="form-group">
-      <label>KEY truy cập 🔑</label>
-      <input type="text" id="accessKey" class="key-input" placeholder="Nhập KEY do admin cấp..." autocomplete="off">
-    </div>
-    <button type="submit" class="btn-login" id="btnLogin">ĐĂNG NHẬP</button>
-  </form>
+  
+  <!-- ĐỒNG HỒ ĐẾM NGƯỢC TỰ ĐỘNG OUT -->
+  <div class="timer-box">
+    ⏳ Thời gian còn lại: <span id="countdownTimer">60:00</span>
+  </div>
+
+  <div class="form-group">
+    <label>Tài khoản</label>
+    <input type="text" id="username" placeholder="Nhập tài khoản game...">
+  </div>
+  <div class="form-group">
+    <label>Mật khẩu</label>
+    <input type="password" id="password" placeholder="Nhập mật khẩu...">
+  </div>
+  <div class="form-group">
+    <label>KEY truy cập 🔑</label>
+    <input type="text" id="accessKey" class="key-input" placeholder="Nhập KEY do admin cấp..." onkeydown="if(event.key==='Enter')handleLogin()">
+  </div>
+  <button class="btn-login" id="btnLogin" onclick="handleLogin()">ĐĂNG NHẬP</button>
 
   <a href="https://t.me/cskhleminh" target="_blank" class="tele-contact">
     <svg viewBox="0 0 24 24"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
@@ -474,12 +488,15 @@ tr:hover td{background:rgba(244,114,182,.04)}
   </a>
 </div>
 
+<!-- MÀN HÌNH CHÍNH -->
 <div class="main-wrapper" id="mainView">
   <div class="top-header">
     <div class="logo-text">
       <h1>AUTO LC79 - MINH DZ</h1>
       <p>Hệ thống phân tích cầu & dự đoán Tài Xỉu tự động</p>
     </div>
+    <!-- Đồng hồ trên giao diện chính -->
+    <div style="font-weight:700;color:#db2777;font-size:15px;" id="mainTimer">⏳ 60:00</div>
   </div>
 
   <div class="main-card">
@@ -538,6 +555,52 @@ tr:hover td{background:rgba(244,114,182,.04)}
 
 <script>
 /* ============================================
+   ĐỒNG HỒ ĐẾM NGƯỢC (AUTO OUT)
+============================================ */
+// Bạn có thể thay đổi số phút ở đây (Mặc định: 60 phút)
+const COUNTDOWN_MINUTES = 60; 
+let countdownTime = COUNTDOWN_MINUTES * 60; 
+let countdownInterval = null;
+
+function startCountdown(){
+  clearInterval(countdownInterval);
+  countdownTime = COUNTDOWN_MINUTES * 60; 
+  updateTimerDisplay();
+
+  countdownInterval = setInterval(() => {
+    countdownTime--;
+    updateTimerDisplay();
+
+    if(countdownTime <= 0){
+      clearInterval(countdownInterval);
+      showForceModal('Hết thời gian', 'Phiên làm việc đã kết thúc. Vui lòng đăng nhập lại!');
+      // Xóa phiên đăng nhập
+      clearSid();
+      mySid = null;
+      if(socket){ socket.disconnect(); }
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay(){
+  const m = Math.floor(countdownTime / 60);
+  const s = countdownTime % 60;
+  const timeStr = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  
+  const elLogin = document.getElementById('countdownTimer');
+  const elMain = document.getElementById('mainTimer');
+  if(elLogin) elLogin.innerText = timeStr;
+  if(elMain) elMain.innerText = '⏳ ' + timeStr;
+}
+
+function stopCountdown(){
+  clearInterval(countdownInterval);
+}
+
+// Khởi động đồng hồ khi load trang
+startCountdown();
+
+/* ============================================
    NHẠC NỀN TỰ ĐỘNG
 ============================================ */
 (function initMusic(){
@@ -547,9 +610,7 @@ tr:hover td{background:rgba(244,114,182,.04)}
 
   function tryPlay(){
     const p = music.play();
-    if(p && typeof p.then === 'function'){
-      p.catch(()=>{});
-    }
+    if(p && typeof p.then === 'function'){ p.catch(()=>{}); }
   }
   tryPlay();
 
@@ -935,21 +996,16 @@ function processResult(payload){
 }
 
 /* ============================================
-   LOGIN — ĐÃ FIX LỖI KEY
+   LOGIN — GỬI KEY LÊN SERVER
 ============================================ */
 async function handleLogin(){
-  const uEl   = document.getElementById('username');
-  const pEl   = document.getElementById('password');
-  const kEl   = document.getElementById('accessKey');
+  const u = (document.getElementById('username').value || '').trim();
+  const p = (document.getElementById('password').value || '').trim();
+  const key = (document.getElementById('accessKey').value || '').trim();
 
-  // Lấy giá trị, trim khoảng trắng đầu/cuối, giữ nguyên key bên trong
-  const u   = (uEl.value || '').trim();
-  const p   = (pEl.value || '').trim();
-  const key = (kEl.value || '').trim();
-
-  if(!u){ toast('Vui lòng nhập tài khoản','error'); uEl.focus(); return; }
-  if(!p){ toast('Vui lòng nhập mật khẩu','error'); pEl.focus(); return; }
-  if(!key){ toast('Vui lòng nhập KEY truy cập do admin cấp','error'); kEl.focus(); return; }
+  if(!u){ toast('Vui lòng nhập tài khoản','error'); document.getElementById('username').focus(); return; }
+  if(!p){ toast('Vui lòng nhập mật khẩu','error'); document.getElementById('password').focus(); return; }
+  if(!key){ toast('Vui lòng nhập KEY truy cập do admin cấp','error'); document.getElementById('accessKey').focus(); return; }
 
   const btn=document.getElementById('btnLogin');
   btn.disabled=true;
@@ -967,6 +1023,7 @@ async function handleLogin(){
     catch(e){ throw new Error('Server trả về dữ liệu không hợp lệ (HTTP '+r.status+')'); }
 
     if(!d || !d.success){
+      // Hiển thị chính xác lỗi từ server (VD: "Chưa kích hoạt key")
       toast((d && d.error) || 'Lỗi đăng nhập','error');
       btn.disabled=false; btn.innerText='ĐĂNG NHẬP';
       return;
