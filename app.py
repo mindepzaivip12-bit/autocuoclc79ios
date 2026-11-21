@@ -29,13 +29,10 @@ COMMON_PARAMS   = "cp=R&cl=R&pf=web"
 # ==========================================
 # CẤU HÌNH SERVER ADMIN (LẤY KEY)
 # ==========================================
-# Link Render Admin của bạn (có sẵn)
 ADMIN_BASE_URL = "https://lc79vipadmin-b8k2.onrender.com"
 
-# Danh sách các API khả thi (Tool sẽ tự thử từ trên xuống)
-# Thường các tool xài Flask sẽ dùng 1 trong các path này
 ADMIN_KEY_ENDPOINTS = [
-    f"{ADMIN_BASE_URL}/api/check_key",   # Mặc định
+    f"{ADMIN_BASE_URL}/api/check_key",
     f"{ADMIN_BASE_URL}/api/check-key",
     f"{ADMIN_BASE_URL}/api/verify",
     f"{ADMIN_BASE_URL}/check_key",
@@ -44,6 +41,8 @@ ADMIN_KEY_ENDPOINTS = [
 ]
 
 ADMIN_API_TIMEOUT = 8
+ADMIN_WORKING_ENDPOINT = None   # cache endpoint hoạt động
+ADMIN_ENDPOINT_LOCK = threading.Lock()
 
 # ==========================================
 # GLOBAL DATA
@@ -56,6 +55,7 @@ WEB_SESSIONS = {}
 WS_CLIENTS   = {}
 
 API_LAST_RAW = {"data": None, "ts": 0, "error": None}
+
 
 # ==========================================
 # HÀM CHUẨN HÓA SIDE
@@ -82,60 +82,152 @@ def normalize_side(value):
     if "LOW" in s or "SMALL" in s: return "XIU"
     return None
 
+
 # ==========================================
-# XÁC THỰC KEY QUA SERVER ADMIN
+# XÁC THỰC KEY QUA SERVER ADMIN — ĐÃ FIX
 # ==========================================
+def _parse_admin_response(r):
+    """
+    Trả về (is_valid, info_or_message, is_json_ok)
+    is_json_ok=False => response không phải JSON (HTML/lỗi) => KHÔNG được coi là hợp lệ
+    """
+    # Chỉ chấp nhận HTTP 2xx mới xử lý tiếp
+    if not (200 <= r.status_code < 300):
+        return False, f"HTTP {r.status_code}", False
+
+    text = (r.text or "").strip()
+    if not text:
+        return False, "Server Admin trả về rỗng", False
+
+    # Thử parse JSON
+    try:
+        data = r.json()
+    except Exception:
+        # ❗ KHÔNG cho qua. Đây chính là lỗi cũ khiến key sai vẫn login được.
+        snippet = text[:120].replace("\n", " ")
+        return False, f"Server Admin không trả JSON (có thể sai endpoint). Body: {snippet}", False
+
+    if not isinstance(data, dict):
+        return False, "JSON không phải object", False
+
+    # Các cờ hợp lệ phổ biến
+    is_ok = (
+        data.get("success") is True
+        or data.get("valid") is True
+        or data.get("ok") is True
+        or data.get("status") == "ok"
+        or (isinstance(data.get("code"), int) and data["code"] == 0)
+    )
+
+    if is_ok:
+        info = data.get("info") or data.get("data") or data.get("key_info") or {}
+        return True, info, True
+
+    msg = (
+        data.get("message")
+        or data.get("error")
+        or data.get("msg")
+        or "KEY không hợp lệ hoặc đã hết hạn"
+    )
+    # Nếu server trả success=False rõ ràng → key sai (KHÔNG cho qua)
+    if any(k in data for k in ("success", "valid", "ok")) :
+        return False, str(msg), True
+
+    # JSON nhưng không có cờ nhận biết → coi như sai (an toàn)
+    return False, f"Phản hồi Admin không rõ ràng: {str(data)[:120]}", True
+
+
+def _try_endpoint(url, payload, headers):
+    try:
+        logger.info(f"[Key Check] Thử: {url}")
+        r = requests.post(url, json=payload, timeout=ADMIN_API_TIMEOUT, headers=headers)
+        logger.info(f"[Key Check] {url} → HTTP {r.status_code}, len={len(r.text or '')}")
+
+        # 404/405 => endpoint không tồn tại → thử cái khác
+        if r.status_code in (404, 405):
+            return None, None  # không kết luận
+
+        is_valid, info_or_msg, is_json_ok = _parse_admin_response(r)
+        return is_valid, info_or_msg
+    except requests.exceptions.Timeout:
+        logger.warning(f"[Key Check] Timeout: {url}")
+        return None, None
+    except requests.exceptions.SSLError as e:
+        logger.warning(f"[Key Check] SSL error {url}: {e}")
+        return None, None
+    except requests.exceptions.ConnectionError as e:
+        logger.warning(f"[Key Check] Connection error {url}: {e}")
+        return None, None
+    except Exception as e:
+        logger.warning(f"[Key Check] Lỗi {url}: {e}")
+        return None, None
+
+
 def validate_key_remote(key, device_id=None, username=None):
-    if not key:
+    """
+    Trả về (ok: bool, info_or_message)
+    - ok=True  -> info (dict) hoặc message
+    - ok=False -> message lỗi
+    """
+    global ADMIN_WORKING_ENDPOINT
+
+    if not key or not str(key).strip():
         return False, "Vui lòng nhập KEY"
 
-    key = key.strip().upper()
+    key = str(key).strip().upper()
     payload = {
         "key": key,
         "device": device_id or "",
-        "username": username or ""
+        "username": username or "",
     }
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Content-Type": "application/json",
-        "Accept": "application/json"
+        "Accept": "application/json",
     }
 
-    # Thử gọi API check key
-    for url in ADMIN_KEY_ENDPOINTS:
-        try:
-            logger.info(f"[Key Check] Đang gọi: {url}")
-            r = requests.post(url, json=payload, timeout=ADMIN_API_TIMEOUT, headers=headers)
-            
-            if r.status_code == 404:
-                continue # API không tồn tại, thử cái tiếp theo
+    # 1) Ưu tiên endpoint đã cache (nếu có)
+    endpoints = list(ADMIN_KEY_ENDPOINTS)
+    if ADMIN_WORKING_ENDPOINT and ADMIN_WORKING_ENDPOINT in endpoints:
+        endpoints.remove(ADMIN_WORKING_ENDPOINT)
+        endpoints.insert(0, ADMIN_WORKING_ENDPOINT)
 
-            try:
-                data = r.json()
-            except:
-                if r.status_code == 200:
-                    return True, {"note": "Server trả về HTML (Bỏ qua check JSON)"}
-                continue
+    last_ambiguous = None  # lưu phản hồi "không rõ ràng" để báo lỗi cuối cùng
 
-            is_ok = data.get("success") is True or data.get("valid") is True or data.get("ok") is True
-            
-            if is_ok:
-                info = data.get("info") or data.get("data") or {}
-                return True, info
-            else:
-                msg = data.get("message") or data.get("error") or "KEY không hợp lệ hoặc đã hết hạn"
-                return False, msg
-                
-        except requests.exceptions.Timeout:
-            logger.warning(f"[Key Check] Timeout tại {url}")
-            continue
-        except requests.exceptions.ConnectionError:
-            return False, "Không thể kết nối đến Server Admin. Vui lòng thử lại sau."
-        except Exception as e:
-            logger.warning(f"[Key Check] Lỗi tại {url}: {e}")
+    for url in endpoints:
+        is_valid, info_or_msg = _try_endpoint(url, payload, headers)
+
+        if is_valid is None:
+            # endpoint không tồn tại / lỗi mạng → thử tiếp
             continue
 
-    return False, "Lỗi xác thực: Server Admin không phản hồi đúng API. (Vui lòng báo Admin)"
+        # Ghi nhớ endpoint hoạt động (dù key đúng hay sai, miễn là JSON hợp lệ)
+        if is_valid is True:
+            with ADMIN_ENDPOINT_LOCK:
+                if ADMIN_WORKING_ENDPOINT != url:
+                    logger.info(f"[Key Check] ✅ Endpoint hoạt động: {url}")
+                    ADMIN_WORKING_ENDPOINT = url
+            return True, info_or_msg
+
+        # is_valid is False → server trả JSON rõ ràng (key sai/hết hạn)
+        # Nhưng cần phân biệt "key sai" vs "endpoint trả JSON lạ"
+        msg = str(info_or_msg)
+        if "không rõ ràng" in msg or "không trả JSON" in msg:
+            last_ambiguous = msg
+            continue  # thử endpoint khác
+
+        # Cache endpoint này vì nó trả JSON hợp lệ (chỉ là key sai)
+        with ADMIN_ENDPOINT_LOCK:
+            if ADMIN_WORKING_ENDPOINT != url:
+                logger.info(f"[Key Check] ✅ Endpoint hoạt động (key sai nhưng JSON chuẩn): {url}")
+                ADMIN_WORKING_ENDPOINT = url
+        return False, msg
+
+    # Tất cả endpoint đều không kết luận được
+    if last_ambiguous:
+        return False, f"Lỗi xác thực: {last_ambiguous}"
+    return False, "Không thể kết nối Server Admin. Kiểm tra mạng hoặc báo Admin."
+
 
 # ==========================================
 # GỌI API LỊCH SỬ GAME
@@ -153,6 +245,7 @@ def fetch_api_raw():
     except Exception as e:
         API_LAST_RAW["error"] = str(e)
         return None
+
 
 # ==========================================
 # API DATA WORKER
@@ -177,6 +270,7 @@ def api_data_worker():
 
 socketio.start_background_task(api_data_worker)
 
+
 # ==========================================
 # DỰ ĐOÁN
 # ==========================================
@@ -185,7 +279,7 @@ def get_prediction():
     data = API_LAST_RAW["data"] if (API_LAST_RAW["data"] and (now - API_LAST_RAW["ts"]) < 1.5) else fetch_api_raw()
     if not data:
         return {"side": None, "conf": None, "ready": False, "api_ok": False, "api_session": None}
-    
+
     side_out = normalize_side(data.get("du_doan"))
     return {
         "side": side_out,
@@ -195,10 +289,12 @@ def get_prediction():
         "api_session": data.get("phien"),
     }
 
+
 # ==========================================
 # LOGIN GAME
 # ==========================================
 def md5_hash(t): return hashlib.md5(t.encode()).hexdigest()
+
 
 def login_game(username, password):
     try:
@@ -228,14 +324,15 @@ def login_game(username, password):
         lobby = r2.json()
         jwt = lobby.get("token")
         if not jwt: return {"_error": "Lobby không trả về token"}
-        
+
         return {
-            "token": jwt, 
-            "nickname": nickname, 
+            "token": jwt,
+            "nickname": nickname,
             "money": lobby.get("remoteLoginResp", {}).get("money", 0)
         }
     except Exception as e:
         return {"_error": f"Lỗi kết nối Game: {e}"}
+
 
 # ==========================================
 # TÍNH TIỀN CƯỢC
@@ -249,6 +346,7 @@ def calc_next_bet(st):
         if st["loss_streak"] <= limit:
             return base * min(2 ** st["loss_streak"], 32)
     return base
+
 
 # ==========================================
 # GAME SOCKET WORKER
@@ -276,11 +374,11 @@ def game_socket_worker(sid, jwt_token):
         st["session_id"] = data.get("id")
         st["has_bet_this_session"] = False
         st["current_bet_type"] = None
-        
+
         pred = get_prediction()
         st["current_prediction"] = pred["side"]
         st["current_bet"] = calc_next_bet(st) if st["auto_bet_enabled"] else int(st["base_bet_amount"])
-        
+
         socketio.emit("session_update", {
             "session_id": st["session_id"],
             "prediction": pred["side"],
@@ -319,12 +417,12 @@ def game_socket_worker(sid, jwt_token):
             is_win = (st["current_bet_type"] == result_side)
             bet_amt = int(st["current_bet"])
             profit_delta = int(bet_amt * 0.98) if is_win else -bet_amt
-            
+
             if is_win:
                 st["win_streak"] += 1; st["loss_streak"] = 0; st["win_count"] += 1
             else:
                 st["win_streak"] = 0; st["loss_streak"] += 1; st["lose_count"] += 1
-                
+
             st["profit_loss"] += profit_delta
             st["waiting_for_result"] = False
 
@@ -341,8 +439,7 @@ def game_socket_worker(sid, jwt_token):
             }, to=sid)
 
         socketio.emit("stats_update", public_state(st), to=sid)
-        
-        # Check mục tiêu chốt lãi
+
         if st["auto_bet_enabled"] and st["target_profit"] and st["profit_loss"] >= st["target_profit"]:
             st["auto_bet_enabled"] = False
             socketio.emit("toast", {"type": "success", "msg": f"🏆 CHỐT LÃI! +{st['profit_loss']:,}đ — Auto đã tắt"}, to=sid)
@@ -353,6 +450,7 @@ def game_socket_worker(sid, jwt_token):
         sio.wait()
     except Exception as e:
         logger.error(f"[{sid}] Socket lỗi: {e}")
+
 
 # ==========================================
 # PUBLIC STATE
@@ -370,6 +468,7 @@ def public_state(st):
         "history": st["history"][:15],
     }
 
+
 def stats_broadcast_worker():
     while True:
         for sid, st in list(WEB_SESSIONS.items()):
@@ -379,12 +478,14 @@ def stats_broadcast_worker():
 
 socketio.start_background_task(stats_broadcast_worker)
 
+
 # ==========================================
 # ROUTES
 # ==========================================
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 @app.route("/api/login", methods=["POST"])
 def api_login():
@@ -395,11 +496,10 @@ def api_login():
     if not username or not password: return jsonify({"success": False, "error": "Thiếu tài khoản/mật khẩu"})
     if not access_key: return jsonify({"success": False, "error": "Vui lòng nhập KEY"})
 
-    # Gọi sang Server Admin check key
     ok, key_info = validate_key_remote(access_key, device_id, username)
-    if not ok: return jsonify({"success": False, "error": f"❌ {key_info}"})
+    if not ok:
+        return jsonify({"success": False, "error": f"❌ {key_info}"})
 
-    # Login game
     res = login_game(username, password)
     if "_error" in res: return jsonify({"success": False, "error": res["_error"]})
 
@@ -417,6 +517,7 @@ def api_login():
 
     socketio.start_background_task(game_socket_worker, sid, res["token"])
     return jsonify({"success": True, "sid": sid, "nickname": res["nickname"], "balance": res["money"]})
+
 
 @app.route("/api/config", methods=["POST"])
 def api_config():
@@ -436,11 +537,13 @@ def api_config():
 
     return jsonify({"success": True, "state": public_state(st)})
 
+
 @app.route("/api/stats")
 def api_stats():
     sid = session.get("sid")
     if not sid or sid not in WEB_SESSIONS: return jsonify({"success": False})
     return jsonify({"success": True, "state": public_state(WEB_SESSIONS[sid])})
+
 
 @app.route("/api/reset_history", methods=["POST"])
 def api_reset_history():
@@ -452,6 +555,7 @@ def api_reset_history():
         socketio.emit("stats_update", public_state(st), to=sid)
     return jsonify({"success": True})
 
+
 @app.route("/api/logout", methods=["POST"])
 def api_logout():
     sid = session.get("sid")
@@ -462,6 +566,25 @@ def api_logout():
     if sid in WEB_SESSIONS: del WEB_SESSIONS[sid]
     session.pop("sid", None)
     return jsonify({"success": True})
+
+
+# ==========================================
+# HEALTH CHECK ENDPOINT (debug admin)
+# ==========================================
+@app.route("/api/debug/admin")
+def api_debug_admin():
+    """Gọi thử tất cả endpoint admin với 1 key test, trả về cái nào phản hồi JSON."""
+    results = {}
+    for url in ADMIN_KEY_ENDPOINTS:
+        try:
+            r = requests.post(url, json={"key": "TEST_KEY_DEBUG", "device": "", "username": ""},
+                              timeout=5, headers={"Content-Type": "application/json"})
+            body = (r.text or "")[:200].replace("\n", " ")
+            results[url] = {"status": r.status_code, "body": body}
+        except Exception as e:
+            results[url] = {"error": str(e)}
+    return jsonify({"working_endpoint": ADMIN_WORKING_ENDPOINT, "results": results})
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
