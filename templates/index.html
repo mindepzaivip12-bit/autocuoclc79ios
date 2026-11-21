@@ -338,7 +338,7 @@ tr:hover td{background:rgba(244,114,182,.04)}
   font-weight:700;font-size:14px;
 }
 
-/* 🎵 MUSIC PLAYER (hidden, auto-play) */
+/* 🎵 MUSIC (hidden) */
 #bgMusic { display:none; }
 </style>
 </head>
@@ -359,7 +359,7 @@ tr:hover td{background:rgba(244,114,182,.04)}
   </div>
 </div>
 
-<!-- NÚT 3 GẠCH (HAMBURGER) -->
+<!-- NÚT 3 GẠCH -->
 <div class="hamburger" id="hamburger" onclick="toggleDrawer()">
   <span></span><span></span><span></span>
 </div>
@@ -405,6 +405,7 @@ tr:hover td{background:rgba(244,114,182,.04)}
   </div>
 </div>
 
+<!-- ===== LOGIN ===== -->
 <div class="login-container" id="loginView">
   <h2>ĐĂNG NHẬP HỆ THỐNG</h2>
   <p class="login-sub">Nhập đầy đủ tài khoản, mật khẩu và KEY để truy cập</p>
@@ -428,13 +429,13 @@ tr:hover td{background:rgba(244,114,182,.04)}
   </a>
 </div>
 
+<!-- ===== MAIN ===== -->
 <div class="main-wrapper" id="mainView">
   <div class="top-header">
     <div class="logo-text">
       <h1>AUTO LC79 - MINH DZ</h1>
       <p>Hệ thống phân tích cầu & dự đoán Tài Xỉu tự động</p>
     </div>
-    <!-- 🔑 KEY EXPIRY DISPLAY (chỉ hiện khi login) -->
     <div class="key-expiry-badge" id="keyExpiryBadge">
       <span class="key-icon">🔑</span>
       <div class="key-info">
@@ -513,18 +514,16 @@ let wakeLock = null;
 let heartbeatTimer = null;
 let targetProfitReached = false;
 
-/* 🔒 KHÓA CỬA CƯỢC THEO PHIÊN */
 let lockedBetSession = null;
 let lockedBetSide = null;
 let lockedBetAmount = 0;
 
-/* 🔑 KEY EXPIRY STATE */
+/* 🔑 KEY EXPIRY */
 let keyExpiryTimestamp = null;
 let keyExpiryInterval = null;
 
 const STORAGE_KEY_BALANCE = 'lc79_balance';
 const STORAGE_KEY_CONFIG  = 'lc79_config';
-const STORAGE_KEY_DEVICE  = 'lc79_device_id';
 const STORAGE_KEY_SID     = 'lc79_sid';
 
 /* ============================================
@@ -532,15 +531,13 @@ const STORAGE_KEY_SID     = 'lc79_sid';
 ============================================ */
 (function initMusic(){
   const music = document.getElementById('bgMusic');
-  music.volume = 0.35; // âm lượng 35%
+  music.volume = 0.35;
   music.loop = true;
 
-  // Thử phát tự động
   function tryPlay(){
     const p = music.play();
     if(p && p.catch){
       p.catch(()=>{
-        // Bị chặn autoplay → chờ tương tác đầu tiên
         const handler = () => {
           music.play().catch(()=>{});
           document.removeEventListener('click', handler);
@@ -555,7 +552,6 @@ const STORAGE_KEY_SID     = 'lc79_sid';
   }
   tryPlay();
 
-  // Khi tab quay lại active, đảm bảo nhạc vẫn phát
   document.addEventListener('visibilitychange', ()=>{
     if(document.visibilityState === 'visible' && music.paused){
       music.play().catch(()=>{});
@@ -608,7 +604,6 @@ function updateKeyExpiryDisplay(){
   }
   badge.classList.remove('expired');
 
-  // Hiển thị giờ cụ thể + còn lại bao lâu
   const dateStr = formatTimeVN(expires);
   let remainStr = '';
   if(remain >= 86400000){
@@ -634,26 +629,7 @@ function setKeyExpiry(timestamp){
   updateKeyExpiryDisplay();
 
   if(keyExpiryInterval) clearInterval(keyExpiryInterval);
-  keyExpiryInterval = setInterval(updateKeyExpiryDisplay, 30000); // cập nhật mỗi 30s
-}
-
-/* ============================================
-   DEVICE ID
-============================================ */
-function getDeviceId(){
-  try{
-    let id = localStorage.getItem(STORAGE_KEY_DEVICE);
-    if(!id){
-      id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
-      id = 'web-' + id;
-      localStorage.setItem(STORAGE_KEY_DEVICE, id);
-    }
-    return id;
-  }catch(e){ return 'web-fallback-' + Date.now(); }
+  keyExpiryInterval = setInterval(updateKeyExpiryDisplay, 30000);
 }
 
 /* ============================================
@@ -722,17 +698,16 @@ async function pushConfigToServer(cfg){
       body:JSON.stringify({
         auto_bet_enabled: autoOn,
         betAmount: cfg.betAmount,
-        targetProfit: cfg.targetProfit
+        target_profit: cfg.targetProfit > 0 ? cfg.targetProfit : null
       })
     });
     const d = await r.json();
     if(!d.success){
-      if((d.error||'').toLowerCase().includes('login')){
-        showForceModal('Phiên đăng nhập đã hết', 'Vui lòng đăng nhập lại.'); return;
+      if((d.error||'').toLowerCase().includes('login') || d.code === 'KEY_EXPIRED'){
+        showForceModal('Phiên đăng nhập đã hết', d.error || 'Vui lòng đăng nhập lại.'); return;
       }
       toast('Lỗi lưu cài đặt: ' + (d.error||'unknown'),'error'); return;
     }
-    toast('💾 Đã lưu cài đặt cược','success');
   }catch(e){ toast('Lỗi lưu cài đặt: '+e.message,'error'); }
 }
 
@@ -742,7 +717,6 @@ async function pushConfigToServer(cfg){
 function showResultFlash(isWin, result, betSide, actualSide){
   const flash=document.getElementById('predResultFlash');
   const box=document.getElementById('predictionBox');
-  const sideTxt = actualSide ? ` (đã đặt: ${actualSide})` : '';
 
   const actualWinSide = result ? (['TÀI','TAI'].includes(result.toUpperCase()) ? 'TÀI' : 'XỈU') : '';
 
@@ -810,7 +784,7 @@ function updateProfitUI(profit){
 }
 
 /* ============================================
-   CẬP NHẬT PREDICTION
+   UPDATE PREDICTION
 ============================================ */
 function updatePredictionUI(state){
   const el       = document.getElementById('predValue');
@@ -891,7 +865,7 @@ function showForceModal(title, msg){
 }
 
 /* ============================================
-   🎯 KIỂM TRA CHỐT LÃI TỰ ĐỘNG
+   CHECK TARGET PROFIT
 ============================================ */
 async function checkTargetProfit(profit){
   const cfg = loadConfig();
@@ -909,7 +883,7 @@ async function checkTargetProfit(profit){
       await fetch('/api/config',{
         method:'POST',
         headers: apiHeaders(),
-        body:JSON.stringify({ auto_bet_enabled:false, betAmount: cfg.betAmount, targetProfit: target })
+        body:JSON.stringify({ auto_bet_enabled:false, betAmount: cfg.betAmount, target_profit: target })
       });
     }catch(e){}
     pollStats();
@@ -917,7 +891,7 @@ async function checkTargetProfit(profit){
 }
 
 /* ============================================
-   XỬ LÝ KẾT QUẢ
+   PROCESS RESULT
 ============================================ */
 function processResult(payload){
   if(!payload) return;
@@ -950,7 +924,7 @@ function processResult(payload){
     }
 
     if (calculatedWin !== payload.is_win) {
-      console.warn(`Phát hiện lỗi Backend: Hệ thống báo ${payload.is_win ? 'thắng' : 'thua'} nhưng thực tế là ${calculatedWin ? 'thắng' : 'thua'}.`);
+      console.warn(`Backend mismatch: báo ${payload.is_win}, thực tế ${calculatedWin}`);
       payload.is_win = calculatedWin;
     }
 
@@ -959,7 +933,7 @@ function processResult(payload){
 }
 
 /* ============================================
-   LOGIN
+   LOGIN — 1 BƯỚC: username + password + key
 ============================================ */
 async function handleLogin(){
   const u = document.getElementById('username').value.trim();
@@ -977,7 +951,7 @@ async function handleLogin(){
     const r=await fetch('/api/login',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ username: u, password: p, device: getDeviceId(), key: key })
+      body:JSON.stringify({ username: u, password: p, key: key })
     });
     const d=await r.json();
 
@@ -994,10 +968,12 @@ async function handleLogin(){
     document.getElementById('mainView').style.display='flex';
     document.getElementById('nicknameDisplay').innerText=d.nickname;
 
-    // 🔑 Hiển thị giờ hết hạn key
-    if(d.key_expires !== undefined) setKeyExpiry(d.key_expires);
-    else if(d.expires_at !== undefined) setKeyExpiry(d.expires_at);
-    else if(d.key_expiry !== undefined) setKeyExpiry(d.key_expiry);
+    // 🔑 Hiển thị giờ hết hạn key ngay
+    if(d.license_expires_at !== undefined && d.license_expires_at !== null){
+      setKeyExpiry(d.license_expires_at);
+    } else if(d.license_time_left > 0){
+      setKeyExpiry(Math.floor(Date.now()/1000) + Number(d.license_time_left));
+    }
 
     const cachedBalance=loadBalance();
     updateBalanceUI(cachedBalance!==null?cachedBalance:d.balance);
@@ -1060,9 +1036,6 @@ function connectSocket(sid){
       history_len: d.history_len
     });
 
-    // 🔑 Nếu server có push key_expires theo session_update
-    if(d.key_expires !== undefined) setKeyExpiry(d.key_expires);
-
     const betVal = Number(d.current_bet || 0);
     const betSide = d.current_bet_side || null;
     document.getElementById('betDisplay').innerText = betVal.toLocaleString();
@@ -1095,15 +1068,22 @@ async function pollStats(){
   try{
     const r=await fetch('/api/stats',{headers: apiHeaders()});
     const d=await r.json();
-    if(!d.success) return;
+    if(!d.success){
+      if(d.code === 'KEY_EXPIRED' || d.code === 'NO_SESSION'){
+        showForceModal('Phiên đã hết hạn', d.error || 'Vui lòng đăng nhập lại.');
+      }
+      return;
+    }
 
     applyState(d.state);
 
-    // 🔑 Cập nhật key_expires nếu có trong state
+    // 🔑 Cập nhật license_expires_at từ state
     if(d.state){
-      if(d.state.key_expires !== undefined) setKeyExpiry(d.state.key_expires);
-      else if(d.state.expires_at !== undefined) setKeyExpiry(d.state.expires_at);
-      else if(d.state.key_expiry !== undefined) setKeyExpiry(d.state.key_expiry);
+      if(d.state.license_expires_at !== undefined && d.state.license_expires_at !== null){
+        setKeyExpiry(d.state.license_expires_at);
+      } else if(d.state.license_time_left > 0){
+        setKeyExpiry(Math.floor(Date.now()/1000) + Number(d.state.license_time_left));
+      }
     }
 
     const s=d.state;
@@ -1187,7 +1167,7 @@ function applyState(s){
 }
 
 /* ============================================
-   RENDER LỊCH SỬ
+   RENDER HISTORY
 ============================================ */
 function renderHistory(rows){
   const tb=document.getElementById('historyBody');
@@ -1237,14 +1217,14 @@ async function toggleAuto(){
       body:JSON.stringify({
         auto_bet_enabled:newVal,
         betAmount:cfg.betAmount,
-        targetProfit:cfg.targetProfit
+        target_profit:cfg.targetProfit > 0 ? cfg.targetProfit : null
       })
     });
     const d = await r.json();
     if(!d.success){
       toast(d.error||'Lỗi cấu hình','error');
-      if((d.error||'').toLowerCase().includes('login')){
-        showForceModal('Phiên đăng nhập đã hết', 'Vui lòng đăng nhập lại.');
+      if((d.error||'').toLowerCase().includes('login') || d.code === 'KEY_EXPIRED'){
+        showForceModal('Phiên đăng nhập đã hết', d.error || 'Vui lòng đăng nhập lại.');
       }
       return;
     }
@@ -1292,17 +1272,13 @@ async function logout(){
 }
 
 /* ============================================
-   💓 HEARTBEAT & WAKE LOCK
+   HEARTBEAT & WAKE LOCK
 ============================================ */
 function startHeartbeat(){
   stopHeartbeat();
   heartbeatTimer = setInterval(()=>{
     if(mySid){
-      fetch('/api/heartbeat',{
-        method:'POST',
-        headers: apiHeaders(),
-        body:JSON.stringify({ autoOn: autoOn, ts: Date.now() })
-      }).catch(()=>{});
+      fetch('/api/stats',{ headers: apiHeaders() }).catch(()=>{});
     }
     if(document.hidden && autoOn) {
       pollStats();
@@ -1356,10 +1332,10 @@ setInterval(()=>{
           applyState(d.state);
 
           // 🔑 Hiển thị key expiry khi khôi phục phiên
-          if(d.state){
-            if(d.state.key_expires !== undefined) setKeyExpiry(d.state.key_expires);
-            else if(d.state.expires_at !== undefined) setKeyExpiry(d.state.expires_at);
-            else if(d.state.key_expiry !== undefined) setKeyExpiry(d.state.key_expiry);
+          if(d.state.license_expires_at !== undefined && d.state.license_expires_at !== null){
+            setKeyExpiry(d.state.license_expires_at);
+          } else if(d.state.license_time_left > 0){
+            setKeyExpiry(Math.floor(Date.now()/1000) + Number(d.state.license_time_left));
           }
 
           connectSocket(savedSid);
