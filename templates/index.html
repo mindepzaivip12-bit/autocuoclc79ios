@@ -26,6 +26,39 @@ body::after{
   pointer-events:none;z-index:0;
 }
 
+/* ===== HOA RƠI ===== */
+#petals{
+  position:fixed;inset:0;pointer-events:none;z-index:1;overflow:hidden;
+}
+.petal{
+  position:absolute;top:-40px;
+  width:14px;height:14px;
+  background:radial-gradient(circle at 30% 30%, #fbcfe8, #f472b6);
+  border-radius:70% 0 70% 0;
+  opacity:.75;
+  will-change:transform,opacity;
+  animation:fall linear infinite;
+  box-shadow:0 0 6px rgba(244,114,182,.35);
+}
+.petal.small{width:9px;height:9px;opacity:.6}
+.petal.big{width:18px;height:18px;opacity:.85}
+
+@keyframes fall{
+  0%{
+    transform:translate3d(0,-10vh,0) rotate(0deg);
+    opacity:0;
+  }
+  10%{opacity:.9}
+  50%{
+    transform:translate3d(40px,50vh,0) rotate(180deg);
+  }
+  90%{opacity:.6}
+  100%{
+    transform:translate3d(-30px,110vh,0) rotate(360deg);
+    opacity:0;
+  }
+}
+
 /* ===== HAMBURGER ===== */
 .hamburger{
   position:fixed;top:20px;left:20px;z-index:1001;
@@ -357,11 +390,14 @@ tr:hover td{background:rgba(244,114,182,.04)}
   <source src="https://files.catbox.moe/wdj7mk.mp4" type="audio/mp4">
 </audio>
 
+<!-- HOA RƠI -->
+<div id="petals"></div>
+
 <div class="toast-wrap" id="toasts"></div>
 
 <div class="force-modal" id="forceModal">
   <div class="force-modal-box">
-    <h2 id="forceTitle">Phiên đã kết thúc</h2>
+    <h2 id="forceTitle">🔒 Phiên đã kết thúc</h2>
     <p id="forceMsg">Vui lòng đăng nhập lại.</p>
     <button onclick="location.reload()">ĐĂNG NHẬP LẠI</button>
   </div>
@@ -376,7 +412,7 @@ tr:hover td{background:rgba(244,114,182,.04)}
 
 <div class="drawer" id="drawer">
   <div class="drawer-header">
-    <h3>CÀI ĐẶT HỆ THỐNG</h3>
+    <h3>⚙️ CÀI ĐẶT HỆ THỐNG</h3>
     <button class="drawer-close" onclick="toggleDrawer()">×</button>
   </div>
 
@@ -416,19 +452,21 @@ tr:hover td{background:rgba(244,114,182,.04)}
 <div class="login-container" id="loginView">
   <h2>ĐĂNG NHẬP HỆ THỐNG</h2>
   <p class="login-sub">Nhập đầy đủ tài khoản, mật khẩu và KEY để truy cập</p>
-  <div class="form-group">
-    <label>Tài khoản</label>
-    <input type="text" id="username" placeholder="Nhập tài khoản game...">
-  </div>
-  <div class="form-group">
-    <label>Mật khẩu</label>
-    <input type="password" id="password" placeholder="Nhập mật khẩu...">
-  </div>
-  <div class="form-group">
-    <label>KEY truy cập </label>
-    <input type="text" id="accessKey" class="key-input" placeholder="Nhập KEY do admin cấp..." onkeydown="if(event.key==='Enter')handleLogin()">
-  </div>
-  <button class="btn-login" id="btnLogin" onclick="handleLogin()">ĐĂNG NHẬP</button>
+  <form id="loginForm" onsubmit="event.preventDefault(); handleLogin();">
+    <div class="form-group">
+      <label>Tài khoản</label>
+      <input type="text" id="username" placeholder="Nhập tài khoản game..." autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Mật khẩu</label>
+      <input type="password" id="password" placeholder="Nhập mật khẩu..." autocomplete="current-password">
+    </div>
+    <div class="form-group">
+      <label>KEY truy cập 🔑</label>
+      <input type="text" id="accessKey" class="key-input" placeholder="Nhập KEY do admin cấp..." autocomplete="off">
+    </div>
+    <button type="submit" class="btn-login" id="btnLogin">ĐĂNG NHẬP</button>
+  </form>
 
   <a href="https://t.me/cskhleminh" target="_blank" class="tele-contact">
     <svg viewBox="0 0 24 24"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
@@ -500,29 +538,23 @@ tr:hover td{background:rgba(244,114,182,.04)}
 
 <script>
 /* ============================================
-   NHẠC NỀN TỰ ĐỘNG (KHÔNG NÚT)
+   NHẠC NỀN TỰ ĐỘNG
 ============================================ */
 (function initMusic(){
   const music = document.getElementById('bgMusic');
   if(!music) return;
-
   music.volume = 0.6;
 
   function tryPlay(){
     const p = music.play();
     if(p && typeof p.then === 'function'){
-      p.catch(()=>{ /* bị chặn autoplay, sẽ thử lại khi user tương tác */ });
+      p.catch(()=>{});
     }
   }
-
-  // Thử phát ngay khi load
   tryPlay();
 
-  // Nếu bị chặn autoplay -> phát ngay khi user có tương tác đầu tiên
   const unlock = ()=>{
-    if(music.paused){
-      music.play().catch(()=>{});
-    }
+    if(music.paused){ music.play().catch(()=>{}); }
     removeUnlock();
   };
   const events = ['click','touchstart','keydown','pointerdown','scroll'];
@@ -531,12 +563,32 @@ tr:hover td{background:rgba(244,114,182,.04)}
   }
   events.forEach(ev=>document.addEventListener(ev, unlock, true));
 
-  // Khi quay lại tab -> tự phát lại
   document.addEventListener('visibilitychange', ()=>{
     if(document.visibilityState === 'visible' && music.paused){
       music.play().catch(()=>{});
     }
   });
+})();
+
+/* ============================================
+   HOA RƠI
+============================================ */
+(function createPetals(){
+  const container = document.getElementById('petals');
+  if(!container) return;
+  const total = 18;
+  for(let i=0;i<total;i++){
+    const p = document.createElement('div');
+    p.className = 'petal ' + (Math.random()<0.3?'small':Math.random()<0.6?'':'big');
+    const left = Math.random()*100;
+    const delay = Math.random()*8;
+    const duration = 8 + Math.random()*10;
+    p.style.left = left + '%';
+    p.style.animationDuration = duration + 's';
+    p.style.animationDelay = '-' + delay + 's';
+    p.style.transform = `scale(${0.6 + Math.random()*0.8})`;
+    container.appendChild(p);
+  }
 })();
 
 /* ============================================
@@ -883,15 +935,21 @@ function processResult(payload){
 }
 
 /* ============================================
-   LOGIN
+   LOGIN — ĐÃ FIX LỖI KEY
 ============================================ */
 async function handleLogin(){
-  const u = document.getElementById('username').value.trim();
-  const p = document.getElementById('password').value.trim();
-  const key = document.getElementById('accessKey').value.trim();
+  const uEl   = document.getElementById('username');
+  const pEl   = document.getElementById('password');
+  const kEl   = document.getElementById('accessKey');
 
-  if(!u || !p) return toast('Vui lòng nhập đầy đủ tài khoản và mật khẩu','error');
-  if(!key) return toast('Vui lòng nhập KEY truy cập do admin cấp','error');
+  // Lấy giá trị, trim khoảng trắng đầu/cuối, giữ nguyên key bên trong
+  const u   = (uEl.value || '').trim();
+  const p   = (pEl.value || '').trim();
+  const key = (kEl.value || '').trim();
+
+  if(!u){ toast('Vui lòng nhập tài khoản','error'); uEl.focus(); return; }
+  if(!p){ toast('Vui lòng nhập mật khẩu','error'); pEl.focus(); return; }
+  if(!key){ toast('Vui lòng nhập KEY truy cập do admin cấp','error'); kEl.focus(); return; }
 
   const btn=document.getElementById('btnLogin');
   btn.disabled=true;
@@ -903,10 +961,13 @@ async function handleLogin(){
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({ username: u, password: p, device: getDeviceId(), key: key })
     });
-    const d=await r.json();
 
-    if(!d.success){
-      toast(d.error||'Lỗi đăng nhập','error');
+    let d;
+    try{ d = await r.json(); }
+    catch(e){ throw new Error('Server trả về dữ liệu không hợp lệ (HTTP '+r.status+')'); }
+
+    if(!d || !d.success){
+      toast((d && d.error) || 'Lỗi đăng nhập','error');
       btn.disabled=false; btn.innerText='ĐĂNG NHẬP';
       return;
     }
@@ -916,10 +977,10 @@ async function handleLogin(){
 
     document.getElementById('loginView').style.display='none';
     document.getElementById('mainView').style.display='flex';
-    document.getElementById('nicknameDisplay').innerText=d.nickname;
+    document.getElementById('nicknameDisplay').innerText=d.nickname || '—';
 
     const cachedBalance=loadBalance();
-    updateBalanceUI(cachedBalance!==null?cachedBalance:d.balance);
+    updateBalanceUI(cachedBalance!==null?cachedBalance:(d.balance||0));
 
     const cachedCfg=loadConfig();
     if(cachedCfg){
