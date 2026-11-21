@@ -26,55 +26,6 @@ body::after{
   pointer-events:none;z-index:0;
 }
 
-/* ===== HOA RƠI ===== */
-#petals{
-  position:fixed;inset:0;pointer-events:none;z-index:1;overflow:hidden;
-}
-.petal{
-  position:absolute;top:-40px;
-  width:14px;height:14px;
-  background:radial-gradient(circle at 30% 30%, #fbcfe8, #f472b6);
-  border-radius:70% 0 70% 0;
-  opacity:.75;
-  will-change:transform,opacity;
-  animation:fall linear infinite;
-  box-shadow:0 0 6px rgba(244,114,182,.35);
-}
-.petal.small{width:9px;height:9px;opacity:.6}
-.petal.big{width:18px;height:18px;opacity:.85}
-
-@keyframes fall{
-  0%{
-    transform:translate3d(0,-10vh,0) rotate(0deg);
-    opacity:0;
-  }
-  10%{opacity:.9}
-  50%{
-    transform:translate3d(40px,50vh,0) rotate(180deg);
-  }
-  90%{opacity:.6}
-  100%{
-    transform:translate3d(-30px,110vh,0) rotate(360deg);
-    opacity:0;
-  }
-}
-
-/* ===== MUSIC BUTTON ===== */
-.music-btn{
-  position:fixed;top:20px;right:20px;z-index:1003;
-  width:48px;height:48px;border-radius:12px;cursor:pointer;
-  background:#fff;border:1px solid rgba(244,114,182,0.3);
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 4px 20px rgba(244,114,182,.2);transition:.2s;
-  font-size:20px;
-}
-.music-btn:hover{background:#fdf2f8;border-color:#f472b6;transform:translateY(-2px)}
-.music-btn.playing{animation:musicPulse 1.6s ease-in-out infinite}
-@keyframes musicPulse{
-  0%,100%{box-shadow:0 4px 20px rgba(244,114,182,.2)}
-  50%{box-shadow:0 4px 30px rgba(236,72,153,.55)}
-}
-
 /* ===== HAMBURGER ===== */
 .hamburger{
   position:fixed;top:20px;left:20px;z-index:1001;
@@ -178,11 +129,6 @@ body::after{
 @keyframes loginAppear{
   from{opacity:0;transform:translateY(30px) scale(.98)}
   to{opacity:1;transform:translateY(0) scale(1)}
-}
-.login-container::before{
-  content:'🌸';
-  position:absolute;top:-18px;left:50%;transform:translateX(-50%);
-  font-size:36px;filter:drop-shadow(0 4px 10px rgba(244,114,182,.4));
 }
 .login-container h2{
   text-align:center;color:#db2777;margin-bottom:10px;font-size:30px;
@@ -400,7 +346,6 @@ tr:hover td{background:rgba(244,114,182,.04)}
   .login-sub{font-size:13px;margin-bottom:28px}
   .form-group input{padding:15px 16px;font-size:15px}
   .btn-login{padding:15px;font-size:15px}
-  .music-btn{top:16px;right:16px;width:42px;height:42px;font-size:17px}
   .toast-wrap{top:70px;right:12px;max-width:calc(100vw - 24px)}
 }
 </style>
@@ -411,10 +356,6 @@ tr:hover td{background:rgba(244,114,182,.04)}
 <audio id="bgMusic" loop preload="auto" playsinline>
   <source src="https://files.catbox.moe/wdj7mk.mp4" type="audio/mp4">
 </audio>
-<button class="music-btn" id="musicBtn" title="Bật/Tắt nhạc">🔊</button>
-
-<!-- HOA RƠI -->
-<div id="petals"></div>
 
 <div class="toast-wrap" id="toasts"></div>
 
@@ -559,54 +500,30 @@ tr:hover td{background:rgba(244,114,182,.04)}
 
 <script>
 /* ============================================
-   NHẠC NỀN TỰ ĐỘNG
+   NHẠC NỀN TỰ ĐỘNG (KHÔNG NÚT)
 ============================================ */
 (function initMusic(){
   const music = document.getElementById('bgMusic');
-  const btn = document.getElementById('musicBtn');
-  if(!music || !btn) return;
+  if(!music) return;
 
   music.volume = 0.6;
-  let isPlaying = false;
 
-  function updateBtn(playing){
-    isPlaying = playing;
-    if(playing){
-      btn.classList.add('playing');
-      btn.textContent = '🔊';
-      btn.title = 'Tắt nhạc';
-    }else{
-      btn.classList.remove('playing');
-      btn.textContent = '🔇';
-      btn.title = 'Bật nhạc';
-    }
-  }
-
-  // Thử phát tự động ngay khi vào web
-  function tryAutoPlay(){
+  function tryPlay(){
     const p = music.play();
     if(p && typeof p.then === 'function'){
-      p.then(()=>{ updateBtn(true); })
-       .catch(()=>{ updateBtn(false); /* trình duyệt chặn autoplay */ });
-    }else{
-      // Trình duyệt cũ
-      try{ music.play(); updateBtn(true); }catch(e){ updateBtn(false); }
+      p.catch(()=>{ /* bị chặn autoplay, sẽ thử lại khi user tương tác */ });
     }
   }
 
-  // Gọi ngay khi load
-  tryAutoPlay();
+  // Thử phát ngay khi load
+  tryPlay();
 
   // Nếu bị chặn autoplay -> phát ngay khi user có tương tác đầu tiên
   const unlock = ()=>{
-    if(!isPlaying){
-      music.play().then(()=>{
-        updateBtn(true);
-        removeUnlock();
-      }).catch(()=>{});
-    }else{
-      removeUnlock();
+    if(music.paused){
+      music.play().catch(()=>{});
     }
+    removeUnlock();
   };
   const events = ['click','touchstart','keydown','pointerdown','scroll'];
   function removeUnlock(){
@@ -614,48 +531,12 @@ tr:hover td{background:rgba(244,114,182,.04)}
   }
   events.forEach(ev=>document.addEventListener(ev, unlock, true));
 
-  // Nút bật/tắt
-  btn.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    if(music.paused){
-      music.play().then(()=>updateBtn(true)).catch(()=>{});
-    }else{
-      music.pause();
-      updateBtn(false);
-    }
-  });
-
-  // Đồng bộ trạng thái khi pause/play tự động (vd: hết tab)
-  music.addEventListener('play', ()=>updateBtn(true));
-  music.addEventListener('pause', ()=>updateBtn(false));
-
-  // Khi quay lại tab, tự phát lại nếu đang bật
+  // Khi quay lại tab -> tự phát lại
   document.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState === 'visible' && !music.paused === false && isPlaying){
-      // đã pause do rời tab -> thử phát lại
-      music.play().then(()=>updateBtn(true)).catch(()=>{});
+    if(document.visibilityState === 'visible' && music.paused){
+      music.play().catch(()=>{});
     }
   });
-})();
-
-/* ============================================
-   HOA RƠI
-============================================ */
-(function createPetals(){
-  const container = document.getElementById('petals');
-  const total = 18;
-  for(let i=0;i<total;i++){
-    const p = document.createElement('div');
-    p.className = 'petal ' + (Math.random()<0.3?'small':Math.random()<0.6?'':'big');
-    const left = Math.random()*100;
-    const delay = Math.random()*8;
-    const duration = 8 + Math.random()*10;
-    p.style.left = left + '%';
-    p.style.animationDuration = duration + 's';
-    p.style.animationDelay = '-' + delay + 's';
-    p.style.transform = `scale(${0.6 + Math.random()*0.8})`;
-    container.appendChild(p);
-  }
 })();
 
 /* ============================================
