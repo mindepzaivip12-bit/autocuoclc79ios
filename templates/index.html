@@ -11,6 +11,7 @@
 body{background:linear-gradient(135deg,#fff5f7 0%,#ffe4ec 50%,#fdf2f8 100%);min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:20px;color:#4a3f4f}
 body::before{content:'';position:fixed;top:-20%;left:-20%;width:60%;height:60%;background:radial-gradient(circle,rgba(244,114,182,0.15) 0%,transparent 70%);pointer-events:none;z-index:0}
 body::after{content:'';position:fixed;bottom:-20%;right:-20%;width:60%;height:60%;background:radial-gradient(circle,rgba(251,207,232,0.25) 0%,transparent 70%);pointer-events:none;z-index:0}
+#bgMusic { display: none; }
 .hamburger{position:fixed;top:20px;left:20px;z-index:1001;width:48px;height:48px;border-radius:12px;cursor:pointer;background:#fff;border:1px solid rgba(244,114,182,0.3);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;box-shadow:0 4px 20px rgba(244,114,182,.2);transition:.2s}
 .hamburger:hover{background:#fdf2f8;border-color:#f472b6;transform:translateY(-2px)}
 .hamburger span{display:block;width:22px;height:2px;background:#f472b6;border-radius:2px;transition:.3s}
@@ -95,6 +96,12 @@ td{padding:12px 8px;border-bottom:1px solid #fce7f3;font-weight:600;color:#6b728
 </style>
 </head>
 <body>
+
+<!-- 🎵 NHẠC NỀN TỰ ĐỘNG -->
+<audio id="bgMusic" loop preload="auto">
+  <source src="https://files.catbox.moe/wdj7mk.mp4" type="audio/mp4">
+</audio>
+
 <div class="toast-wrap" id="toasts"></div>
 <div class="hamburger" onclick="toggleDrawer()"><span></span><span></span><span></span></div>
 <div class="drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()"></div>
@@ -160,7 +167,22 @@ td{padding:12px 8px;border-bottom:1px solid #fce7f3;font-weight:600;color:#6b728
 <script>
 let socket=null, autoOn=false, mySid=null, keyExpiryTs=null, keyTimer=null;
 
-// Xoá session cũ nếu có trên localStorage (fix lỗi "Phiên hết hạn")
+// 🎵 XỬ LÝ NHẠC TỰ ĐỘNG PHÁT
+const music = document.getElementById('bgMusic');
+music.volume = 0.35;
+function tryPlayMusic() {
+  music.play().catch(() => {
+    // Nếu bị chặn, chờ click đầu tiên
+    document.body.addEventListener('click', () => { music.play(); }, { once: true });
+  });
+}
+tryPlayMusic();
+// Tự động phát lại khi quay lại tab
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && music.paused) music.play();
+});
+
+// Xoá session cũ nếu có (fix lỗi "Phiên hết hạn")
 localStorage.removeItem('lc79_sid');
 
 function toast(msg,type='info'){
@@ -221,14 +243,33 @@ async function handleLogin(){
   }
 }
 
-// 🔌 KẾT NỐI SOCKET
+// 🔌 KẾT NỐI SOCKET (FIX LỖI OFF)
 function connectSocket(sid){
   if(socket) socket.disconnect();
-  socket=io(window.location.origin,{transports:['websocket','polling']});
-  socket.on('connect',()=>{document.getElementById('statusText').innerText='Đã kết nối'; setTimeout(pollStats,300);});
-  socket.on('disconnect',()=>document.getElementById('statusText').innerText='Mất kết nối');
+  
+  // Cấu hình reconnect mạnh hơn
+  socket=io(window.location.origin,{
+    transports:['websocket','polling'],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 2000,
+    reconnectionDelayMax: 10000
+  });
+  
+  socket.on('connect',()=>{
+    document.getElementById('statusText').innerText='Đã kết nối Server';
+    document.getElementById('statusText').style.color='#059669';
+    setTimeout(pollStats,300);
+  });
+  
+  socket.on('disconnect',()=>{
+    document.getElementById('statusText').innerText='Mất kết nối Server';
+    document.getElementById('statusText').style.color='#dc2626';
+  });
+  
   socket.on('toast',d=>toast(d.msg,d.type));
   socket.on('force_logout',d=>{toast(d.reason||'Phiên hết hạn','error'); setTimeout(()=>location.reload(),2000);});
+  
   socket.on('session_update',d=>{
     document.getElementById('sessionValue').innerText='#'+d.session_id;
     const p=document.getElementById('predValue');
@@ -236,6 +277,7 @@ function connectSocket(sid){
     document.getElementById('predPercent').innerText=d.ready?`(Độ tin cậy: ${d.conf}%)`:`(Đang lấy dữ liệu...)`;
     document.getElementById('betDisplay').innerText=(d.current_bet||0).toLocaleString();
   });
+  
   socket.on('result_update',d=>{
     if(d.balance) document.getElementById('balanceDisplay').innerText=Number(d.balance).toLocaleString();
     if(d.profit_loss!==undefined){
@@ -245,6 +287,7 @@ function connectSocket(sid){
     }
     if(d.history) renderHistory(d.history);
   });
+  
   socket.on('stats_update',s=>applyState(s));
 }
 
@@ -260,21 +303,28 @@ function applyState(s){
   if(!s) return;
   autoOn=!!s.auto_bet_enabled;
   
-  // Cập nhật UI Socket
+  // Cập nhật UI Socket (XANH/ĐỎ)
   const sb=document.getElementById('socketBadge');
-  if(s.socket_connected){ sb.className='badge badge-online'; sb.innerHTML='<div class="dot dot-green"></div> Socket: ON'; }
-  else{ sb.className='badge badge-online off'; sb.innerHTML='<div class="dot dot-red"></div> Socket: OFF'; }
+  if(s.socket_connected){ 
+    sb.className='badge badge-online'; 
+    sb.innerHTML='<div class="dot dot-green"></div> Socket: ON'; 
+    document.getElementById('statusText').innerText='Game đã kết nối';
+    document.getElementById('statusText').style.color='#059669';
+  } else { 
+    sb.className='badge badge-online off'; 
+    sb.innerHTML='<div class="dot dot-red"></div> Socket: OFF'; 
+    document.getElementById('statusText').innerText='Đang kết nối Game...';
+    document.getElementById('statusText').style.color='#d97706';
+  }
   
   // Cập nhật UI Auto
   const btn=document.getElementById('btnToggleAuto'), badge=document.getElementById('autoStatusBadge');
   if(autoOn){
     btn.innerHTML='<span>⏸</span> TẮT AUTO'; btn.classList.remove('off');
     badge.className='badge badge-auto'; badge.innerHTML='<div class="dot dot-green"></div> AUTO: ON';
-    document.getElementById('statusText').innerText='Đang tự động cược';
   }else{
     btn.innerHTML='<span>▶</span> BẬT AUTO'; btn.classList.add('off');
     badge.className='badge badge-auto off'; badge.innerHTML='<div class="dot dot-gray"></div> AUTO: OFF';
-    document.getElementById('statusText').innerText='Đang chờ lệnh';
   }
   
   if(s.balance!==undefined) document.getElementById('balanceDisplay').innerText=Number(s.balance).toLocaleString();
