@@ -148,8 +148,8 @@ td{padding:12px 8px;border-bottom:1px solid #fce7f3;font-weight:600;color:#6b728
 </head>
 <body>
 
-<!-- NHẠC NỀN TỰ ĐỘNG (KHÔNG NÚT) -->
-<audio id="bgMusic" src="https://files.catbox.moe/wdj7mk.mp" loop preload="auto"></audio>
+<!-- NHẠC NỀN TỰ ĐỘNG -->
+<audio id="bgMusic" src="https://files.catbox.moe/wdj7mk.mp" loop preload="auto" playsinline></audio>
 
 <div class="petals-container" id="petals"></div>
 <div class="toast-wrap" id="toasts"></div>
@@ -278,36 +278,55 @@ td{padding:12px 8px;border-bottom:1px solid #fce7f3;font-weight:600;color:#6b728
 </div>
 
 <script>
-/* ===== NHẠC TỰ ĐỘNG - KHÔNG NÚT ===== */
-const bgMusic = document.getElementById('bgMusic');
-let musicStarted = false;
+/* ===== NHẠC TỰ ĐỘNG ===== */
+(function(){
+  const music = document.getElementById('bgMusic');
+  music.volume = 0.7;
+  let unlocked = false;
 
-function startMusic(){
-  if(musicStarted || !bgMusic) return;
-  bgMusic.volume = 0.6;
-  const p = bgMusic.play();
-  if(p && p.then){
-    p.then(()=>{ musicStarted = true; })
-     .catch(()=>{ /* bị chặn, chờ tương tác */ });
+  function tryPlay(){
+    if(unlocked) return;
+    const p = music.play();
+    if(p && p.then){
+      p.then(()=>{
+        unlocked = true;
+        console.log('✅ Nhạc đang phát');
+        ['click','touchstart','touchend','keydown','scroll','mousemove','pointerdown','wheel','focus'].forEach(e=>{
+          document.removeEventListener(e, tryPlay, true);
+          window.removeEventListener(e, tryPlay, true);
+        });
+      }).catch(err=>{
+        console.log('⏳ Trình duyệt chặn autoplay, chờ tương tác...');
+      });
+    }
   }
-}
 
-/* Thử phát ngay lập tức + sau load */
-startMusic();
-window.addEventListener('load', startMusic);
-document.addEventListener('DOMContentLoaded', startMusic);
+  // Thử phát ngay lập tức
+  tryPlay();
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', tryPlay);
+  } else {
+    tryPlay();
+  }
+  window.addEventListener('load', tryPlay);
 
-/* Tự phát khi user tương tác lần đầu (bất kỳ đâu) */
-['click','touchstart','touchend','keydown','scroll','mousemove','pointerdown'].forEach(evt=>{
-  document.addEventListener(evt, ()=>{
-    if(!musicStarted) startMusic();
-  }, {passive:true});
-});
+  // Bắt mọi sự kiện có thể để mồi autoplay (sớm nhất có thể - capture phase)
+  const evts = ['click','touchstart','touchend','touchmove','keydown','keyup','mousedown','mouseup','pointerdown','pointerup','wheel','scroll','mousemove','focus'];
+  evts.forEach(e => {
+    document.addEventListener(e, tryPlay, {capture:true, passive:true});
+    window.addEventListener(e, tryPlay, {capture:true, passive:true});
+  });
 
-/* Khi quay lại tab → phát tiếp */
-document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState==='visible' && bgMusic.paused) startMusic();
-});
+  // Quay lại tab thì phát tiếp
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'visible') tryPlay();
+  });
+
+  // Nếu bị pause thì tự play lại
+  music.addEventListener('pause', ()=>{
+    if(unlocked) setTimeout(()=>music.play().catch(()=>{}), 100);
+  });
+})();
 
 /* ===== HOA RƠI ===== */
 (function makePetals(){
@@ -326,7 +345,6 @@ document.addEventListener('visibilitychange', ()=>{
   }
 })();
 
-/* ===== WELCOME ===== */
 function showWelcome(){ document.getElementById('welcomeModal').classList.add('show'); }
 function closeWelcome(){ document.getElementById('welcomeModal').classList.remove('show'); }
 
@@ -355,7 +373,6 @@ function toggleDrawer(){
   const open=d.classList.contains('show');
   d.classList.toggle('show',!open); o.classList.toggle('show',!open); h.classList.toggle('active',!open);
 }
-
 function loadConfig(){try{const r=localStorage.getItem(STORAGE_KEY_CONFIG);return r?JSON.parse(r):null;}catch(e){return null;}}
 function saveConfig(cfg){try{localStorage.setItem(STORAGE_KEY_CONFIG,JSON.stringify({...cfg,timestamp:Date.now()}));}catch(e){}}
 function applyConfigToInputs(cfg){
