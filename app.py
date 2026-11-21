@@ -77,13 +77,16 @@ def license_check(key, fingerprint=None):
     try:
         params = {"key": key}
         if fingerprint: params["fingerprint"] = fingerprint
-        r = requests.get(f"{LICENSE_SERVER_URL}/api/license/check", params=params, headers=_license_headers(), timeout=6)
+        # Tăng timeout để chờ Render Free khởi động
+        r = requests.get(f"{LICENSE_SERVER_URL}/api/license/check", params=params, headers=_license_headers(), timeout=20)
         if r.status_code == 404:
             res = {"ok": False, "valid": False, "message": "Key không tồn tại", "code": "NOT_FOUND"}
         else:
             r.raise_for_status()
             res = r.json() if r.text.strip().startswith("{") else {"raw": r.text}
             res.setdefault("ok", True)
+    except requests.exceptions.Timeout:
+        return {"ok": False, "valid": False, "message": "Server Key đang khởi động (Timeout). Vui lòng thử lại sau 30s!", "code": "TIMEOUT"}
     except Exception as e:
         return {"ok": False, "valid": False, "message": f"Lỗi server key: {type(e).__name__}", "code": "SERVER_ERROR"}
 
@@ -96,7 +99,8 @@ def license_activate(key, fingerprint, ip=None, ua=None):
     
     payload = {"key": key, "fingerprint": fingerprint, "ip": ip, "ua": ua}
     try:
-        r = requests.post(f"{LICENSE_SERVER_URL}/api/license/activate", json=payload, headers=_license_headers(), timeout=8)
+        # Tăng timeout để chờ Render Free khởi động
+        r = requests.post(f"{LICENSE_SERVER_URL}/api/license/activate", json=payload, headers=_license_headers(), timeout=20)
         data = r.json() if r.text.strip().startswith("{") else {}
         if r.status_code in (200, 201):
             data.setdefault("ok", True); data.setdefault("success", True); _cache_clear(); return data
@@ -104,6 +108,8 @@ def license_activate(key, fingerprint, ip=None, ua=None):
             data.setdefault("ok", False); data.setdefault("success", False)
             data.setdefault("message", data.get("error") or f"HTTP {r.status_code}")
             return data
+    except requests.exceptions.Timeout:
+        return {"ok": False, "success": False, "message": "Server Key đang khởi động (Timeout). Vui lòng thử lại sau 30s!", "code": "TIMEOUT"}
     except Exception as e:
         return {"ok": False, "success": False, "message": f"Lỗi server key: {type(e).__name__}", "code": "SERVER_ERROR"}
 
@@ -269,32 +275,35 @@ def api_login():
     password = (data.get("password") or "").strip()
     key = (data.get("key") or "").strip().upper()
 
-    if not username or not password: return jsonify({"success": False, "error": "Thiếu tài khoản/mật khẩu"})
-    if not key: return jsonify({"success": False, "error": "Vui lòng nhập KEY truy cập", "code": "NO_KEY"})
+    if not username or not password: return jsonify({"success": False, "error": "Thiếu tài khoản/mật khẩu"}), 400
+    if not key: return jsonify({"success": False, "error": "Vui lòng nhập KEY truy cập", "code": "NO_KEY"}), 400
 
     # 1. CHECK LICENSE (SERVER KEY)
     if LICENSE_SERVER_URL:
         ip, ua = _client_ip(), _client_ua()
         fp = _device_fingerprint(ip, ua)
         
-        # Thử kích hoạt (nếu key chưa active thì bind thiết bị)
+        # Kích hoạt key (bind thiết bị)
         act_res = license_activate(key, fp, ip=ip, ua=ua)
         
         # Check lại trạng thái key
         chk = license_check(key, fp)
         if not _is_license_valid(chk):
-            err = _license_msg(act_res) or _license_msg(chk) or "Key không hợp lệ"
-            return jsonify({"success": False, "error": err, "code": "KEY_INVALID"}), 403
+            # Ưu tiên lỗi từ activate (nếu có)
+            err = _license_msg(act_res) if not act_res.get("ok") else _license_msg(chk)
+            return jsonify({"success": False, "error": err or "Key không hợp lệ", "code": "KEY_INVALID"}), 403
         
         expires = chk.get("expires_at")
         left = _license_time_left(chk)
     else:
+        # Nếu không cấu hình license server thì mở khóa tạm 30 ngày (Test)
         expires = int(time.time()) + 86400*30
         left = 86400*30
 
     # 2. LOGIN GAME
     res = login_game(username, password)
-    if "_error" in res: return jsonify({"success": False, "error": res["_error"]})
+    if "_error" in res: 
+        return jsonify({"success": False, "error": res["_error"]}), 401
 
     # 3. TẠO SESSION
     sid = os.urandom(8).hex()
