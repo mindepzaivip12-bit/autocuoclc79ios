@@ -17,7 +17,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet',
                     ping_timeout=60, ping_interval=25)
 
 # ==========================================
-# CẤU HÌNH GAME
+# CẤU HÌNH
 # ==========================================
 API_LOGIN_URL   = "https://apifo88daigia.tele68.com/api"
 API_LOBBY_URL   = "https://wlb.tele68.com/v1/lobby/auth/login"
@@ -27,9 +27,6 @@ GAME_WS_PATH    = "txmd5/"
 GAME_WS_NS      = "/txmd5"
 COMMON_PARAMS   = "cp=R&cl=R&pf=web"
 
-# ==========================================
-# 📌 LICENSE SERVER CONFIG (SERVER KEY)
-# ==========================================
 LICENSE_SERVER_URL = os.environ.get("LICENSE_SERVER_URL", "https://lc79vipadmin-5orx.onrender.com").rstrip("/")
 LICENSE_API_KEY   = os.environ.get("LICENSE_API_KEY", "").strip()
 LICENSE_CACHE_TTL = 30
@@ -37,9 +34,6 @@ LICENSE_CACHE_TTL = 30
 _LICENSE_CACHE = {}
 _LICENSE_CACHE_LOCK = threading.Lock()
 
-# ==========================================
-# GLOBAL DATA
-# ==========================================
 GLOBAL_HISTORY = []
 MAX_GLOBAL_HISTORY = 2000
 GLOBAL_HISTORY_LOCK = threading.Lock()
@@ -174,13 +168,8 @@ def _force_logout(sid, reason="MANUAL"):
     WEB_SESSIONS.pop(sid, None)
     try: socketio.emit("force_logout", {"reason": reason}, to=sid)
     except: pass
-    logger.warning(f"[License] 🚪 Force logout {sid} — {reason}")
 
-# ==========================================
-# LICENSE WATCHDOG
-# ==========================================
 def license_watchdog_worker():
-    logger.info("[License Watchdog] started")
     while True:
         try:
             if LICENSE_SERVER_URL:
@@ -199,7 +188,7 @@ def license_watchdog_worker():
 socketio.start_background_task(license_watchdog_worker)
 
 # ==========================================
-# ✅ HÀM CHUẨN HÓA SIDE
+# HÀM HỖ TRỢ GAME
 # ==========================================
 def normalize_side(value):
     if value is None: return None
@@ -216,9 +205,6 @@ def normalize_side(value):
     if "LOW" in s or "SMALL" in s: return "XIU"
     return None
 
-# ==========================================
-# GỌI API LỊCH SỬ
-# ==========================================
 def fetch_api_raw():
     try:
         url = f"{API_HISTORY_URL}?{COMMON_PARAMS}&at=&_t={int(time.time()*1000)}"
@@ -229,14 +215,9 @@ def fetch_api_raw():
         return data
     except Exception as e:
         API_LAST_RAW["error"] = str(e)
-        logger.error(f"[API] Fetch fail: {e}")
         return None
 
-# ==========================================
-# API DATA WORKER
-# ==========================================
 def api_data_worker():
-    logger.info("[API Worker] started")
     last_session_logged = None
     while True:
         data = fetch_api_raw()
@@ -244,30 +225,22 @@ def api_data_worker():
             session_id = data.get("phien"); result_str = data.get("ket_qua") or ""
             if session_id and result_str and session_id != last_session_logged:
                 side = normalize_side(result_str)
-                dices = []
-                try:
-                    parts = str(result_str).split()
-                    if len(parts) > 1: dices = [int(x) for x in parts[1].split("-")]
-                except: pass
                 if side:
                     with GLOBAL_HISTORY_LOCK:
                         if not any(h["session"] == session_id for h in GLOBAL_HISTORY[-5:]):
-                            GLOBAL_HISTORY.append({"session": session_id, "dice": dices, "side": side, "ts": time.time()})
+                            GLOBAL_HISTORY.append({"session": session_id, "side": side, "ts": time.time()})
                             if len(GLOBAL_HISTORY) > MAX_GLOBAL_HISTORY: GLOBAL_HISTORY.pop(0)
                     last_session_logged = session_id
         socketio.sleep(1.5)
 socketio.start_background_task(api_data_worker)
 
-# ==========================================
-# DỰ ĐOÁN
-# ==========================================
 def get_prediction():
     now = time.time()
     data = API_LAST_RAW["data"] if API_LAST_RAW["data"] and (now - API_LAST_RAW["ts"]) < 1.5 else fetch_api_raw()
-    if not data: return {"side": None, "conf": None, "ready": False, "api_ok": False, "api_session": None, "raw": None}
+    if not data: return {"side": None, "conf": None, "ready": False, "api_session": None}
     du_doan = data.get("du_doan"); do_tin_cay = data.get("do_tin_cay")
     side_out = normalize_side(du_doan)
-    return {"side": side_out, "conf": do_tin_cay, "ready": side_out is not None, "api_ok": True, "api_session": data.get("phien"), "raw": data}
+    return {"side": side_out, "conf": do_tin_cay, "ready": side_out is not None, "api_session": data.get("phien")}
 
 def parse_result_side(result_raw):
     if not result_raw: return None
@@ -277,9 +250,6 @@ def parse_result_side(result_raw):
     if len(nums) >= 3: return "TAI" if sum(nums[:3]) >= 11 else "XIU"
     return None
 
-# ==========================================
-# LOGIN GAME
-# ==========================================
 def login_game(username, password):
     try:
         pw = hashlib.md5(password.encode()).hexdigest()
@@ -309,31 +279,55 @@ def calc_next_bet(st):
     return base
 
 # ==========================================
-# GAME SOCKET WORKER
+# 🚀 GAME SOCKET WORKER (FIX TRIỆT ĐỂ LỖI OFF)
 # ==========================================
 def game_socket_worker(sid, jwt_token):
     st = WEB_SESSIONS.get(sid)
     if not st: return
 
-    sio = SocketClient(reconnection=True, reconnection_attempts=100, reconnection_delay=2, logger=False, engineio_logger=False)
+    # Xoá client cũ nếu có
+    if sid in WS_CLIENTS:
+        try: WS_CLIENTS[sid].disconnect()
+        except: pass
+        del WS_CLIENTS[sid]
+
+    # Cấu hình reconnect chặt chẽ
+    sio = SocketClient(
+        reconnection=True, 
+        reconnection_attempts=0, # 0 = vô hạn
+        reconnection_delay=2, 
+        reconnection_delay_max=10,
+        logger=False, 
+        engineio_logger=False
+    )
     WS_CLIENTS[sid] = sio
 
     def check_target_profit():
         if (st["auto_bet_enabled"] and st["target_profit"] and st["profit_loss"] >= st["target_profit"]):
             st["auto_bet_enabled"] = False
-            socketio.emit("toast", {"type": "success", "msg": f"🏆 CHỐT LÃI! +{st['profit_loss']:,}đ — Auto đã tắt"}, to=sid)
+            socketio.emit("toast", {"type": "success", "msg": f"🏆 CHỐT LÃI! +{st['profit_loss']:,}đ"}, to=sid)
             socketio.emit("stats_update", public_state(st), to=sid)
             return True
         return False
 
     @sio.event(namespace=GAME_WS_NS)
-    def connect(): st["socket_connected"] = True; socketio.emit("stats_update", public_state(st), to=sid)
+    def connect():
+        logger.info(f"[{sid}] ✅ Game socket CONNECTED")
+        st["socket_connected"] = True
+        socketio.emit("stats_update", public_state(st), to=sid)
+        socketio.emit("toast", {"type": "success", "msg": "Game: Đã kết nối"}, to=sid)
 
     @sio.event(namespace=GAME_WS_NS)
-    def connect_error(data): st["socket_connected"] = False; socketio.emit("stats_update", public_state(st), to=sid)
+    def connect_error(data):
+        logger.error(f"[{sid}] ❌ Game socket CONNECT ERROR: {data}")
+        st["socket_connected"] = False
+        socketio.emit("stats_update", public_state(st), to=sid)
 
     @sio.event(namespace=GAME_WS_NS)
-    def disconnect(): st["socket_connected"] = False; socketio.emit("stats_update", public_state(st), to=sid)
+    def disconnect():
+        logger.warning(f"[{sid}] ❌ Game socket DISCONNECTED. Reconnecting...")
+        st["socket_connected"] = False
+        socketio.emit("stats_update", public_state(st), to=sid)
 
     @sio.on("new-session", namespace=GAME_WS_NS)
     def on_new_session(data):
@@ -401,10 +395,29 @@ def game_socket_worker(sid, jwt_token):
         check_target_profit()
 
     try:
-        sio.connect(f"{GAME_WS_URL}?token={jwt_token}", socketio_path=GAME_WS_PATH, namespaces=[GAME_WS_NS], headers={"User-Agent": "Mozilla/5.0", "Origin": "https://tele68.com"}, auth={"token": jwt_token}, transports=["websocket"], wait_timeout=15)
+        logger.info(f"[{sid}] Đang kết nối tới Game Socket: {GAME_WS_URL}...")
+        connect_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Origin": "https://tele68.com",
+            "Referer": "https://tele68.com/",
+            "Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8"
+        }
+        
+        # Tham số truyền vào được tinh chỉnh để fix lỗi handshake
+        sio.connect(
+            f"{GAME_WS_URL}?token={jwt_token}",
+            socketio_path=GAME_WS_PATH,
+            namespaces=[GAME_WS_NS],
+            headers=connect_headers,
+            transports=['websocket'], # Ép buộc dùng websocket, tránh polling lỗi
+            wait_timeout=20
+        )
         sio.wait()
     except Exception as e:
-        st["socket_connected"] = False; socketio.emit("stats_update", public_state(st), to=sid)
+        logger.error(f"[{sid}] ❌ SOCKET FATAL ERROR: {type(e).__name__} - {e}")
+        st["socket_connected"] = False
+        socketio.emit("stats_update", public_state(st), to=sid)
+        socketio.emit("toast", {"type": "error", "msg": f"Lỗi Socket: {type(e).__name__}"}, to=sid)
 
 # ==========================================
 # PUBLIC STATE & WORKER
@@ -445,7 +458,6 @@ def api_login():
     if not username or not password: return jsonify({"success": False, "error": "Thiếu tài khoản/mật khẩu"})
     if not key: return jsonify({"success": False, "error": "Vui lòng nhập KEY truy cập", "code": "NO_KEY"})
 
-    # 1. Check License
     if LICENSE_SERVER_URL:
         ip, ua = _client_ip(), _client_ua()
         fp = _device_fingerprint(ip, ua)
@@ -453,23 +465,17 @@ def api_login():
         if not act_res.get("success", False):
             chk = license_check(key, fp)
             if not _is_license_valid(chk):
-                err = _license_msg(act_res) or _license_msg(chk) or "Key không hợp lệ"
-                return jsonify({"success": False, "error": err, "code": "KEY_INVALID"}), 403
+                return jsonify({"success": False, "error": _license_msg(act_res) or _license_msg(chk), "code": "KEY_INVALID"}), 403
         chk = license_check(key, fp)
         if not _is_license_valid(chk):
             return jsonify({"success": False, "error": _license_msg(chk), "code": "KEY_EXPIRED"}), 403
-        expires = chk.get("expires_at")
-        left = _license_time_left(chk)
+        expires = chk.get("expires_at"); left = _license_time_left(chk)
     else:
-        fp = "no_license"
-        expires = int(time.time()) + 86400*30
-        left = 86400*30
+        fp = "no_license"; expires = int(time.time()) + 86400*30; left = 86400*30
 
-    # 2. Login Game
     res = login_game(username, password)
     if "_error" in res: return jsonify({"success": False, "error": res["_error"]})
 
-    # 3. Create Session
     sid = os.urandom(8).hex()
     session["sid"] = sid
     WEB_SESSIONS[sid] = {
