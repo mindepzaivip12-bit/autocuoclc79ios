@@ -10,18 +10,18 @@
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',sans-serif}
 
 body{
-  background:linear-gradient(135deg,#0a0f1e 0%,#0f172a 50%,#0b1220 100%);
+  background:linear-gradient(135deg,#fff5f7 0%,#ffe4ec 50%,#fdf2f8 100%);
   min-height:100vh;display:flex;justify-content:center;align-items:flex-start;
-  padding:20px;color:#cbd5e1;
+  padding:20px;color:#4a3f4f;
 }
 body::before{
   content:'';position:fixed;top:-20%;left:-20%;width:60%;height:60%;
-  background:radial-gradient(circle,rgba(96,165,250,0.12) 0%,transparent 70%);
+  background:radial-gradient(circle,rgba(244,114,182,0.15) 0%,transparent 70%);
   pointer-events:none;z-index:0;
 }
 body::after{
   content:'';position:fixed;bottom:-20%;right:-20%;width:60%;height:60%;
-  background:radial-gradient(circle,rgba(147,197,253,0.08) 0%,transparent 70%);
+  background:radial-gradient(circle,rgba(251,207,232,0.25) 0%,transparent 70%);
   pointer-events:none;z-index:0;
 }
 
@@ -29,27 +29,27 @@ body::after{
 .hamburger{
   position:fixed;top:20px;left:20px;z-index:1001;
   width:48px;height:48px;border-radius:12px;cursor:pointer;
-  background:#111827;border:1px solid rgba(96,165,250,0.25);
+  background:#fff;border:1px solid rgba(244,114,182,0.3);
   display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;
-  box-shadow:0 4px 20px rgba(0,0,0,.5);transition:.2s;
+  box-shadow:0 4px 20px rgba(244,114,182,.2);transition:.2s;
 }
-.hamburger:hover{background:#1e293b;border-color:#60a5fa;transform:translateY(-2px)}
-.hamburger span{display:block;width:22px;height:2px;background:#93c5fd;border-radius:2px;transition:.3s}
+.hamburger:hover{background:#fdf2f8;border-color:#f472b6;transform:translateY(-2px)}
+.hamburger span{display:block;width:22px;height:2px;background:#f472b6;border-radius:2px;transition:.3s}
 .hamburger.active span:nth-child(1){transform:translateY(7px) rotate(45deg)}
 .hamburger.active span:nth-child(2){opacity:0}
 .hamburger.active span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
 
 /* ===== DRAWER ===== */
 .drawer-overlay{
-  position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
+  position:fixed;inset:0;background:rgba(74,63,79,.4);backdrop-filter:blur(4px);
   z-index:1000;opacity:0;pointer-events:none;transition:opacity .3s;
 }
 .drawer-overlay.show{opacity:1;pointer-events:auto}
 
 .drawer{
   position:fixed;top:0;left:0;height:100vh;width:360px;max-width:90vw;z-index:1002;
-  background:#0f172a;border-right:1px solid rgba(96,165,250,0.2);
-  box-shadow:4px 0 40px rgba(0,0,0,.6);
+  background:#fff;border-right:1px solid rgba(244,114,182,0.2);
+  box-shadow:4px 0 40px rgba(244,114,182,.2);
   transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
   overflow-y:auto;padding:70px 20px 20px;
 }
@@ -57,273 +57,232 @@ body::after{
 
 .drawer-header{
   position:absolute;top:0;left:0;right:0;padding:18px 20px;
-  border-bottom:1px solid rgba(96,165,250,0.15);
-  background:linear-gradient(180deg,#111827,#0f172a);
+  border-bottom:1px solid rgba(244,114,182,0.15);
+  background:linear-gradient(180deg,#fff5f7,#fff);
   display:flex;align-items:center;justify-content:space-between;
 }
 .drawer-header h3{
-  font-size:15px;color:#93c5fd;font-weight:700;letter-spacing:.5px;
-  text-shadow:0 0 15px rgba(96,165,250,.3);
+  font-size:15px;color:#db2777;font-weight:700;letter-spacing:.5px;
 }
 .drawer-close{
-  width:30px;height:30px;border-radius:6px;background:rgba(239,68,68,.15);
-  border:1px solid rgba(239,68,68,.3);color:#f87171;cursor:pointer;
+  width:30px;height:30px;border-radius:6px;background:rgba(239,68,68,.1);
+  border:1px solid rgba(239,68,68,.25);color:#f87171;cursor:pointer;
   font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;
   transition:.2s;
 }
-.drawer-close:hover{background:rgba(239,68,68,.3)}
+.drawer-close:hover{background:rgba(239,68,68,.2)}
 
 .drawer-section{margin-bottom:22px}
 .drawer-section-title{
-  font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;
+  font-size:11px;color:#be185d;font-weight:700;text-transform:uppercase;
   letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;gap:6px;
 }
 .drawer-section-title::before{
-  content:'';width:3px;height:12px;background:#60a5fa;border-radius:2px;
-  box-shadow:0 0 8px rgba(96,165,250,.6);
+  content:'';width:3px;height:12px;background:#f472b6;border-radius:2px;
 }
 
 .drawer-field{margin-bottom:12px}
 .drawer-field label{
-  display:block;font-size:12px;font-weight:600;color:#94a3b8;margin-bottom:5px;
+  display:block;font-size:12px;font-weight:600;color:#9d6b8c;margin-bottom:5px;
 }
 .drawer-field input[type="number"]{
-  width:100%;padding:10px 12px;background:#0b1220;color:#e2e8f0;
-  border:1px solid #1e293b;border-radius:8px;outline:none;transition:.2s;font-size:13px;
+  width:100%;padding:10px 12px;background:#fff5f7;color:#4a3f4f;
+  border:1px solid #fbcfe8;border-radius:8px;outline:none;transition:.2s;font-size:13px;
 }
-.drawer-field input::placeholder{color:#475569}
-.drawer-field input:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(96,165,250,.15)}
-.drawer-hint{font-size:11px;color:#475569;margin-top:4px;font-weight:500}
-
-/* Toggle Switch */
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-}
-.switch input { 
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #1e293b;
-  transition: .4s;
-  border-radius: 24px;
-  border: 1px solid #334155;
-}
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 16px;
-  width: 16px;
-  left: 3px;
-  bottom: 3px;
-  background-color: #94a3b8;
-  transition: .4s;
-  border-radius: 50%;
-}
-input:checked + .slider {
-  background-color: #3b82f6;
-  border-color: #60a5fa;
-}
-input:checked + .slider:before {
-  transform: translateX(20px);
-  background-color: #fff;
-}
+.drawer-field input::placeholder{color:#d8b4c8}
+.drawer-field input:focus{border-color:#f472b6;box-shadow:0 0 0 3px rgba(244,114,182,.15)}
+.drawer-hint{font-size:11px;color:#c084a8;margin-top:4px;font-weight:500}
 
 .saved-indicator{
-  display:inline-block;font-size:10px;color:#34d399;font-weight:600;
+  display:inline-block;font-size:10px;color:#10b981;font-weight:600;
   margin-left:6px;opacity:0;transition:opacity .3s;
 }
 .saved-indicator.show{opacity:1}
 
 .btn-apply{
   width:100%;padding:11px;border:none;border-radius:8px;cursor:pointer;
-  background:linear-gradient(135deg,#3b82f6,#60a5fa);color:#fff;
+  background:linear-gradient(135deg,#ec4899,#f472b6);color:#fff;
   font-weight:700;font-size:13px;transition:.2s;
-  box-shadow:0 4px 14px rgba(59,130,246,.3);
+  box-shadow:0 4px 14px rgba(236,72,153,.3);
 }
-.btn-apply:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,130,246,.45)}
+.btn-apply:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(236,72,153,.45)}
 .btn-apply:active{transform:translateY(0)}
 
 /* ===== LOGIN ===== */
 .login-container{
   position:relative;z-index:1;
-  background:#111827;width:100%;max-width:400px;border-radius:16px;padding:30px;
-  box-shadow:0 10px 40px rgba(0,0,0,.6),0 0 0 1px rgba(96,165,250,0.15);
-  border:1px solid rgba(96,165,250,0.1);
-  margin-top: 10vh;
+  background:#fff;width:100%;max-width:400px;border-radius:20px;padding:32px;
+  box-shadow:0 10px 40px rgba(244,114,182,.15),0 0 0 1px rgba(244,114,182,0.15);
+  border:1px solid rgba(244,114,182,0.1);
+  margin-top: 8vh;
 }
 .login-container h2{
-  text-align:center;color:#93c5fd;margin-bottom:20px;
-  text-shadow:0 0 20px rgba(96,165,250,.3);
+  text-align:center;color:#db2777;margin-bottom:6px;font-size:22px;
 }
+.login-sub{text-align:center;font-size:12px;color:#c084a8;margin-bottom:22px;font-weight:500}
+
 .form-group{margin-bottom:15px}
-.form-group label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#94a3b8}
+.form-group label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#9d6b8c}
 .form-group input{
-  width:100%;padding:12px;background:#0b1220;color:#e2e8f0;
-  border:1px solid #1e293b;border-radius:8px;outline:none;transition:.2s;
+  width:100%;padding:12px;background:#fff5f7;color:#4a3f4f;
+  border:1px solid #fbcfe8;border-radius:10px;outline:none;transition:.2s;
 }
-.form-group input::placeholder{color:#475569}
-.form-group input:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(96,165,250,.15)}
+.form-group input::placeholder{color:#d8b4c8}
+.form-group input:focus{border-color:#f472b6;box-shadow:0 0 0 3px rgba(244,114,182,.15)}
+.form-group input.key-input{
+  border-color:#f9a8d4;background:#fdf2f8;
+}
+.form-group input.key-input:focus{border-color:#ec4899;box-shadow:0 0 0 3px rgba(236,72,153,.2)}
+
 .btn-login{
-  width:100%;padding:12px;background:linear-gradient(135deg,#3b82f6,#60a5fa);
-  color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;
-  transition:.2s;box-shadow:0 4px 14px rgba(59,130,246,.3); margin-top: 5px;
+  width:100%;padding:13px;background:linear-gradient(135deg,#ec4899,#f472b6);
+  color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;
+  transition:.2s;box-shadow:0 4px 14px rgba(236,72,153,.3); margin-top: 8px;
+  font-size:14px;
 }
-.btn-login:hover{background:linear-gradient(135deg,#2563eb,#3b82f6);transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,130,246,.45)}
+.btn-login:hover{background:linear-gradient(135deg,#db2777,#ec4899);transform:translateY(-1px);box-shadow:0 6px 20px rgba(236,72,153,.45)}
 .btn-login:disabled{opacity:.6;cursor:not-allowed;transform:none}
 
 .tele-contact{
   display:flex;align-items:center;justify-content:center;gap:8px;
   margin-top:18px;padding:12px;border-radius:10px;
-  background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.2);
-  color:#93c5fd;font-weight:600;font-size:13px;text-decoration:none;
+  background:rgba(244,114,182,.08);border:1px solid rgba(244,114,182,.2);
+  color:#db2777;font-weight:600;font-size:13px;text-decoration:none;
   transition:.2s;
 }
-.tele-contact:hover{background:rgba(96,165,250,.15);border-color:#60a5fa;transform:translateY(-1px)}
-.tele-contact svg{width:18px;height:18px;fill:#60a5fa}
+.tele-contact:hover{background:rgba(244,114,182,.15);border-color:#f472b6;transform:translateY(-1px)}
+.tele-contact svg{width:18px;height:18px;fill:#f472b6}
 
 /* ===== MAIN ===== */
 .main-wrapper{display:none;width:100%;max-width:900px;flex-direction:column;gap:15px;position:relative;z-index:1; margin-top: 20px;}
 .top-header{
-  background:#111827;border-radius:12px;padding:15px 25px;
+  background:#fff;border-radius:16px;padding:15px 25px;
   display:flex;justify-content:space-between;align-items:center;
-  box-shadow:0 4px 20px rgba(0,0,0,.4);border:1px solid rgba(96,165,250,0.12);
+  box-shadow:0 4px 20px rgba(244,114,182,.12);border:1px solid rgba(244,114,182,0.15);
 }
 .logo-text h1{
-  font-size:20px;color:#dbeafe;font-weight:800;letter-spacing:.5px;margin-bottom:4px;
-  text-shadow:0 0 20px rgba(96,165,250,.25);
+  font-size:20px;color:#db2777;font-weight:800;letter-spacing:.5px;margin-bottom:4px;
 }
-.logo-text p{font-size:13px;color:#64748b}
+.logo-text p{font-size:13px;color:#c084a8}
 .main-card{
-  background:#111827;border-radius:16px;padding:25px;
-  box-shadow:0 10px 40px rgba(0,0,0,.5);border:1px solid rgba(96,165,250,0.12);
+  background:#fff;border-radius:20px;padding:25px;
+  box-shadow:0 10px 40px rgba(244,114,182,.15);border:1px solid rgba(244,114,182,0.15);
 }
 .section-title{
-  font-size:14px;color:#93c5fd;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:20px;
+  font-size:14px;color:#db2777;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:20px;
 }
 
 .status-badges{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
 .badge{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600}
-.badge-online{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3)}
-.badge-online.off{background:rgba(239,68,68,.12);color:#f87171;border-color:rgba(239,68,68,.3)}
-.badge-auto{background:rgba(96,165,250,.12);color:#93c5fd;border:1px solid rgba(96,165,250,.3)}
-.badge-auto.off{background:rgba(71,85,105,.3);color:#94a3b8;border-color:#334155}
-.badge-bet{background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.3)}
-.badge-bet.off{background:rgba(71,85,105,.3);color:#94a3b8;border-color:#334155}
-.badge-bet.active{background:rgba(16,185,129,.15);color:#34d399;border-color:rgba(16,185,129,.4)}
-.dot{width:6px;height:6px;border-radius:50%;background:#60a5fa}
-.dot-green{background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.6)}
-.dot-red{background:#f87171;box-shadow:0 0 8px rgba(248,113,113,.6)}
-.dot-gray{background:#64748b}
-.dot-active{background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.8)}
+.badge-online{background:rgba(16,185,129,.1);color:#059669;border:1px solid rgba(16,185,129,.3)}
+.badge-online.off{background:rgba(239,68,68,.1);color:#dc2626;border-color:rgba(239,68,68,.3)}
+.badge-auto{background:rgba(236,72,153,.1);color:#db2777;border:1px solid rgba(236,72,153,.3)}
+.badge-auto.off{background:#f3f4f6;color:#9ca3af;border-color:#e5e7eb}
+.badge-bet{background:rgba(245,158,11,.1);color:#d97706;border:1px solid rgba(245,158,11,.3)}
+.badge-bet.off{background:#f3f4f6;color:#9ca3af;border-color:#e5e7eb}
+.badge-bet.active{background:rgba(16,185,129,.12);color:#059669;border-color:rgba(16,185,129,.4)}
+.dot{width:6px;height:6px;border-radius:50%;background:#f472b6}
+.dot-green{background:#10b981;box-shadow:0 0 8px rgba(16,185,129,.6)}
+.dot-red{background:#ef4444;box-shadow:0 0 8px rgba(239,68,68,.6)}
+.dot-gray{background:#9ca3af}
+.dot-active{background:#10b981;box-shadow:0 0 8px rgba(16,185,129,.8)}
 
 .prediction-box{
-  background:linear-gradient(135deg,#0b1220 0%,#0f172a 100%);
-  border:1px solid rgba(96,165,250,0.2);border-radius:12px;padding:20px;
+  background:linear-gradient(135deg,#fff5f7 0%,#fdf2f8 100%);
+  border:1px solid rgba(244,114,182,0.3);border-radius:16px;padding:20px;
   display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;
   position:relative;overflow:hidden;transition:border-color .3s;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
 }
 .prediction-box::before{
-  content:'';position:absolute;top:0;left:0;width:100%;height:2px;
-  background:linear-gradient(90deg,transparent,#60a5fa,transparent);opacity:.6;
+  content:'';position:absolute;top:0;left:0;width:100%;height:3px;
+  background:linear-gradient(90deg,transparent,#f472b6,transparent);opacity:.7;
 }
 .prediction-box.locked{border-color:rgba(251,191,36,.5)}
 .prediction-box.locked::before{background:linear-gradient(90deg,transparent,#fbbf24,transparent)}
 
 .pred-left{display:flex;flex-direction:column;gap:5px;z-index:2}
-.pred-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px}
+.pred-label{font-size:12px;color:#c084a8;font-weight:600;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px}
 .pred-label .lock-icon{font-size:10px}
 .pred-value{
-  font-size:32px;font-weight:800;color:#93c5fd;letter-spacing:1px;
-  text-shadow:0 0 20px rgba(96,165,250,.4);transition:.3s;
+  font-size:32px;font-weight:800;color:#db2777;letter-spacing:1px;
+  transition:.3s;
 }
-.pred-value.val-tai{color:#60a5fa;text-shadow:0 0 24px rgba(96,165,250,.7)}
-.pred-value.val-xiu{color:#f87171;text-shadow:0 0 24px rgba(248,113,113,.7)}
-.pred-value.val-locked{opacity:.7}
-.pred-percent{font-size:12px;color:#64748b;font-weight:500}
-.pred-percent.locked{color:#fbbf24}
+.pred-value.val-tai{color:#2563eb;}
+.pred-value.val-xiu{color:#dc2626;}
+.pred-value.val-locked{opacity:.8}
+.pred-percent{font-size:12px;color:#c084a8;font-weight:500}
+.pred-percent.locked{color:#d97706}
 .pred-right{text-align:right;z-index:2}
-.session-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:4px;display:block;letter-spacing:.5px}
-.session-value{font-size:16px;font-weight:800;color:#e2e8f0;text-shadow:0 0 10px rgba(96,165,250,.2)}
+.session-label{font-size:12px;color:#c084a8;font-weight:600;text-transform:uppercase;margin-bottom:4px;display:block;letter-spacing:.5px}
+.session-value{font-size:16px;font-weight:800;color:#4a3f4f}
 
 .pred-result-flash{
   position:absolute;top:0;left:0;width:100%;height:100%;
-  background:rgba(16,185,129,0.15);
+  background:rgba(16,185,129,0.12);
   display:none;flex-direction:column;align-items:center;justify-content:center;
   font-size:26px;font-weight:800;z-index:10;animation:fadeIn 0.2s;
   backdrop-filter:blur(4px);
 }
-.pred-result-flash.lose{background:rgba(239,68,68,0.15)}
-.pred-result-flash .text-win{color:#34d399;text-shadow:0 0 30px rgba(52,211,153,.8)}
-.pred-result-flash .text-lose{color:#f87171;text-shadow:0 0 30px rgba(248,113,113,.8)}
-.pred-result-flash small{font-size:14px;font-weight:600;color:#cbd5e1;margin-top:4px}
+.pred-result-flash.lose{background:rgba(239,68,68,0.12)}
+.pred-result-flash .text-win{color:#059669}
+.pred-result-flash .text-lose{color:#dc2626}
+.pred-result-flash small{font-size:14px;font-weight:600;color:#6b7280;margin-top:4px}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
 .pred-result-flash .text-win, .pred-result-flash .text-lose{animation:pulse 0.5s ease}
 
 .info-grid{
   display:grid;grid-template-columns:1fr 1fr;
-  border:1px solid rgba(96,165,250,0.15);border-radius:12px;margin-bottom:20px;overflow:hidden;
-  background:#0b1220;
+  border:1px solid rgba(244,114,182,0.2);border-radius:12px;margin-bottom:20px;overflow:hidden;
+  background:#fff5f7;
 }
-.info-item{padding:15px 20px;border-bottom:1px solid rgba(96,165,250,0.1)}
-.info-item:nth-child(odd){border-right:1px solid rgba(96,165,250,0.1)}
+.info-item{padding:15px 20px;border-bottom:1px solid rgba(244,114,182,0.12)}
+.info-item:nth-child(odd){border-right:1px solid rgba(244,114,182,0.12)}
 .info-item:nth-last-child(-n+2){border-bottom:none}
-.info-label{font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:6px;display:block;letter-spacing:.5px}
-.info-value{font-size:15px;font-weight:700;color:#e2e8f0}
-.info-item.highlight{background:rgba(96,165,250,.05)!important}
+.info-label{font-size:11px;color:#c084a8;font-weight:600;text-transform:uppercase;margin-bottom:6px;display:block;letter-spacing:.5px}
+.info-value{font-size:15px;font-weight:700;color:#4a3f4f}
+.info-item.highlight{background:rgba(244,114,182,.06)!important}
 
 .action-buttons{display:flex;gap:12px;margin-bottom:25px;flex-wrap:wrap}
 .btn-action{
-  padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;
+  padding:10px 20px;border:none;border-radius:10px;font-size:14px;font-weight:700;
   cursor:pointer;display:flex;align-items:center;gap:8px;color:#fff;transition:.2s;
 }
 .btn-toggle-auto{background:linear-gradient(135deg,#10b981,#34d399);box-shadow:0 4px 14px rgba(16,185,129,.3)}
-.btn-toggle-auto.off{background:linear-gradient(135deg,#3b82f6,#60a5fa);box-shadow:0 4px 14px rgba(59,130,246,.3)}
+.btn-toggle-auto.off{background:linear-gradient(135deg,#ec4899,#f472b6);box-shadow:0 4px 14px rgba(236,72,153,.3)}
 .btn-stop-bot{background:linear-gradient(135deg,#ef4444,#f87171);box-shadow:0 4px 14px rgba(239,68,68,.3)}
-.btn-action:hover{transform:translateY(-2px);filter:brightness(1.1)}
+.btn-action:hover{transform:translateY(-2px);filter:brightness(1.05)}
 
-.table-title{font-size:13px;color:#93c5fd;font-weight:600;text-transform:uppercase;margin-bottom:15px;letter-spacing:.5px}
+.table-title{font-size:13px;color:#db2777;font-weight:700;text-transform:uppercase;margin-bottom:15px;letter-spacing:.5px}
 .table-wrapper{overflow-x:auto;border-radius:8px}
 table{width:100%;border-collapse:collapse;font-size:13px;min-width:480px}
 th{
-  text-align:left;padding:12px 8px;color:#94a3b8;font-weight:600;
-  border-bottom:1px solid rgba(96,165,250,0.15);font-size:11px;text-transform:uppercase;
-  background:rgba(96,165,250,.04);letter-spacing:.5px;white-space:nowrap;
+  text-align:left;padding:12px 8px;color:#9d6b8c;font-weight:600;
+  border-bottom:1px solid rgba(244,114,182,0.2);font-size:11px;text-transform:uppercase;
+  background:rgba(244,114,182,.05);letter-spacing:.5px;white-space:nowrap;
 }
-td{padding:12px 8px;border-bottom:1px solid #1e293b;font-weight:600;color:#cbd5e1;white-space:nowrap}
-tr:hover td{background:rgba(96,165,250,.04)}
-.val-tai{color:#60a5fa;text-shadow:0 0 8px rgba(96,165,250,.4)}
-.val-xiu{color:#f87171;text-shadow:0 0 8px rgba(248,113,113,.4)}
-.val-win{color:#34d399;text-shadow:0 0 8px rgba(52,211,153,.4)}
-.val-lose{color:#f87171;text-shadow:0 0 8px rgba(248,113,113,.4)}
+td{padding:12px 8px;border-bottom:1px solid #fce7f3;font-weight:600;color:#6b7280;white-space:nowrap}
+tr:hover td{background:rgba(244,114,182,.04)}
+.val-tai{color:#2563eb;}
+.val-xiu{color:#dc2626;}
+.val-win{color:#059669;}
+.val-lose{color:#dc2626;}
 .bet-tag{
   display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;
   font-weight:700;margin-left:6px;letter-spacing:.3px;
 }
-.bet-tag.tai{background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.3)}
-.bet-tag.xiu{background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.3)}
+.bet-tag.tai{background:rgba(37,99,235,.12);color:#2563eb;border:1px solid rgba(37,99,235,.25)}
+.bet-tag.xiu{background:rgba(220,38,38,.12);color:#dc2626;border:1px solid rgba(220,38,38,.25)}
 
 .toast-wrap{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:320px}
 .toast{
-  padding:12px 16px;border-radius:8px;color:#fff;font-weight:600;font-size:13px;
-  box-shadow:0 8px 24px rgba(0,0,0,.5);animation:slideIn .3s;backdrop-filter:blur(8px);
+  padding:12px 16px;border-radius:10px;color:#fff;font-weight:600;font-size:13px;
+  box-shadow:0 8px 24px rgba(0,0,0,.15);animation:slideIn .3s;backdrop-filter:blur(8px);
 }
-.toast.success{background:linear-gradient(135deg,rgba(16,185,129,.9),rgba(52,211,153,.9));border:1px solid rgba(52,211,153,.5)}
-.toast.error{background:linear-gradient(135deg,rgba(239,68,68,.9),rgba(248,113,113,.9));border:1px solid rgba(248,113,113,.5)}
-.toast.info{background:linear-gradient(135deg,rgba(59,130,246,.9),rgba(96,165,250,.9));border:1px solid rgba(96,165,250,.5)}
-.toast.warn{background:linear-gradient(135deg,rgba(245,158,11,.9),rgba(251,191,36,.9));border:1px solid rgba(251,191,36,.5)}
+.toast.success{background:linear-gradient(135deg,rgba(16,185,129,.95),rgba(52,211,153,.95));border:1px solid rgba(52,211,153,.5)}
+.toast.error{background:linear-gradient(135deg,rgba(239,68,68,.95),rgba(248,113,113,.95));border:1px solid rgba(248,113,113,.5)}
+.toast.info{background:linear-gradient(135deg,rgba(236,72,153,.95),rgba(244,114,182,.95));border:1px solid rgba(244,114,182,.5)}
+.toast.warn{background:linear-gradient(135deg,rgba(245,158,11,.95),rgba(251,191,36,.95));border:1px solid rgba(251,191,36,.5)}
 @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
 
 .spinner{
@@ -337,25 +296,25 @@ tr:hover td{background:rgba(96,165,250,.04)}
 @keyframes flashBalance{0%{background:rgba(52,211,153,.25)}100%{background:transparent}}
 
 ::-webkit-scrollbar{width:8px;height:8px}
-::-webkit-scrollbar-track{background:#0b1220}
-::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}
-::-webkit-scrollbar-thumb:hover{background:#334155}
+::-webkit-scrollbar-track{background:#fff5f7}
+::-webkit-scrollbar-thumb{background:#fbcfe8;border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:#f9a8d4}
 
 .force-modal{
-  position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);
+  position:fixed;inset:0;background:rgba(74,63,79,.6);backdrop-filter:blur(6px);
   z-index:10000;display:none;align-items:center;justify-content:center;padding:20px;
 }
 .force-modal.show{display:flex}
 .force-modal-box{
-  background:#111827;border:1px solid rgba(239,68,68,.4);border-radius:16px;
+  background:#fff;border:1px solid rgba(239,68,68,.3);border-radius:20px;
   padding:30px;max-width:400px;width:100%;text-align:center;
-  box-shadow:0 20px 60px rgba(0,0,0,.8);
+  box-shadow:0 20px 60px rgba(0,0,0,.3);
 }
-.force-modal-box h2{color:#f87171;font-size:22px;margin-bottom:12px}
-.force-modal-box p{color:#cbd5e1;font-size:14px;margin-bottom:20px;line-height:1.6}
+.force-modal-box h2{color:#dc2626;font-size:22px;margin-bottom:12px}
+.force-modal-box p{color:#6b7280;font-size:14px;margin-bottom:20px;line-height:1.6}
 .force-modal-box button{
-  padding:12px 24px;border:none;border-radius:8px;cursor:pointer;
-  background:linear-gradient(135deg,#3b82f6,#60a5fa);color:#fff;
+  padding:12px 24px;border:none;border-radius:10px;cursor:pointer;
+  background:linear-gradient(135deg,#ec4899,#f472b6);color:#fff;
   font-weight:700;font-size:14px;
 }
 </style>
@@ -390,7 +349,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
     <div class="drawer-field">
       <label>Tiền cược mỗi phiên <span class="saved-indicator" id="savedBetAmount">✓ đã lưu</span></label>
       <input type="number" id="betAmount" value="10000" min="1000" step="1000" onchange="onConfigChange()">
-      <div class="drawer-hint">Số tiền cố định    </div>
+      <div class="drawer-hint">Số tiền cố định mỗi phiên</div>
     </div>
   </div>
 
@@ -399,35 +358,14 @@ tr:hover td{background:rgba(96,165,250,.04)}
     <div class="drawer-field">
       <label>Số tiền lãi muốn chốt <span class="saved-indicator" id="savedTargetProfit">✓ đã lưu</span></label>
       <input type="number" id="targetProfit" value="0" min="0" step="1000" onchange="onConfigChange()">
-      <div class="drawer-hint">CHỐT LÃI TỰ ĐỘNG TẮT</div>
-    </div>
-  </div>
-
-  <!-- TÍNH NĂNG GẤP X2 -->
-  <div class="drawer-section">
-    <div class="drawer-section-title">CẤU HÌNH GẤP X2 (MARTINGALE)</div>
-    <div class="drawer-field" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-      <label style="margin-bottom:0">Bật gấp x2 sau mỗi phiên thua</label>
-      <label class="switch">
-        <input type="checkbox" id="toggleMartingale" onchange="onConfigChange()">
-        <span class="slider"></span>
-      </label>
-    </div>
-    <div class="drawer-field">
-      <label>Tiền cược gốc mỗi phiên (khi thắng)</label>
-      <input type="number" id="baseBetAmount" value="1000" min="1000" step="1000" onchange="onConfigChange()">
-    </div>
-    <div class="drawer-field">
-      <label>Mức cược thấp nhất (khi gãy >2 tay)</label>
-      <input type="number" id="minBetAmount" value="1000" min="1000" step="1000" onchange="onConfigChange()">
-      <div class="drawer-hint">Tự động reset về mức này nếu thua liên tiếp 3 tay</div>
+      <div class="drawer-hint">Đặt 0 để tắt chốt lãi tự động</div>
     </div>
   </div>
 
   <div class="drawer-section">
-    <div class="drawer-section-title">SIKIBIDI</div>
-    <button class="btn-apply" style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3);box-shadow:none;margin-bottom:10px" onclick="resetHistory()">🗑 XÓA LỊCH SỬ</button>
-    <button class="btn-apply" style="background:rgba(71,85,105,.3);color:#94a3b8;border:1px solid #334155;box-shadow:none" onclick="logout()">🚪 ĐĂNG XUẤT</button>
+    <div class="drawer-section-title">HỆ THỐNG</div>
+    <button class="btn-apply" style="background:rgba(239,68,68,.12);color:#dc2626;border:1px solid rgba(239,68,68,.25);box-shadow:none;margin-bottom:10px" onclick="resetHistory()">🗑 XÓA LỊCH SỬ</button>
+    <button class="btn-apply" style="background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;box-shadow:none" onclick="logout()">🚪 ĐĂNG XUẤT</button>
   </div>
 
   <div class="drawer-section">
@@ -441,13 +379,18 @@ tr:hover td{background:rgba(96,165,250,.04)}
 
 <div class="login-container" id="loginView">
   <h2>ĐĂNG NHẬP HỆ THỐNG</h2>
+  <p class="login-sub">Nhập đầy đủ tài khoản, mật khẩu và KEY để truy cập</p>
   <div class="form-group">
     <label>Tài khoản</label>
     <input type="text" id="username" placeholder="Nhập tài khoản game...">
   </div>
   <div class="form-group">
     <label>Mật khẩu</label>
-    <input type="password" id="password" placeholder="Nhập mật khẩu..." onkeydown="if(event.key==='Enter')handleLogin()">
+    <input type="password" id="password" placeholder="Nhập mật khẩu...">
+  </div>
+  <div class="form-group">
+    <label>KEY truy cập 🔑</label>
+    <input type="text" id="accessKey" class="key-input" placeholder="Nhập KEY do admin cấp..." onkeydown="if(event.key==='Enter')handleLogin()">
   </div>
   <button class="btn-login" id="btnLogin" onclick="handleLogin()">ĐĂNG NHẬP</button>
 
@@ -501,7 +444,7 @@ tr:hover td{background:rgba(96,165,250,.04)}
 
     <div class="action-buttons">
       <button class="btn-action btn-toggle-auto off" id="btnToggleAuto" onclick="toggleAuto()"><span>▶</span> BẬT AUTO</button>
-      <button class="btn-action btn-stop-bot" onclick="stopBot()"><span></span> NGẮT BOT</button>
+      <button class="btn-action btn-stop-bot" onclick="stopBot()"><span>⛔</span> NGẮT BOT</button>
     </div>
 
     <div class="table-title">LỊCH SỬ CƯỢC</div>
@@ -538,10 +481,6 @@ let targetProfitReached = false;
 let lockedBetSession = null;
 let lockedBetSide = null;
 let lockedBetAmount = 0;
-
-/* 🎲 QUẢN LÝ GẤP X2 */
-let lossStreak = 0; // Chuỗi thua liên tiếp
-let currentBetAmount = 0; // Mức cược hiện tại đang áp dụng
 
 const STORAGE_KEY_BALANCE = 'lc79_balance';
 const STORAGE_KEY_CONFIG  = 'lc79_config';
@@ -587,7 +526,7 @@ function toggleDrawer(){
 }
 
 /* ============================================
-   CONFIG & GẤP X2 LOGIC
+   CONFIG
 ============================================ */
 function loadConfig(){ try{ const r=localStorage.getItem(STORAGE_KEY_CONFIG); return r?JSON.parse(r):null; }catch(e){ return null; } }
 function saveConfig(cfg){ try{ localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify({...cfg,timestamp:Date.now()})); }catch(e){} }
@@ -596,18 +535,12 @@ function applyConfigToInputs(cfg){
   if(!cfg)return;
   if(cfg.betAmount!==undefined) document.getElementById('betAmount').value = cfg.betAmount;
   if(cfg.targetProfit!==undefined) document.getElementById('targetProfit').value = cfg.targetProfit;
-  if(cfg.martingaleEnabled!==undefined) document.getElementById('toggleMartingale').checked = cfg.martingaleEnabled;
-  if(cfg.baseBetAmount!==undefined) document.getElementById('baseBetAmount').value = cfg.baseBetAmount;
-  if(cfg.minBetAmount!==undefined) document.getElementById('minBetAmount').value = cfg.minBetAmount;
 }
 
 function readConfigFromInputs(){
   return {
     betAmount: parseInt(document.getElementById('betAmount').value) || 10000,
-    targetProfit: parseInt(document.getElementById('targetProfit').value) || 0,
-    martingaleEnabled: document.getElementById('toggleMartingale').checked,
-    baseBetAmount: parseInt(document.getElementById('baseBetAmount').value) || 1000,
-    minBetAmount: parseInt(document.getElementById('minBetAmount').value) || 1000
+    targetProfit: parseInt(document.getElementById('targetProfit').value) || 0
   };
 }
 
@@ -623,7 +556,6 @@ function onConfigChange(){
   showSavedIndicator('savedTargetProfit');
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>pushConfigToServer(cfg),500);
-  updateBetCalculation();
 }
 
 function apiHeaders(){
@@ -640,11 +572,7 @@ async function pushConfigToServer(cfg){
       body:JSON.stringify({
         auto_bet_enabled: autoOn,
         betAmount: cfg.betAmount,
-        targetProfit: cfg.targetProfit,
-        // Gửi thêm cấu hình gấp x2 nếu backend hỗ trợ
-        martingaleEnabled: cfg.martingaleEnabled,
-        baseBetAmount: cfg.baseBetAmount,
-        minBetAmount: cfg.minBetAmount
+        targetProfit: cfg.targetProfit
       })
     });
     const d = await r.json();
@@ -656,29 +584,6 @@ async function pushConfigToServer(cfg){
     }
     toast('💾 Đã lưu cài đặt cược','success');
   }catch(e){ toast('Lỗi lưu cài đặt: '+e.message,'error'); }
-}
-
-// Tính toán mức cược dựa trên chuỗi thua
-function updateBetCalculation() {
-  const cfg = readConfigFromInputs();
-  if (!cfg.martingaleEnabled) {
-    currentBetAmount = cfg.betAmount;
-    return;
-  }
-
-  if (lossStreak === 0) {
-    currentBetAmount = cfg.baseBetAmount;
-  } else if (lossStreak <= 2) {
-    // Thua 1 hoặc 2 tay: x2 mỗi lần
-    currentBetAmount = cfg.baseBetAmount * Math.pow(2, lossStreak);
-  } else {
-    // Thua quá 2 tay (tức 3 lần thua liên tiếp trở lên): reset về mức thấp nhất
-    currentBetAmount = cfg.minBetAmount;
-    // Reset lossStreak về 0 để bắt đầu lại chu kỳ mới
-    lossStreak = 0; 
-    toast('🔄 Đã gãy quá 2 tay, tự động reset về mức cược thấp nhất: ' + cfg.minBetAmount.toLocaleString() + 'đ', 'warn');
-  }
-  document.getElementById('betAmount').value = currentBetAmount;
 }
 
 /* ============================================
@@ -706,7 +611,7 @@ function showResultFlash(isWin, result, betSide, actualSide){
   clearTimeout(showResultFlash._t);
   showResultFlash._t=setTimeout(()=>{
     flash.style.display='none';
-    box.style.borderColor = lockedBetSession ? 'rgba(251,191,36,.5)' : 'rgba(96,165,250,0.2)';
+    box.style.borderColor = lockedBetSession ? 'rgba(251,191,36,.5)' : 'rgba(244,114,182,0.3)';
   },4000);
 }
 
@@ -751,7 +656,7 @@ function loadBalance(){ try{ const r=localStorage.getItem(STORAGE_KEY_BALANCE); 
 function updateProfitUI(profit){
   const pl=document.getElementById('plDisplay');
   pl.innerText=(profit>=0?'+':'')+Number(profit).toLocaleString();
-  pl.style.color=profit>=0?'#34d399':'#f87171';
+  pl.style.color=profit>=0?'#059669':'#dc2626';
 }
 
 /* ============================================
@@ -899,28 +804,6 @@ function processResult(payload){
       payload.is_win = calculatedWin;
     }
 
-    // 🎲 CẬP NHẬT CHUỖI THUA & TÍNH LẠI CƯỢC
-    const cfg = readConfigFromInputs();
-    if (cfg.martingaleEnabled) {
-      if (payload.is_win) {
-        lossStreak = 0; // Thắng -> reset chuỗi
-        toast('🏆 Thắng : ' + cfg.baseBetAmount.toLocaleString() + 'đ', 'success');
-      } else {
-        lossStreak++; // Thua -> tăng chuỗi
-        if (lossStreak > 2) {
-          lossStreak = 0; // Gãy quá 2 tay -> reset về 0 (sẽ tính mức min)
-          toast('💀 Gãy quá 2 tay! Tự động reset về mức cược thấp nhất: ' + cfg.minBetAmount.toLocaleString() + 'đ', 'error');
-        } else {
-          toast('📉 Thua! Chuỗi thua: ' + lossStreak + '. Tăng cược lên: ' + (cfg.baseBetAmount * Math.pow(2, lossStreak)).toLocaleString() + 'đ', 'warn');
-        }
-      }
-      updateBetCalculation();
-      // Cập nhật lại giá trị ô input
-      document.getElementById('betAmount').value = currentBetAmount;
-      saveConfig(readConfigFromInputs());
-      pushConfigToServer(readConfigFromInputs());
-    }
-
     showResultFlash(payload.is_win, payload.result, actualBetSide, actualBetSide);
   }
 }
@@ -931,7 +814,10 @@ function processResult(payload){
 async function handleLogin(){
   const u = document.getElementById('username').value.trim();
   const p = document.getElementById('password').value.trim();
-  if(!u || !p) return toast('Nhập đủ tài khoản/mật khẩu','error');
+  const key = document.getElementById('accessKey').value.trim();
+
+  if(!u || !p) return toast('Vui lòng nhập đầy đủ tài khoản và mật khẩu','error');
+  if(!key) return toast('Vui lòng nhập KEY truy cập do admin cấp','error');
 
   const btn=document.getElementById('btnLogin');
   btn.disabled=true;
@@ -941,7 +827,7 @@ async function handleLogin(){
     const r=await fetch('/api/login',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ username: u, password: p, device: getDeviceId() })
+      body:JSON.stringify({ username: u, password: p, device: getDeviceId(), key: key })
     });
     const d=await r.json();
 
@@ -991,13 +877,13 @@ function connectSocket(sid){
 
   socket.on('connect',()=>{
     document.getElementById('statusText').innerText='Đã kết nối Server';
-    document.getElementById('statusText').style.color='#34d399';
+    document.getElementById('statusText').style.color='#059669';
     if(sid) socket.emit('join_session', { sid: sid });
     setTimeout(pollStats, 300);
   });
   socket.on('disconnect',()=>{
     document.getElementById('statusText').innerText='Mất kết nối Server';
-    document.getElementById('statusText').style.color='#f87171';
+    document.getElementById('statusText').style.color='#dc2626';
   });
 
   socket.on('toast',d=>toast(d.msg,d.type));
@@ -1119,17 +1005,17 @@ function applyState(s){
   const statusTxt=document.getElementById('statusText');
 
   if(autoOn){
-    btn.innerHTML='<span></span> TẮT AUTO'; btn.classList.remove('off');
+    btn.innerHTML='<span>⏸</span> TẮT AUTO'; btn.classList.remove('off');
     badge.className='badge badge-auto';
     badge.innerHTML='<div class="dot dot-green"></div> AUTO: ĐANG CHẠY';
     statusTxt.innerText='Đang tự động đặt cược';
-    statusTxt.style.color='#34d399';
+    statusTxt.style.color='#059669';
   }else{
     btn.innerHTML='<span>▶</span> BẬT AUTO'; btn.classList.add('off');
     badge.className='badge badge-auto off';
     badge.innerHTML='<div class="dot dot-gray"></div> AUTO: ĐANG TẮT';
     statusTxt.innerText='Đang chờ lệnh';
-    statusTxt.style.color='#64748b';
+    statusTxt.style.color='#9ca3af';
   }
 
   if(s.history) renderHistory(s.history);
@@ -1142,7 +1028,7 @@ function renderHistory(rows){
   const tb=document.getElementById('historyBody');
   tb.innerHTML='';
   if(!rows||!rows.length){
-    tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:#475569;padding:20px">Chưa có lịch sử</td></tr>';
+    tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:#d8b4c8;padding:20px">Chưa có lịch sử</td></tr>';
     return;
   }
   rows.forEach(r=>{
@@ -1159,8 +1045,8 @@ function renderHistory(rows){
         : '—';
     const dice = Array.isArray(r.dice)?r.dice.slice(0,3).join(' - '):'—';
 
-    if(r.win===true) tr.style.background='rgba(52,211,153,.06)';
-    else if(r.win===false) tr.style.background='rgba(248,113,113,.06)';
+    if(r.win===true) tr.style.background='rgba(16,185,129,.06)';
+    else if(r.win===false) tr.style.background='rgba(239,68,68,.06)';
 
     tr.innerHTML=`
       <td>#${r.session}</td>
@@ -1186,10 +1072,7 @@ async function toggleAuto(){
       body:JSON.stringify({
         auto_bet_enabled:newVal,
         betAmount:cfg.betAmount,
-        targetProfit:cfg.targetProfit,
-        martingaleEnabled: cfg.martingaleEnabled,
-        baseBetAmount: cfg.baseBetAmount,
-        minBetAmount: cfg.minBetAmount
+        targetProfit:cfg.targetProfit
       })
     });
     const d = await r.json();
@@ -1202,8 +1085,6 @@ async function toggleAuto(){
     }
     if(newVal){
       targetProfitReached = false;
-      lossStreak = 0; // Reset chuỗi thua khi bật auto
-      updateBetCalculation();
       requestWakeLock();
     }
     toast(newVal?'✅ Đã bật chế độ Auto Cược':'⏸ Đã tắt chế độ Auto Cược',newVal?'success':'info');
@@ -1218,7 +1099,7 @@ async function stopBot(){
       headers: apiHeaders(),
       body:JSON.stringify({auto_bet_enabled:false})
     });
-    autoOn=false; targetProfitReached=false; lossStreak=0; toast('Đã ngắt Bot khẩn cấp','error'); pollStats();
+    autoOn=false; targetProfitReached=false; toast('Đã ngắt Bot khẩn cấp','error'); pollStats();
   }catch(e){ toast('Lỗi: '+e.message,'error'); }
 }
 
@@ -1229,11 +1110,9 @@ async function resetHistory(){
     toast('Đã xóa lịch sử','success');
     updateProfitUI(0);
     targetProfitReached = false;
-    lossStreak = 0;
     localStorage.removeItem(STORAGE_KEY_BALANCE);
     lastProcessedSession=0;
     lockedBetSession=null; lockedBetSide=null; lockedBetAmount=0;
-    updateBetCalculation();
   }catch(e){ toast('Lỗi: '+e.message,'error'); }
 }
 
