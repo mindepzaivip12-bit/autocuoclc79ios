@@ -1,8 +1,10 @@
 import eventlet
 eventlet.monkey_patch()
 
-import os, json, time, base64, hashlib, logging, threading, re
+import os, json, time, base64, hashlib, logging, threading, re, secrets
 import requests
+from datetime import datetime, timedelta
+from functools import wraps
 from flask import Flask, render_template, request, jsonify, session
 from flask_socketio import SocketIO
 from socketio import Client as SocketClient
@@ -16,7 +18,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet',
                     ping_timeout=60, ping_interval=25)
 
 # ==========================================
-# CẤU HÌNH
+# CẤU HÌNH GAME
 # ==========================================
 API_LOGIN_URL   = "https://apifo88daigia.tele68.com/api"
 API_LOBBY_URL   = "https://wlb.tele68.com/v1/lobby/auth/login"
@@ -26,6 +28,20 @@ GAME_WS_URL     = "https://wtxmd52.tele68.com"
 GAME_WS_PATH    = "txmd5/"
 GAME_WS_NS      = "/txmd5"
 COMMON_PARAMS   = "cp=R&cl=R&pf=web"
+
+# ==========================================
+# 📌 LICENSE SERVER CONFIG (TỪ XA)
+# ==========================================
+LICENSE_SERVER_URL = os.environ.get(
+    "LICENSE_SERVER_URL",
+    "https://license-server-cua-ban.onrender.com"   # ← ĐỔI URL SERVER KEY CỦA BẠN
+).rstrip("/")
+LICENSE_API_KEY   = os.environ.get("LICENSE_API_KEY", "").strip()
+LICENSE_CACHE_TTL = 30   # giây — cache status để giảm request server
+
+# Cache: key -> {"data": {...}, "ts": epoch}
+_LICENSE_CACHE = {}
+_LICENSE_CACHE_LOCK = threading.Lock()
 
 # ==========================================
 # GLOBAL DATA
@@ -39,6 +55,262 @@ WS_CLIENTS   = {}
 
 API_LAST_RAW   = {"data": None, "ts": 0, "error": None}
 ADMIN_LAST_RAW = {"data": None, "ts": 0, "error": None, "last_push_ts": 0}
+
+# ==========================================
+# 🔑 LICENSE CLIENT — GỌI SERVER TỪ XA
+# ==========================================
+def _license_headers():
+    h = {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+        "User-Agent": "BotClient/1.0",
+    }
+    if LICENSE_API_KEY:
+        h["X-Api-Key"] = LICENSE_API_KEY
+        h["Authorization"] = f"Bearer {LICENSE_API_KEY}"
+    return h
+
+def _now_ts():
+    return int(time.time())
+
+def _cache_get(key):
+    with _LICENSE_CACHE_LOCK:
+        item = _LICENSE_CACHE.get(key)
+    if not item:
+        return None
+    if _now_ts() - item["ts"] > LICENSE_CACHE_TTL:
+        return None
+    return item["data"]
+
+def _cache_set(key, data):
+    with _LICENSE_CACHE_LOCK:
+        _LICENSE_CACHE[key] = {"data": data, "ts": _now_ts()}
+
+def _cache_clear(key=None):
+    with _LICENSE_CACHE_LOCK:
+        if key:
+            _LICENSE_CACHE.pop(key, None)
+        else:
+            _LICENSE_CACHE.clear()
+
+def license_check(key, fingerprint=None):
+    """
+    Kiểm tra key với server. Trả dict:
+      {ok, valid, expired, revoked, expires_at, time_left, max_devices,
+       devices, message, code}
+    """
+    key = (key or "").strip().upper()
+    if not key:
+        return {"ok": False, "valid": False, "expired": False, "revoked": False,
+                "message": "Thiếu key", "code": "NO_KEY"}
+
+    # cache cho key + fingerprint (nếu có bind)
+    cache_key = f"{key}|{fingerprint or '-'}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        params = {"key": key}
+        if fingerprint:
+            params["fingerprint"] = fingerprint
+        r = requests.get(
+            f"{LICENSE_SERVER_URL}/api/license/check",
+            params=params,
+            headers=_license_headers(),
+            timeout=6,
+        )
+        if r.status_code == 404:
+            res = {"ok": False, "valid": False, "expired": False, "revoked": False,
+                   "message": "Key không tồn tại", "code": "NOT_FOUND"}
+        else:
+            r.raise_for_status()
+            res = r.json() if r.text.strip().startswith("{") else {"raw": r.text}
+            res.setdefault("ok", True)
+    except Exception as e:
+        logger.error(f"[License] Check fail: {e}")
+        return {"ok": False, "valid": False, "expired": False, "revoked": False,
+                "message": f"Không kết nối được server key: {e}", "code": "SERVER_ERROR"}
+
+    _cache_set(cache_key, res)
+    return res
+
+def license_activate(key, fingerprint, ip=None, ua=None):
+    """
+    Kích hoạt key + bind thiết bị với server.
+    Server chịu trách nhiệm enforce 1 key = N thiết bị.
+    """
+    key = (key or "").strip().upper()
+    if not key:
+        return {"ok": False, "success": False, "message": "Thiếu key", "code": "NO_KEY"}
+
+    payload = {"key": key, "fingerprint": fingerprint, "ip": ip, "ua": ua}
+    try:
+        r = requests.post(
+            f"{LICENSE_SERVER_URL}/api/license/activate",
+            json=payload,
+            headers=_license_headers(),
+            timeout=8,
+        )
+        data = r.json() if r.text.strip().startswith("{") else {}
+        if r.status_code in (200, 201):
+            data.setdefault("ok", True)
+            data.setdefault("success", True)
+            _cache_clear()
+            return data
+        else:
+            data.setdefault("ok", False)
+            data.setdefault("success", False)
+            data.setdefault("message", data.get("error") or f"HTTP {r.status_code}")
+            return data
+    except Exception as e:
+        logger.error(f"[License] Activate fail: {e}")
+        return {"ok": False, "success": False,
+                "message": f"Không kết nối được server key: {e}",
+                "code": "SERVER_ERROR"}
+
+def license_heartbeat(key, fingerprint):
+    """Báo server biết key còn sống (dùng trong watchdog)."""
+    key = (key or "").strip().upper()
+    try:
+        requests.post(
+            f"{LICENSE_SERVER_URL}/api/license/heartbeat",
+            json={"key": key, "fingerprint": fingerprint, "ts": _now_ts()},
+            headers=_license_headers(),
+            timeout=4,
+        )
+        return True
+    except Exception:
+        return False
+
+def _is_license_valid(res):
+    if not isinstance(res, dict):
+        return False
+    if not res.get("ok", False):
+        return False
+    if res.get("revoked"):
+        return False
+    if res.get("expired"):
+        return False
+    if res.get("valid") is False:
+        return False
+    left = res.get("time_left")
+    if isinstance(left, (int, float)) and left <= 0:
+        return False
+    return True
+
+def _license_msg(res):
+    if not isinstance(res, dict):
+        return "Key không hợp lệ"
+    return (res.get("message")
+            or res.get("error")
+            or ("Key đã hết hạn sử dụng" if res.get("expired") else "Key không hợp lệ"))
+
+def _license_time_left(res):
+    if not isinstance(res, dict):
+        return 0
+    if isinstance(res.get("time_left"), (int, float)):
+        return max(0, int(res["time_left"]))
+    exp = res.get("expires_at")
+    if isinstance(exp, (int, float)):
+        return max(0, int(exp) - _now_ts())
+    return 0
+
+def _client_ip():
+    return (request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+            or request.remote_addr or "unknown")
+
+def _client_ua():
+    return request.headers.get("User-Agent", "unknown")
+
+def _device_fingerprint(ip, ua):
+    raw = f"{ip or 'unknown'}|{ua or 'unknown'}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:32]
+
+def require_license(f):
+    """Decorator bảo vệ route — key phải còn hạn trên server."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        sid = session.get("sid")
+        if not sid or sid not in WEB_SESSIONS:
+            return jsonify({"success": False, "error": "Chưa đăng nhập", "code": "NO_SESSION"}), 401
+        st = WEB_SESSIONS[sid]
+        key = st.get("license_key")
+        fp = st.get("license_fp")
+        if not key:
+            return jsonify({"success": False, "error": "Chưa kích hoạt key", "code": "NO_KEY"}), 401
+
+        res = license_check(key, fp)
+        if not _is_license_valid(res):
+            _force_logout(sid, reason="KEY_EXPIRED")
+            return jsonify({
+                "success": False,
+                "error": _license_msg(res) or "Key đã hết hạn sử dụng",
+                "code": res.get("code") or "KEY_EXPIRED",
+            }), 403
+        return f(*args, **kwargs)
+    return wrapper
+
+def _force_logout(sid, reason="MANUAL"):
+    st = WEB_SESSIONS.get(sid)
+    if st:
+        try:
+            push_telemetry_to_admin("force_logout", sid=sid, st=st, extra={"reason": reason})
+        except Exception:
+            pass
+    if sid in WS_CLIENTS:
+        try:
+            WS_CLIENTS[sid].disconnect()
+        except Exception:
+            pass
+        WS_CLIENTS.pop(sid, None)
+    WEB_SESSIONS.pop(sid, None)
+    try:
+        socketio.emit("force_logout", {"reason": reason}, to=sid)
+    except Exception:
+        pass
+    logger.warning(f"[License] 🚪 Force logout {sid} — {reason}")
+
+# ==========================================
+# LICENSE WATCHDOG — 30s check + heartbeat
+# ==========================================
+def license_watchdog_worker():
+    logger.info("[License Watchdog] started")
+    while True:
+        try:
+            for sid, st in list(WEB_SESSIONS.items()):
+                key = st.get("license_key")
+                fp  = st.get("license_fp")
+                if not key:
+                    continue
+
+                # clear cache để chắc chắn lấy trạng thái mới
+                _cache_clear(f"{key}|{fp or '-'}")
+                res = license_check(key, fp)
+
+                if not _is_license_valid(res):
+                    socketio.emit("toast", {
+                        "type": "error",
+                        "msg": f"⛔ {_license_msg(res) or 'Key đã hết hạn sử dụng'} — đăng xuất"
+                    }, to=sid)
+                    _force_logout(sid, reason="KEY_EXPIRED")
+                    continue
+
+                # heartbeat nhẹ
+                license_heartbeat(key, fp)
+
+                left = _license_time_left(res)
+                if 0 < left <= 300 and not st.get("_warned_expiry"):
+                    st["_warned_expiry"] = True
+                    socketio.emit("toast", {
+                        "type": "warning",
+                        "msg": f"⚠️ Key còn {left // 60} phút sử dụng"
+                    }, to=sid)
+        except Exception as e:
+            logger.error(f"[License Watchdog] {e}")
+        socketio.sleep(30)
+
+socketio.start_background_task(license_watchdog_worker)
 
 # ==========================================
 # ✅ HÀM CHUẨN HÓA SIDE
@@ -86,7 +358,6 @@ def _admin_headers():
     return headers
 
 def fetch_admin_config(username=None, sid=None):
-    """Lấy cấu hình / trạng thái điều khiển từ Render Admin."""
     endpoints = ["/api/config", "/api/bot/config", "/config", "/"]
     params = {"_t": int(time.time() * 1000)}
     if username:
@@ -120,7 +391,6 @@ def fetch_admin_config(username=None, sid=None):
     return ADMIN_LAST_RAW.get("data")
 
 def apply_admin_config_to_session(st, sid, admin_cfg):
-    """Áp dụng cấu hình từ Admin vào session nếu có thay đổi."""
     if not isinstance(admin_cfg, dict):
         return False
     changed = False
@@ -181,7 +451,6 @@ def apply_admin_config_to_session(st, sid, admin_cfg):
     return changed
 
 def push_telemetry_to_admin(event_name="heartbeat", sid=None, st=None, extra=None):
-    """Đẩy trạng thái bot / session / kết quả lên Render Admin."""
     payload = {
         "event": event_name,
         "ts": int(time.time()),
@@ -210,6 +479,7 @@ def push_telemetry_to_admin(event_name="heartbeat", sid=None, st=None, extra=Non
             "win_streak": st.get("win_streak"),
             "loss_streak": st.get("loss_streak"),
             "socket_connected": st.get("socket_connected"),
+            "license_key": st.get("license_key"),
         })
     if extra:
         payload["extra"] = extra
@@ -295,7 +565,6 @@ def api_data_worker():
                                         f"du_doan={du_doan} | conf={do_tin_cay}")
                     last_session_logged = session_id
 
-        # Đồng bộ định kỳ với Render Admin (~mỗi 6s)
         tick_counter += 1
         if tick_counter % 4 == 0:
             admin_cfg = fetch_admin_config()
@@ -409,23 +678,21 @@ def login_game(username, password):
         return {"_error": f"Lỗi kết nối: {e}"}
 
 # ==========================================
-# ✅ TÍNH TIỀN CƯỢC — HỖ TRỢ X2
+# TÍNH TIỀN CƯỢC — HỖ TRỢ X2
 # ==========================================
 def calc_next_bet(st):
     base = int(st["base_bet_amount"])
-    
-    # X2 theo CHUỖI THẮNG
+
     if st.get("x2_mode") and st["win_streak"] > 0:
         multiplier = min(2 ** st["win_streak"], 32)
         return base * multiplier
-    
-    # X2 theo CHUỖI THUA
+
     if st.get("x2_loss_mode") and st["loss_streak"] > 0:
         limit = int(st.get("x2_loss_limit", 5))
         if st["loss_streak"] <= limit:
             multiplier = min(2 ** st["loss_streak"], 32)
             return base * multiplier
-    
+
     return base
 
 # ==========================================
@@ -475,9 +742,6 @@ def game_socket_worker(sid, jwt_token):
         socketio.emit("stats_update", public_state(st), to=sid)
         push_telemetry_to_admin("socket_disconnected", sid=sid, st=st)
 
-    # ==========================================
-    # 🆕 NEW SESSION
-    # ==========================================
     @sio.on("new-session", namespace=GAME_WS_NS)
     def on_new_session(data):
         new_id = data.get("id") or data.get("sessionId") or "N/A"
@@ -533,9 +797,6 @@ def game_socket_worker(sid, jwt_token):
         }, to=sid)
         socketio.emit("stats_update", public_state(st), to=sid)
 
-    # ==========================================
-    # 🎲 TICK UPDATE — ĐẶT CƯỢC
-    # ==========================================
     @sio.on("tick-update", namespace=GAME_WS_NS)
     def on_tick_update(data):
         if data.get("state") != "BETTING":
@@ -611,9 +872,6 @@ def game_socket_worker(sid, jwt_token):
         except Exception:
             pass
 
-    # ==========================================
-    # 📊 SESSION RESULT
-    # ==========================================
     @sio.on("session-result", namespace=GAME_WS_NS)
     def on_session_result(data):
         result_raw = (data.get("resultTruyenThong")
@@ -718,6 +976,9 @@ def game_socket_worker(sid, jwt_token):
 # PUBLIC STATE
 # ==========================================
 def public_state(st):
+    key = st.get("license_key")
+    fp = st.get("license_fp")
+    lic = license_check(key, fp) if key else None
     return {
         "nickname": st["nickname"],
         "balance": st["balance"],
@@ -741,6 +1002,10 @@ def public_state(st):
         "has_bet_this_session": st.get("has_bet_this_session", False),
         "admin_url": API_ADMIN_URL,
         "admin_ok": ADMIN_LAST_RAW.get("error") is None and ADMIN_LAST_RAW.get("data") is not None,
+        "license_key": key,
+        "license_expires_at": (lic or {}).get("expires_at"),
+        "license_time_left": _license_time_left(lic or {}),
+        "license_active": _is_license_valid(lic or {}),
         "history": st["history"][:15],
     }
 
@@ -765,26 +1030,106 @@ socketio.start_background_task(stats_broadcast_worker)
 def index():
     return render_template("index.html")
 
+# ---- LICENSE: kích hoạt key (proxy tới License Server) ----
+@app.route("/api/license/activate", methods=["POST"])
+def api_license_activate():
+    data = request.json or {}
+    key = (data.get("key") or "").strip().upper()
+    if not key:
+        return jsonify({"success": False, "error": "Vui lòng nhập key"}), 400
+
+    ip = _client_ip()
+    ua = _client_ua()
+    fp = _device_fingerprint(ip, ua)
+
+    res = license_activate(key, fp, ip=ip, ua=ua)
+    if not res.get("success", False):
+        return jsonify({
+            "success": False,
+            "error": _license_msg(res) or "Kích hoạt thất bại",
+            "code": res.get("code") or "ACTIVATE_FAIL",
+        }), 403
+
+    # server trả OK → lưu session
+    session["license_key"] = key
+    session["license_fp"] = fp
+    _cache_clear()
+
+    left = _license_time_left(res)
+    return jsonify({
+        "success": True,
+        "key": key,
+        "expires_at": res.get("expires_at"),
+        "time_left": left,
+        "time_left_text": f"{left // 86400} ngày {left % 86400 // 3600} giờ",
+        "devices": res.get("devices"),
+        "max_devices": res.get("max_devices"),
+    })
+
+# ---- LICENSE: xem trạng thái ----
+@app.route("/api/license/status", methods=["GET"])
+def api_license_status():
+    key = session.get("license_key")
+    fp = session.get("license_fp")
+    if not key:
+        return jsonify({"success": False, "error": "Chưa kích hoạt key", "code": "NO_KEY"}), 401
+
+    res = license_check(key, fp)
+    if not _is_license_valid(res):
+        return jsonify({
+            "success": False,
+            "error": _license_msg(res) or "Key đã hết hạn sử dụng",
+            "code": res.get("code") or "KEY_EXPIRED",
+        }), 403
+
+    left = _license_time_left(res)
+    return jsonify({
+        "success": True,
+        "key": key,
+        "expires_at": res.get("expires_at"),
+        "time_left": left,
+        "time_left_text": f"{left // 86400} ngày {left % 86400 // 3600} giờ",
+        "devices": res.get("devices"),
+        "max_devices": res.get("max_devices"),
+    })
+
+# ---- LOGIN GAME (yêu cầu key hợp lệ) ----
 @app.route("/api/login", methods=["POST"])
 def api_login():
+    key = session.get("license_key")
+    fp = session.get("license_fp")
+    if not key:
+        return jsonify({"success": False, "error": "Chưa kích hoạt key", "code": "NO_KEY"}), 401
+
+    res = license_check(key, fp)
+    if not _is_license_valid(res):
+        session.pop("license_key", None)
+        session.pop("license_fp", None)
+        return jsonify({
+            "success": False,
+            "error": _license_msg(res) or "Key đã hết hạn sử dụng",
+            "code": res.get("code") or "KEY_EXPIRED",
+        }), 403
+
     data = request.json or {}
     username = (data.get("username") or "").strip()
     password = (data.get("password") or "").strip()
-
     if not username or not password:
         return jsonify({"success": False, "error": "Thiếu tài khoản/mật khẩu"})
 
-    res = login_game(username, password)
-    if "_error" in res:
-        return jsonify({"success": False, "error": res["_error"]})
+    r = login_game(username, password)
+    if "_error" in r:
+        return jsonify({"success": False, "error": r["_error"]})
 
     sid = os.urandom(8).hex()
     session["sid"] = sid
     WEB_SESSIONS[sid] = {
-        "nickname": res["nickname"],
-        "balance": res["money"],
-        "token": res["token"],
+        "nickname": r["nickname"],
+        "balance": r["money"],
+        "token": r["token"],
         "username": username,
+        "license_key": key,
+        "license_fp": fp,
         "profit_loss": 0,
         "auto_bet_enabled": False,
         "x2_mode": False,
@@ -815,20 +1160,21 @@ def api_login():
         apply_admin_config_to_session(WEB_SESSIONS[sid], sid, admin_cfg)
     push_telemetry_to_admin("login", sid=sid, st=WEB_SESSIONS[sid])
 
-    socketio.start_background_task(game_socket_worker, sid, res["token"])
+    socketio.start_background_task(game_socket_worker, sid, r["token"])
 
+    left = _license_time_left(res)
     return jsonify({
         "success": True,
         "sid": sid,
-        "nickname": res["nickname"],
-        "balance": res["money"],
+        "nickname": r["nickname"],
+        "balance": r["money"],
+        "license_time_left": left,
     })
 
 @app.route("/api/config", methods=["POST"])
+@require_license
 def api_config():
     sid = session.get("sid")
-    if not sid or sid not in WEB_SESSIONS:
-        return jsonify({"success": False, "error": "Chưa login"})
     st = WEB_SESSIONS[sid]
     data = request.json or {}
 
@@ -876,16 +1222,16 @@ def api_config():
     return jsonify({"success": True, "state": public_state(st)})
 
 @app.route("/api/stats")
+@require_license
 def api_stats():
     sid = session.get("sid")
-    if not sid or sid not in WEB_SESSIONS:
-        return jsonify({"success": False})
     return jsonify({"success": True, "state": public_state(WEB_SESSIONS[sid])})
 
 @app.route("/api/admin_sync", methods=["GET", "POST"])
+@require_license
 def api_admin_sync():
     sid = session.get("sid")
-    st = WEB_SESSIONS.get(sid) if sid else None
+    st = WEB_SESSIONS.get(sid)
     cfg = fetch_admin_config(username=st.get("username") if st else None, sid=sid)
     applied = False
     if st and isinstance(cfg, dict):
@@ -927,9 +1273,11 @@ def api_debug_api():
             "last_push_ts": ADMIN_LAST_RAW.get("last_push_ts"),
             "data": ADMIN_LAST_RAW.get("data"),
         },
+        "license_server": LICENSE_SERVER_URL,
     })
 
 @app.route("/api/reset_history", methods=["POST"])
+@require_license
 def api_reset_history():
     sid = session.get("sid")
     if sid and sid in WEB_SESSIONS:
@@ -959,7 +1307,19 @@ def api_logout():
     if sid in WEB_SESSIONS:
         del WEB_SESSIONS[sid]
     session.pop("sid", None)
+    # giữ license_key/fp để khỏi phải nhập lại key
     return jsonify({"success": True})
+
+# ==========================================
+# SOCKET EVENTS
+# ==========================================
+@socketio.on("connect")
+def on_connect():
+    logger.info(f"[WebSocket] client connected sid={request.sid}")
+
+@socketio.on("disconnect")
+def on_disconnect():
+    logger.info(f"[WebSocket] client disconnected sid={request.sid}")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
