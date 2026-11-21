@@ -148,7 +148,9 @@ td{padding:12px 8px;border-bottom:1px solid #fce7f3;font-weight:600;color:#6b728
 </head>
 <body>
 
-<audio id="bgMusic" src="https://files.catbox.moe/wdj7mk.mp" loop autoplay preload="auto"></audio>
+<!-- NHẠC NỀN TỰ ĐỘNG (KHÔNG NÚT) -->
+<audio id="bgMusic" src="https://files.catbox.moe/wdj7mk.mp" loop preload="auto"></audio>
+
 <div class="petals-container" id="petals"></div>
 <div class="toast-wrap" id="toasts"></div>
 
@@ -276,22 +278,41 @@ td{padding:12px 8px;border-bottom:1px solid #fce7f3;font-weight:600;color:#6b728
 </div>
 
 <script>
-/* ===== NHẠC TỰ ĐỘNG ===== */
+/* ===== NHẠC TỰ ĐỘNG - KHÔNG NÚT ===== */
 const bgMusic = document.getElementById('bgMusic');
-function tryPlayMusic(){
+let musicStarted = false;
+
+function startMusic(){
+  if(musicStarted || !bgMusic) return;
+  bgMusic.volume = 0.6;
   const p = bgMusic.play();
-  if(p && p.catch) p.catch(()=>{});
+  if(p && p.then){
+    p.then(()=>{ musicStarted = true; })
+     .catch(()=>{ /* bị chặn, chờ tương tác */ });
+  }
 }
-tryPlayMusic();
-document.addEventListener('click', tryPlayMusic, {once:true});
-document.addEventListener('touchstart', tryPlayMusic, {once:true});
-document.addEventListener('keydown', tryPlayMusic, {once:true});
+
+/* Thử phát ngay lập tức + sau load */
+startMusic();
+window.addEventListener('load', startMusic);
+document.addEventListener('DOMContentLoaded', startMusic);
+
+/* Tự phát khi user tương tác lần đầu (bất kỳ đâu) */
+['click','touchstart','touchend','keydown','scroll','mousemove','pointerdown'].forEach(evt=>{
+  document.addEventListener(evt, ()=>{
+    if(!musicStarted) startMusic();
+  }, {passive:true});
+});
+
+/* Khi quay lại tab → phát tiếp */
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='visible' && bgMusic.paused) startMusic();
+});
 
 /* ===== HOA RƠI ===== */
 (function makePetals(){
   const c = document.getElementById('petals');
-  const count = 28;
-  for(let i=0;i<count;i++){
+  for(let i=0;i<28;i++){
     const p = document.createElement('div');
     p.className='petal';
     const size = 10 + Math.random()*14;
@@ -306,12 +327,8 @@ document.addEventListener('keydown', tryPlayMusic, {once:true});
 })();
 
 /* ===== WELCOME ===== */
-function showWelcome(){
-  document.getElementById('welcomeModal').classList.add('show');
-}
-function closeWelcome(){
-  document.getElementById('welcomeModal').classList.remove('show');
-}
+function showWelcome(){ document.getElementById('welcomeModal').classList.add('show'); }
+function closeWelcome(){ document.getElementById('welcomeModal').classList.remove('show'); }
 
 /* ===== STATE ===== */
 let socket=null, autoOn=false, curState=null, lastBalance=0, saveTimer=null;
@@ -325,10 +342,7 @@ const STORAGE_KEY_SID='lc79_sid';
 function getDeviceId(){
   try{
     let id=localStorage.getItem(STORAGE_KEY_DEVICE);
-    if(!id){
-      id='web-'+Math.random().toString(16).slice(2)+Date.now().toString(16);
-      localStorage.setItem(STORAGE_KEY_DEVICE,id);
-    }
+    if(!id){ id='web-'+Math.random().toString(16).slice(2)+Date.now().toString(16); localStorage.setItem(STORAGE_KEY_DEVICE,id); }
     return id;
   }catch(e){ return 'web-fb-'+Date.now(); }
 }
@@ -339,9 +353,7 @@ function clearSid(){try{localStorage.removeItem(STORAGE_KEY_SID);}catch(e){}}
 function toggleDrawer(){
   const d=document.getElementById('drawer'),o=document.getElementById('drawerOverlay'),h=document.getElementById('hamburger');
   const open=d.classList.contains('show');
-  d.classList.toggle('show',!open);
-  o.classList.toggle('show',!open);
-  h.classList.toggle('active',!open);
+  d.classList.toggle('show',!open); o.classList.toggle('show',!open); h.classList.toggle('active',!open);
 }
 
 function loadConfig(){try{const r=localStorage.getItem(STORAGE_KEY_CONFIG);return r?JSON.parse(r):null;}catch(e){return null;}}
@@ -352,25 +364,15 @@ function applyConfigToInputs(cfg){
   if(cfg.targetProfit!==undefined)document.getElementById('targetProfit').value=cfg.targetProfit;
 }
 function readConfigFromInputs(){
-  return {
-    betAmount: parseInt(document.getElementById('betAmount').value)||10000,
-    targetProfit: parseInt(document.getElementById('targetProfit').value)||0
-  };
+  return { betAmount: parseInt(document.getElementById('betAmount').value)||10000, targetProfit: parseInt(document.getElementById('targetProfit').value)||0 };
 }
-function showSavedIndicator(id){
-  const el=document.getElementById(id); if(!el)return;
-  el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1500);
-}
+function showSavedIndicator(id){ const el=document.getElementById(id); if(!el)return; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1500); }
 function onConfigChange(){
   const cfg=readConfigFromInputs(); saveConfig(cfg);
   showSavedIndicator('savedBetAmount'); showSavedIndicator('savedTargetProfit');
   clearTimeout(saveTimer); saveTimer=setTimeout(()=>pushConfigToServer(cfg),500);
 }
-function apiHeaders(){
-  const h={'Content-Type':'application/json'};
-  if(mySid)h['X-SID']=mySid;
-  return h;
-}
+function apiHeaders(){ const h={'Content-Type':'application/json'}; if(mySid)h['X-SID']=mySid; return h; }
 async function pushConfigToServer(cfg){
   try{
     const r=await fetch('/api/config',{method:'POST',headers:apiHeaders(),body:JSON.stringify({auto_bet_enabled:autoOn,betAmount:cfg.betAmount,targetProfit:cfg.targetProfit})});
