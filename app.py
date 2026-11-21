@@ -11,12 +11,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.urandom(24).hex()
+app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "lc79_minhdz_super_secret_2024_change_me")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet',
                     ping_timeout=60, ping_interval=25)
 
 # ==========================================
-# CẤU HÌNH
+# CẤU HÌNH GAME
 # ==========================================
 API_LOGIN_URL   = "https://apifo88daigia.tele68.com/api"
 API_LOBBY_URL   = "https://wlb.tele68.com/v1/lobby/auth/login"
@@ -25,6 +25,21 @@ GAME_WS_URL     = "https://wtxmd52.tele68.com"
 GAME_WS_PATH    = "txmd5/"
 GAME_WS_NS      = "/txmd5"
 COMMON_PARAMS   = "cp=R&cl=R&pf=web"
+
+# ==========================================
+# CẤU HÌNH SERVER ADMIN (KEY PROVIDER)
+# ==========================================
+ADMIN_BASE_URL        = os.environ.get("ADMIN_BASE_URL", "https://lc79vipadmin-b8k2.onrender.com")
+ADMIN_KEY_API_URL     = f"{ADMIN_BASE_URL}/api/check_key"
+ADMIN_MAINTENANCE_URL = f"{ADMIN_BASE_URL}/api/maintenance"
+ADMIN_CONFIG_URL      = f"{ADMIN_BASE_URL}/api/config"
+
+ADMIN_API_TIMEOUT = 10
+
+# Cache trạng thái bảo trì
+MAINTENANCE_CACHE_TTL = 60
+_last_maintenance_check = 0
+_maintenance_status = {"maintenance": False, "message": ""}
 
 # ==========================================
 # GLOBAL DATA
@@ -39,7 +54,7 @@ WS_CLIENTS   = {}
 API_LAST_RAW = {"data": None, "ts": 0, "error": None}
 
 # ==========================================
-# ✅ HÀM CHUẨN HÓA SIDE
+# HÀM CHUẨN HÓA SIDE
 # ==========================================
 def normalize_side(value):
     if value is None:
@@ -67,6 +82,102 @@ def normalize_side(value):
     if "HIGH" in s or "BIG" in s: return "TAI"
     if "LOW" in s or "SMALL" in s: return "XIU"
     return None
+
+# ==========================================
+# KIỂM TRA BẢO TRÌ
+# ==========================================
+def check_maintenance():
+    """Trả về (maintenance: bool, message: str) - cache 60s"""
+    global _last_maintenance_check, _maintenance_status
+    now = time.time()
+    if now - _last_maintenance_check < MAINTENANCE_CACHE_TTL:
+        return _maintenance_status["maintenance"], _maintenance_status["message"]
+
+    try:
+        r = requests.get(
+            ADMIN_MAINTENANCE_URL,
+            timeout=ADMIN_API_TIMEOUT,
+            headers={"User-Agent": "LC79-Tool/1.0"}
+        )
+        data = r.json()
+        _maintenance_status = {
+            "maintenance": bool(data.get("maintenance", False)),
+            "message": data.get("message", "")
+        }
+        _last_maintenance_check = now
+        logger.info(f"[Maintenance] {_maintenance_status}")
+    except Exception as e:
+        logger.warning(f"[Maintenance] Không kiểm tra được: {e}")
+        # Giữ trạng thái cũ - không chặn user nếu server admin lỗi
+    return _maintenance_status["maintenance"], _maintenance_status["message"]
+
+# ==========================================
+# XÁC THỰC KEY REMOTE
+# ==========================================
+def validate_key_remote(key, device_id=None, username=None):
+    """
+    Gọi API server admin để xác thực KEY.
+    Trả về (ok: bool, info: dict|str)
+    """
+    if not key:
+        return False, "Vui lòng nhập KEY"
+
+    key = key.strip().upper()
+
+    try:
+        payload = {
+            "key": key,
+            "device": device_id or "",
+            "username": username or "",
+            "tool": "lc79_minhdz"
+        }
+        r = requests.post(
+            ADMIN_KEY_API_URL,
+            json=payload,
+            timeout=ADMIN_API_TIMEOUT,
+            headers={
+                "User-Agent": "LC79-Tool/1.0",
+                "Content-Type": "application/json"
+            }
+        )
+
+        # Nếu server trả về không phải JSON
+        try:
+            data = r.json()
+        except Exception:
+            return False, f"Server KEY trả về dữ liệu không hợp lệ (HTTP {r.status_code})"
+
+        # Chấp nhận nhiều dạng response
+        ok = data.get("success") is True or data.get("valid") is True or data.get("ok") is True
+        if not ok:
+            msg = data.get("message") or data.get("error") or "KEY không hợp lệ"
+            return False, msg
+
+        info = data.get("info") or data.get("data") or {}
+
+        # Kiểm tra thời hạn
+        expires = info.get("expires_at") or info.get("expires") or 0
+        if expires and expires > 0 and time.time() > expires:
+            return False, "KEY đã hết hạn"
+
+        # Kiểm tra trạng thái
+        if info.get("active") is False or info.get("status") == "disabled":
+            return False, "KEY đã bị vô hiệu hóa"
+
+        # Kiểm tra thiết bị
+        bound_device = info.get("device") or info.get("device_id")
+        if bound_device and device_id and str(bound_device) != str(device_id):
+            return False, "KEY đã được gắn với thiết bị khác"
+
+        return True, info
+
+    except requests.exceptions.Timeout:
+        return False, "Server xác thực KEY không phản hồi (timeout)"
+    except requests.exceptions.ConnectionError:
+        return False, "Không kết nối được server xác thực KEY"
+    except Exception as e:
+        logger.error(f"[KeyRemote] Lỗi: {e}")
+        return False, f"Lỗi xác thực KEY: {e}"
 
 # ==========================================
 # GỌI API LỊCH SỬ
@@ -228,24 +339,18 @@ def login_game(username, password):
         return {"_error": f"Lỗi kết nối: {e}"}
 
 # ==========================================
-# ✅ TÍNH TIỀN CƯỢC — HỖ TRỢ X2
+# TÍNH TIỀN CƯỢC
 # ==========================================
 def calc_next_bet(st):
     base = int(st["base_bet_amount"])
-    
-    # X2 theo CHUỖI THẮNG
     if st.get("x2_mode") and st["win_streak"] > 0:
-        # 2^win_streak, giới hạn 5 lần
         multiplier = min(2 ** st["win_streak"], 32)
         return base * multiplier
-    
-    # X2 theo CHUỖI THUA
     if st.get("x2_loss_mode") and st["loss_streak"] > 0:
         limit = int(st.get("x2_loss_limit", 5))
         if st["loss_streak"] <= limit:
             multiplier = min(2 ** st["loss_streak"], 32)
             return base * multiplier
-    
     return base
 
 # ==========================================
@@ -292,20 +397,16 @@ def game_socket_worker(sid, jwt_token):
         st["socket_connected"] = False
         socketio.emit("stats_update", public_state(st), to=sid)
 
-    # ==========================================
-    # 🆕 NEW SESSION
-    # ==========================================
     @sio.on("new-session", namespace=GAME_WS_NS)
     def on_new_session(data):
         new_id = data.get("id") or data.get("sessionId") or "N/A"
         logger.info(f"[{sid}] 🆕 New session: {new_id}")
 
-        # Reset state cho session mới
         st["session_id"] = new_id
         st["has_bet_this_session"] = False
         st["current_bet_type"] = None
         st["current_bet_session"] = None
-        st["current_prediction"] = None  # ✅ Reset để tránh dùng pred cũ
+        st["current_prediction"] = None
 
         if check_target_profit():
             return
@@ -314,7 +415,6 @@ def game_socket_worker(sid, jwt_token):
         api_session = pred.get("api_session")
         pred_side = pred["side"]
 
-        # Chỉ nhận dự đoán khi API cùng phiên hoặc phiên liền trước
         if pred_side and api_session:
             try:
                 diff = int(new_id) - int(api_session)
@@ -323,13 +423,11 @@ def game_socket_worker(sid, jwt_token):
             if diff not in (0, 1):
                 logger.warning(f"[{sid}] ⚠ API session {api_session} lệch xa new {new_id} → bỏ")
                 pred_side = None
-                api_session = None  # ✅ Clear luôn api_session để không dùng nhầm
+                api_session = None
 
         st["current_prediction"] = pred_side
-        st["current_pred_session"] = api_session  # ✅ Lưu session của prediction
+        st["current_pred_session"] = api_session
         st["last_api_raw"] = pred.get("raw")
-
-        # ✅ Tính bet dựa trên streak hiện tại (x2 nếu bật)
         st["current_bet"] = calc_next_bet(st) if st["auto_bet_enabled"] else int(st["base_bet_amount"])
 
         logger.info(f"[{sid}] 🎯 Session {new_id} | Bet={st['current_bet']:,}đ | "
@@ -349,43 +447,30 @@ def game_socket_worker(sid, jwt_token):
         }, to=sid)
         socketio.emit("stats_update", public_state(st), to=sid)
 
-    # ==========================================
-    # 🎲 TICK UPDATE — ĐẶT CƯỢC
-    # ==========================================
     @sio.on("tick-update", namespace=GAME_WS_NS)
     def on_tick_update(data):
         if data.get("state") != "BETTING":
             return
-        
-        # ✅ CHECK 1: Auto phải đang bật
         if not st["auto_bet_enabled"]:
             return
-        
-        # ✅ CHECK 2: Chưa cược phiên này
         if st["has_bet_this_session"]:
             return
-        
-        # ✅ CHECK 3: Phải có session_id
         if not st["session_id"]:
             return
-        
-        # ✅ CHECK 4: Phải có prediction
+
         pred_raw = st.get("current_prediction")
         bet_type = normalize_side(pred_raw)
         if not bet_type:
             logger.warning(f"[{sid}] ⚠ API chưa báo dự đoán → KHÔNG cược phiên {st['session_id']}")
             return
-        
-        # ✅ CHECK 5: Prediction phải thuộc session hiện tại
+
         pred_session = st.get("current_pred_session")
         if pred_session and str(pred_session) != str(st["session_id"]):
-            # Prediction thuộc session cũ → thử refresh
             logger.info(f"[{sid}] 🔄 Pred session {pred_session} != current {st['session_id']} → refresh")
             new_pred = get_prediction()
             new_pred_side = normalize_side(new_pred.get("side"))
             new_api_session = new_pred.get("api_session")
-            
-            # Chỉ chấp nhận nếu API session khớp
+
             if new_pred_side and new_api_session:
                 try:
                     diff = int(st["session_id"]) - int(new_api_session)
@@ -432,9 +517,6 @@ def game_socket_worker(sid, jwt_token):
         except Exception:
             pass
 
-    # ==========================================
-    # 📊 SESSION RESULT
-    # ==========================================
     @sio.on("session-result", namespace=GAME_WS_NS)
     def on_session_result(data):
         result_raw = (data.get("resultTruyenThong")
@@ -443,7 +525,6 @@ def game_socket_worker(sid, jwt_token):
         dices = data.get("dices") or data.get("dice") or []
         session_of_result = data.get("id") or st.get("session_id")
 
-        # ✅ CHECK: Tránh xử lý trùng session
         if st.get("last_result_session") == str(session_of_result):
             logger.info(f"[{sid}] ⏭ Skip duplicate result session {session_of_result}")
             return
@@ -456,7 +537,6 @@ def game_socket_worker(sid, jwt_token):
         bet_type_used = st.get("current_bet_type")
         bet_session = st.get("current_bet_session")
 
-        # ✅ Chỉ tính win/loss khi: đã cược + cùng session + parse được
         if (st.get("waiting_for_result")
                 and bet_type_used
                 and result_side
@@ -475,11 +555,7 @@ def game_socket_worker(sid, jwt_token):
                 st["lose_count"] += 1
             st["profit_loss"] += profit_delta
             st["waiting_for_result"] = False
-            
-            # ✅ Clear bet_type sau khi tính để tránh session sau dùng nhầm
-            # (không clear ngay vì cần cho history — clear ở new_session)
 
-        # Lưu history
         st["history"].insert(0, {
             "session": session_of_result,
             "pred": bet_type_used or st.get("current_prediction"),
@@ -557,9 +633,10 @@ def public_state(st):
         "win_streak": st["win_streak"],
         "loss_streak": st["loss_streak"],
         "socket_connected": st["socket_connected"],
-        "waiting_for_result": st.get("waiting_for_result", False),  # ✅ Thêm
-        "has_bet_this_session": st.get("has_bet_this_session", False),  # ✅ Thêm
+        "waiting_for_result": st.get("waiting_for_result", False),
+        "has_bet_this_session": st.get("has_bet_this_session", False),
         "history": st["history"][:15],
+        "key_info": st.get("key_info"),
     }
 
 def stats_broadcast_worker():
@@ -586,12 +663,33 @@ def index():
 @app.route("/api/login", methods=["POST"])
 def api_login():
     data = request.json or {}
-    username = (data.get("username") or "").strip()
-    password = (data.get("password") or "").strip()
+    username   = (data.get("username") or "").strip()
+    password   = (data.get("password") or "").strip()
+    access_key = (data.get("key") or "").strip()
+    device_id  = (data.get("device") or "").strip()
 
     if not username or not password:
         return jsonify({"success": False, "error": "Thiếu tài khoản/mật khẩu"})
+    if not access_key:
+        return jsonify({"success": False, "error": "Vui lòng nhập KEY truy cập do admin cấp"})
 
+    # 1. Kiểm tra bảo trì
+    maint, maint_msg = check_maintenance()
+    if maint:
+        return jsonify({
+            "success": False,
+            "error": f"🔧 Tool đang bảo trì: {maint_msg or 'Vui lòng thử lại sau'}"
+        })
+
+    # 2. Xác thực KEY với server admin
+    ok, key_info = validate_key_remote(access_key, device_id, username)
+    if not ok:
+        logger.warning(f"[Login] KEY fail ({access_key[:8]}...): {key_info}")
+        return jsonify({"success": False, "error": f"❌ {key_info}"})
+
+    logger.info(f"[Login] KEY OK ({access_key[:8]}...) user={username}")
+
+    # 3. Đăng nhập game
     res = login_game(username, password)
     if "_error" in res:
         return jsonify({"success": False, "error": res["_error"]})
@@ -603,6 +701,9 @@ def api_login():
         "balance": res["money"],
         "token": res["token"],
         "username": username,
+        "access_key": access_key,
+        "key_info": key_info,
+        "device_id": device_id,
         "profit_loss": 0,
         "auto_bet_enabled": False,
         "x2_mode": False,
@@ -614,12 +715,12 @@ def api_login():
         "current_bet": 10000,
         "target_profit": None,
         "current_prediction": None,
-        "current_pred_session": None,   # ✅ Thêm
+        "current_pred_session": None,
         "current_bet_type": None,
         "current_bet_session": None,
         "waiting_for_result": False,
         "has_bet_this_session": False,
-        "last_result_session": None,    # ✅ Thêm
+        "last_result_session": None,
         "session_id": None,
         "win_count": 0,
         "lose_count": 0,
@@ -635,6 +736,7 @@ def api_login():
         "sid": sid,
         "nickname": res["nickname"],
         "balance": res["money"],
+        "key_info": key_info,
     })
 
 @app.route("/api/config", methods=["POST"])
@@ -655,18 +757,15 @@ def api_config():
         except (TypeError, ValueError):
             pass
 
-    # ✅ XỬ LÝ AUTO ON/OFF — RESET STATE KHI TẮT
     if "auto_bet_enabled" in data:
         new_auto = bool(data["auto_bet_enabled"])
         if new_auto != st["auto_bet_enabled"]:
             st["auto_bet_enabled"] = new_auto
             if not new_auto:
-                # ✅ TẮT AUTO: KHÔNG reset bet đang chờ (vẫn tính kết quả)
-                # Nhưng KHÔNG cược thêm phiên mới
-                st["has_bet_this_session"] = True  # Chặn cược phiên hiện tại
+                st["has_bet_this_session"] = True
                 logger.info(f"[Config {sid}] ⏸ AUTO OFF")
             else:
-                st["has_bet_this_session"] = False  # Cho phép cược phiên mới
+                st["has_bet_this_session"] = False
                 logger.info(f"[Config {sid}] ▶️ AUTO ON")
             socketio.emit("toast", {
                 "type": "info",
@@ -717,6 +816,27 @@ def api_debug_api():
         } if data else None,
     })
 
+# ==========================================
+# PUBLIC KEY CHECK (cho tool khác / debug)
+# ==========================================
+@app.route("/api/check_key", methods=["POST"])
+def api_check_key():
+    data = request.json or {}
+    key = (data.get("key") or "").strip()
+    device = (data.get("device") or "").strip()
+    username = (data.get("username") or "").strip()
+    ok, info = validate_key_remote(key, device, username)
+    return jsonify({
+        "success": ok,
+        "message": "OK" if ok else info,
+        "info": info if ok else None
+    })
+
+@app.route("/api/maintenance")
+def api_maintenance():
+    maint, msg = check_maintenance()
+    return jsonify({"maintenance": maint, "message": msg})
+
 @app.route("/api/reset_history", methods=["POST"])
 def api_reset_history():
     sid = session.get("sid")
@@ -744,6 +864,18 @@ def api_logout():
         del WEB_SESSIONS[sid]
     session.pop("sid", None)
     return jsonify({"success": True})
+
+# ==========================================
+# HEALTHCHECK
+# ==========================================
+@app.route("/health")
+def health():
+    return jsonify({
+        "status": "ok",
+        "sessions": len(WEB_SESSIONS),
+        "admin_url": ADMIN_BASE_URL,
+        "maintenance": _maintenance_status,
+    })
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
