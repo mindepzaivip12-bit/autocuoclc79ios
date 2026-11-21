@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'lc79-minh-dz-secret-key-fixed' # Cố định secret key để không bị mất session khi restart
+app.config['SECRET_KEY'] = 'lc79-minh-dz-secret-key-v2-fixed'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', ping_timeout=60, ping_interval=25)
 
 # ==========================================
@@ -25,8 +25,6 @@ GAME_WS_URL     = "https://wtxmd52.tele68.com"
 GAME_WS_PATH    = "txmd5/"
 GAME_WS_NS      = "/txmd5"
 COMMON_PARAMS   = "cp=R&cl=R&pf=web"
-
-LICENSE_SERVER_URL = os.environ.get("LICENSE_SERVER_URL", "https://lc79vipadmin-5orx.onrender.com").rstrip("/")
 
 WEB_SESSIONS = {}
 WS_CLIENTS = {}
@@ -73,14 +71,24 @@ def login_game(u, p):
     except Exception as e:
         return {"_error": f"Lỗi kết nối game: {e}"}
 
+def public_state(st):
+    return {
+        "nickname": st["nickname"], "balance": st["balance"], "profit_loss": st["profit_loss"],
+        "auto_bet_enabled": st["auto_bet_enabled"], "base_bet_amount": st["base_bet_amount"],
+        "current_bet": st["current_bet"], "current_prediction": st["current_prediction"],
+        "session_id": st["session_id"], "win_count": st["win_count"], "lose_count": st["lose_count"],
+        "socket_connected": st["socket_connected"], "history": st["history"][:15]
+    }
+
 # ==========================================
-# GAME SOCKET WORKER (Đã fix lỗi kết nối)
+# GAME SOCKET WORKER (ĐÃ FIX LỖI OFF)
 # ==========================================
 def game_socket_worker(sid, jwt):
     st = WEB_SESSIONS.get(sid)
     if not st: return
 
-    sio = SocketClient(reconnection=True, reconnection_attempts=10, reconnection_delay=2, logger=False, engineio_logger=False)
+    # Tăng cường reconnect
+    sio = SocketClient(reconnection=True, reconnection_attempts=50, reconnection_delay=2, reconnection_delay_max=10, logger=False, engineio_logger=False)
     WS_CLIENTS[sid] = sio
 
     @sio.event(namespace=GAME_WS_NS)
@@ -92,14 +100,13 @@ def game_socket_worker(sid, jwt):
 
     @sio.event(namespace=GAME_WS_NS)
     def connect_error(data):
-        logger.error(f"[{sid}] ❌ Lỗi Socket: {data}")
+        logger.error(f"[{sid}] ❌ Lỗi Socket Game: {data}")
         st["socket_connected"] = False
         socketio.emit("stats_update", public_state(st), to=sid)
-        socketio.emit("toast", {"type": "error", "msg": f"Lỗi Socket: {data}"}, to=sid)
 
     @sio.event(namespace=GAME_WS_NS)
     def disconnect():
-        logger.warning(f"[{sid}] ⚠️ Mất kết nối Socket Game")
+        logger.warning(f"[{sid}] ⚠️ Mất kết nối Socket Game. Đang tự động kết nối lại...")
         st["socket_connected"] = False
         socketio.emit("stats_update", public_state(st), to=sid)
 
@@ -144,22 +151,16 @@ def game_socket_worker(sid, jwt):
         socketio.emit("stats_update", public_state(st), to=sid)
 
     try:
-        logger.info(f"[{sid}] Đang kết nối tới Game Socket...")
-        sio.connect(f"{GAME_WS_URL}?token={jwt}", socketio_path=GAME_WS_PATH, namespaces=[GAME_WS_NS], transports=["websocket"], wait_timeout=15)
+        logger.info(f"[{sid}] Đang kết nối tới Game Socket ({GAME_WS_URL})...")
+        # Thêm headers giả lập trình duyệt để tránh bị block
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Origin": "https://tele68.com", "Referer": "https://tele68.com/"}
+        sio.connect(f"{GAME_WS_URL}?token={jwt}", socketio_path=GAME_WS_PATH, namespaces=[GAME_WS_NS], headers=headers, transports=["websocket"], wait_timeout=15)
         sio.wait()
     except Exception as e:
-        logger.error(f"[{sid}] ❌ Lỗi khởi tạo Socket: {e}")
+        logger.error(f"[{sid}] ❌ Lỗi khởi tạo Socket: {type(e).__name__} - {e}")
         st["socket_connected"] = False
         socketio.emit("stats_update", public_state(st), to=sid)
-
-def public_state(st):
-    return {
-        "nickname": st["nickname"], "balance": st["balance"], "profit_loss": st["profit_loss"],
-        "auto_bet_enabled": st["auto_bet_enabled"], "base_bet_amount": st["base_bet_amount"],
-        "current_bet": st["current_bet"], "current_prediction": st["current_prediction"],
-        "session_id": st["session_id"], "win_count": st["win_count"], "lose_count": st["lose_count"],
-        "socket_connected": st["socket_connected"], "history": st["history"][:15]
-    }
+        socketio.emit("toast", {"type": "error", "msg": f"Lỗi kết nối Game: {type(e).__name__}"}, to=sid)
 
 # ==========================================
 # ROUTES
@@ -171,8 +172,6 @@ def index(): return render_template("index.html")
 def api_login():
     data = request.json or {}
     u, p = (data.get("username") or "").strip(), (data.get("password") or "").strip()
-    
-    # Tạm bỏ qua check key để test
     if not u or not p: return jsonify({"success": False, "error": "Thiếu tài khoản/mật khẩu"})
 
     r = login_game(u, p)
