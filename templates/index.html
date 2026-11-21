@@ -43,8 +43,6 @@ body::after{content:'';position:fixed;bottom:-20%;right:-20%;width:60%;height:60
 .top-header{background:#fff;border-radius:16px;padding:15px 25px;display:flex;justify-content:space-between;align-items:center;gap:15px;box-shadow:0 4px 20px rgba(244,114,182,.12);border:1px solid rgba(244,114,182,0.15);flex-wrap:wrap}
 .logo-text h1{font-size:20px;color:#db2777;font-weight:800;margin-bottom:4px}
 .logo-text p{font-size:13px;color:#c084a8}
-.key-expiry-badge{display:none;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;background:linear-gradient(135deg,#ec4899,#f472b6);color:#fff;font-weight:700;font-size:13px;box-shadow:0 4px 16px rgba(236,72,153,.35);white-space:nowrap}
-.key-expiry-badge.show{display:flex}
 .main-card{background:#fff;border-radius:20px;padding:25px;box-shadow:0 10px 40px rgba(244,114,182,.15);border:1px solid rgba(244,114,182,0.15)}
 .section-title{font-size:14px;color:#db2777;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:20px}
 .status-badges{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
@@ -111,17 +109,15 @@ td{padding:12px 8px;border-bottom:1px solid #fce7f3;font-weight:600;color:#6b728
 
 <div class="login-container" id="loginView">
   <h2>ĐĂNG NHẬP HỆ THỐNG</h2>
-  <p class="login-sub">Nhập đầy đủ tài khoản, mật khẩu và KEY để truy cập</p>
+  <p class="login-sub">Nhập tài khoản và mật khẩu để truy cập</p>
   <div class="form-group"><label>Tài khoản</label><input type="text" id="username" placeholder="Nhập tài khoản..."></div>
-  <div class="form-group"><label>Mật khẩu</label><input type="password" id="password" placeholder="Nhập mật khẩu..."></div>
-  <div class="form-group"><label>KEY truy cập 🔑</label><input type="text" id="accessKey" placeholder="Nhập KEY..." onkeydown="if(event.key==='Enter')handleLogin()"></div>
+  <div class="form-group"><label>Mật khẩu</label><input type="password" id="password" placeholder="Nhập mật khẩu..." onkeydown="if(event.key==='Enter')handleLogin()"></div>
   <button class="btn-login" id="btnLogin" onclick="handleLogin()">ĐĂNG NHẬP</button>
 </div>
 
 <div class="main-wrapper" id="mainView">
   <div class="top-header">
     <div class="logo-text"><h1>AUTO LC79 - MINH DZ</h1><p>Hệ thống phân tích cầu & dự đoán Tài Xỉu</p></div>
-    <div class="key-expiry-badge" id="keyExpiryBadge"><span style="font-size:16px">🔑</span><div><small>KEY HẾT HẠN</small><strong id="keyExpiryText">—</strong></div></div>
   </div>
   <div class="main-card">
     <div class="section-title"><span>📊</span> TRUNG TÂM AUTO LC79</div>
@@ -158,7 +154,7 @@ td{padding:12px 8px;border-bottom:1px solid #fce7f3;font-weight:600;color:#6b728
 </div>
 
 <script>
-let socket=null, autoOn=false, mySid=null, keyTimer=null;
+let socket=null, autoOn=false, mySid=null;
 
 // 🎵 ÂM THANH TỰ ĐỘNG
 const music = document.getElementById('bgMusic'); 
@@ -189,57 +185,33 @@ function toggleDrawer(){
   document.getElementById('drawerOverlay').classList.toggle('show'); 
 }
 
-// 🔑 XỬ LÝ HẠN KEY
-function setKeyExpiry(ts){
-  if(!ts) return;
-  const t = document.getElementById('keyExpiryText');
-  const exp = Number(ts) * (String(ts).length<=10?1000:1);
-  const update = ()=>{
-    const remain = exp - Date.now();
-    document.getElementById('keyExpiryBadge').classList.add('show');
-    if(remain <= 0){ t.innerText = 'ĐÃ HẾT HẠN'; return; }
-    const d = new Date(exp);
-    const dateStr = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} - ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
-    const remainStr = remain >= 86400000 ? `${Math.floor(remain/86400000)} ngày` : `${Math.floor(remain/3600000)}h`;
-    t.innerText = `${dateStr} (${remainStr})`;
-  };
-  update(); if(keyTimer) clearInterval(keyTimer); keyTimer = setInterval(update, 30000);
-}
-
-// 🔑 ĐĂNG NHẬP - FIXED 404/403 HOÀN CHỈNH
+// 🔑 ĐĂNG NHẬP (CHỈ CẦN TÀI KHOẢN + MẬT KHẨU)
 async function handleLogin(){
   const u=document.getElementById('username').value.trim();
   const p=document.getElementById('password').value.trim();
-  const k=document.getElementById('accessKey').value.trim();
   
   if(!u||!p) return toast('Nhập tài khoản/mật khẩu','error');
-  if(!k) return toast('Nhập KEY truy cập','error');
   
   const btn=document.getElementById('btnLogin'); 
-  btn.disabled=true; btn.innerText='Đang kiểm tra KEY...';
+  btn.disabled=true; btn.innerText='Đang đăng nhập...';
   
   try{
     const r = await fetch('/api/login', {
         method: 'POST', 
         headers: {'Content-Type': 'application/json'}, 
-        body: JSON.stringify({username:u, password:p, key:k})
+        body: JSON.stringify({username:u, password:p})
     });
     
-    // 🛡️ XỬ LÝ LỖI CHUẨN - KHÔNG HIỆN 404/403 CHUNG CHUNG
     if(!r.ok){
        let msg = null;
-       let errCode = null;
        try { 
            const errData = await r.json(); 
            msg = errData.error || errData.message;
-           errCode = errData.code;
-       } catch(e){ /* server trả HTML, bỏ qua */ }
+       } catch(e){}
        
-       // Fallback theo HTTP status
        if(!msg){
-         if(r.status === 403) msg = '🚫 Key không hợp lệ hoặc đã hết hạn!';
-         else if(r.status === 404) msg = '⚠️ API License 404 — Server Admin đổi URL. Liên hệ Admin!';
-         else if(r.status === 401) msg = '❌ Tài khoản/mật khẩu Game sai!';
+         if(r.status === 401) msg = '❌ Tài khoản hoặc mật khẩu Game sai!';
+         else if(r.status === 400) msg = '⚠️ Thiếu thông tin đăng nhập!';
          else if(r.status === 500) msg = '💥 Server lỗi 500. Thử lại sau!';
          else if(r.status === 503) msg = '⏳ Server đang khởi động. Đợi 30s rồi thử lại!';
          else msg = `Lỗi Server (${r.status})`;
@@ -260,7 +232,6 @@ async function handleLogin(){
     document.getElementById('mainView').style.display='flex';
     document.getElementById('nicknameDisplay').innerText=d.nickname;
     document.getElementById('balanceDisplay').innerText=Number(d.balance).toLocaleString();
-    if(d.license_expires_at) setKeyExpiry(d.license_expires_at);
     
     connectSocket(mySid);
     toast('Đăng nhập thành công!','success');
@@ -375,7 +346,6 @@ async function logout(){
   location.reload();
 }
 
-// Tự động cập nhật trạng thái mỗi 3s
 setInterval(()=>{if(socket&&socket.connected) pollStats();},3000);
 </script>
 </body>
