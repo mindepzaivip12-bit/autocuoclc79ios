@@ -30,14 +30,24 @@ GAME_WS_NS      = "/txmd5"
 COMMON_PARAMS   = "cp=R&cl=R&pf=web"
 
 # ==========================================
-# 📌 LICENSE SERVER CONFIG (TỪ XA)
+# 📌 LICENSE SERVER CONFIG
 # ==========================================
 LICENSE_SERVER_URL = os.environ.get(
     "LICENSE_SERVER_URL",
-    "https://license-server-cua-ban.onrender.com"   # ← ĐỔI URL SERVER KEY CỦA BẠN
+    "https://lc79-license.onrender.com"   # ← ĐỔI URL SERVER KEY THẬT CỦA BẠN
 ).rstrip("/")
 LICENSE_API_KEY   = os.environ.get("LICENSE_API_KEY", "").strip()
 LICENSE_CACHE_TTL = 30
+
+# ✅ Validate URL — tránh lỗi "https::/"
+if LICENSE_SERVER_URL and not LICENSE_SERVER_URL.startswith(("http://", "https://")):
+    logger.error(f"[License] ❌ LICENSE_SERVER_URL không hợp lệ: {LICENSE_SERVER_URL!r}")
+    LICENSE_SERVER_URL = ""
+
+if not LICENSE_SERVER_URL:
+    logger.warning("[License] ⚠️ LICENSE_SERVER_URL chưa cấu hình — key sẽ không check được")
+else:
+    logger.info(f"[License] ✅ License server: {LICENSE_SERVER_URL}")
 
 _LICENSE_CACHE = {}
 _LICENSE_CACHE_LOCK = threading.Lock()
@@ -98,6 +108,11 @@ def license_check(key, fingerprint=None):
         return {"ok": False, "valid": False, "expired": False, "revoked": False,
                 "message": "Thiếu key", "code": "NO_KEY"}
 
+    if not LICENSE_SERVER_URL:
+        return {"ok": False, "valid": False, "expired": False, "revoked": False,
+                "message": "Server key chưa được cấu hình. Liên hệ admin @cskhleminh.",
+                "code": "SERVER_NOT_CONFIGURED"}
+
     cache_key = f"{key}|{fingerprint or '-'}"
     cached = _cache_get(cache_key)
     if cached is not None:
@@ -120,10 +135,16 @@ def license_check(key, fingerprint=None):
             r.raise_for_status()
             res = r.json() if r.text.strip().startswith("{") else {"raw": r.text}
             res.setdefault("ok", True)
-    except Exception as e:
-        logger.error(f"[License] Check fail: {e}")
+    except requests.exceptions.Timeout:
         return {"ok": False, "valid": False, "expired": False, "revoked": False,
-                "message": f"Không kết nối được server key: {e}", "code": "SERVER_ERROR"}
+                "message": "Server key không phản hồi (timeout)", "code": "TIMEOUT"}
+    except requests.exceptions.ConnectionError:
+        return {"ok": False, "valid": False, "expired": False, "revoked": False,
+                "message": "Không kết nối được server key", "code": "CONN_ERROR"}
+    except Exception as e:
+        logger.error(f"[License] Check fail: {type(e).__name__}: {e}")
+        return {"ok": False, "valid": False, "expired": False, "revoked": False,
+                "message": f"Lỗi server key: {type(e).__name__}", "code": "SERVER_ERROR"}
 
     _cache_set(cache_key, res)
     return res
@@ -132,6 +153,11 @@ def license_activate(key, fingerprint, ip=None, ua=None):
     key = (key or "").strip().upper()
     if not key:
         return {"ok": False, "success": False, "message": "Thiếu key", "code": "NO_KEY"}
+
+    if not LICENSE_SERVER_URL:
+        return {"ok": False, "success": False,
+                "message": "Server key chưa được cấu hình",
+                "code": "SERVER_NOT_CONFIGURED"}
 
     payload = {"key": key, "fingerprint": fingerprint, "ip": ip, "ua": ua}
     try:
@@ -152,14 +178,22 @@ def license_activate(key, fingerprint, ip=None, ua=None):
             data.setdefault("success", False)
             data.setdefault("message", data.get("error") or f"HTTP {r.status_code}")
             return data
-    except Exception as e:
-        logger.error(f"[License] Activate fail: {e}")
+    except requests.exceptions.Timeout:
         return {"ok": False, "success": False,
-                "message": f"Không kết nối được server key: {e}",
+                "message": "Server key không phản hồi (timeout)", "code": "TIMEOUT"}
+    except requests.exceptions.ConnectionError:
+        return {"ok": False, "success": False,
+                "message": "Không kết nối được server key", "code": "CONN_ERROR"}
+    except Exception as e:
+        logger.error(f"[License] Activate fail: {type(e).__name__}: {e}")
+        return {"ok": False, "success": False,
+                "message": f"Lỗi server key: {type(e).__name__}",
                 "code": "SERVER_ERROR"}
 
 def license_heartbeat(key, fingerprint):
     key = (key or "").strip().upper()
+    if not LICENSE_SERVER_URL:
+        return False
     try:
         requests.post(
             f"{LICENSE_SERVER_URL}/api/license/heartbeat",
@@ -265,6 +299,9 @@ def license_watchdog_worker():
     logger.info("[License Watchdog] started")
     while True:
         try:
+            if not LICENSE_SERVER_URL:
+                socketio.sleep(60)
+                continue
             for sid, st in list(WEB_SESSIONS.items()):
                 key = st.get("license_key")
                 fp  = st.get("license_fp")
@@ -1028,31 +1065,47 @@ def api_login():
     if not key:
         return jsonify({"success": False, "error": "Vui lòng nhập KEY truy cập", "code": "NO_KEY"})
 
-    # Bước 1: activate key (bind thiết bị) — nếu key chưa active thì activate, nếu active rồi cũng OK
+    # ⚠️ Kiểm tra server key đã cấu hình chưa
+    if not LICENSE_SERVER_URL:
+        return jsonify({
+            "success": False,
+            "error": "Server key chưa được cấu hình. Vui lòng liên hệ admin @cskhleminh",
+            "code": "SERVER_NOT_CONFIGURED",
+        }), 503
+
     ip = _client_ip()
     ua = _client_ua()
     fp = _device_fingerprint(ip, ua)
 
+    # Bước 1: activate key
     act_res = license_activate(key, fp, ip=ip, ua=ua)
     if not act_res.get("success", False):
-        # Nếu activate fail vì đã active rồi, thử check lại
         chk = license_check(key, fp)
         if not _is_license_valid(chk):
+            err_code = act_res.get("code") or chk.get("code") or "KEY_INVALID"
+            err_msg = _license_msg(act_res) or _license_msg(chk) or "Key không hợp lệ"
+            # Map lỗi kết nối thành message thân thiện
+            if err_code in ("TIMEOUT", "CONN_ERROR", "SERVER_ERROR", "SERVER_NOT_CONFIGURED"):
+                err_msg = "Không kết nối được server key. Vui lòng thử lại sau ít phút hoặc liên hệ admin."
             return jsonify({
                 "success": False,
-                "error": _license_msg(act_res) or _license_msg(chk) or "Key không hợp lệ",
-                "code": act_res.get("code") or chk.get("code") or "KEY_INVALID",
+                "error": err_msg,
+                "code": err_code,
             }), 403
         act_res = chk
         act_res["success"] = True
 
-    # Bước 2: kiểm tra license còn hạn
+    # Bước 2: check license còn hạn
     chk = license_check(key, fp)
     if not _is_license_valid(chk):
+        err_code = chk.get("code") or "KEY_EXPIRED"
+        err_msg = _license_msg(chk) or "Key đã hết hạn"
+        if err_code in ("TIMEOUT", "CONN_ERROR", "SERVER_ERROR"):
+            err_msg = "Không kết nối được server key. Vui lòng thử lại."
         return jsonify({
             "success": False,
-            "error": _license_msg(chk) or "Key đã hết hạn",
-            "code": chk.get("code") or "KEY_EXPIRED",
+            "error": err_msg,
+            "code": err_code,
         }), 403
 
     # Bước 3: login game
@@ -1060,7 +1113,7 @@ def api_login():
     if "_error" in r:
         return jsonify({"success": False, "error": r["_error"]})
 
-    # Bước 4: tạo session + lưu license
+    # Bước 4: tạo session
     sid = os.urandom(8).hex()
     session["sid"] = sid
     session["license_key"] = key
@@ -1105,7 +1158,6 @@ def api_login():
 
     socketio.start_background_task(game_socket_worker, sid, r["token"])
 
-    # Trả về thông tin key để FE hiển thị giờ hết hạn
     left = _license_time_left(chk)
     return jsonify({
         "success": True,
@@ -1224,7 +1276,37 @@ def api_debug_api():
             "data": ADMIN_LAST_RAW.get("data"),
         },
         "license_server": LICENSE_SERVER_URL,
+        "license_configured": bool(LICENSE_SERVER_URL),
     })
+
+# ✅ DEBUG LICENSE — kiểm tra server key có sống không
+@app.route("/api/debug_license")
+def api_debug_license():
+    result = {
+        "license_server_url": LICENSE_SERVER_URL,
+        "configured": bool(LICENSE_SERVER_URL),
+        "api_key_set": bool(LICENSE_API_KEY),
+        "cache_size": len(_LICENSE_CACHE),
+    }
+    if LICENSE_SERVER_URL:
+        try:
+            r = requests.get(f"{LICENSE_SERVER_URL}/", timeout=5, headers=_license_headers())
+            result["ping_ok"] = r.status_code < 500
+            result["ping_status"] = r.status_code
+            result["ping_body_preview"] = r.text[:200]
+        except requests.exceptions.Timeout:
+            result["ping_ok"] = False
+            result["ping_error"] = "TIMEOUT"
+        except requests.exceptions.ConnectionError:
+            result["ping_ok"] = False
+            result["ping_error"] = "CONNECTION_ERROR"
+        except Exception as e:
+            result["ping_ok"] = False
+            result["ping_error"] = f"{type(e).__name__}: {e}"
+    else:
+        result["ping_ok"] = False
+        result["ping_error"] = "LICENSE_SERVER_URL chưa được cấu hình"
+    return jsonify(result)
 
 @app.route("/api/reset_history", methods=["POST"])
 @require_license
