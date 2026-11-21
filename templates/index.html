@@ -11,9 +11,9 @@
 body{background:linear-gradient(135deg,#fff5f7 0%,#ffe4ec 50%,#fdf2f8 100%);min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:20px;color:#4a3f4f;overflow-x:hidden}
 body::before{content:'';position:fixed;top:-20%;left:-20%;width:60%;height:60%;background:radial-gradient(circle,rgba(244,114,182,0.15) 0%,transparent 70%);pointer-events:none;z-index:0}
 body::after{content:'';position:fixed;bottom:-20%;right:-20%;width:60%;height:60%;background:radial-gradient(circle,rgba(251,207,232,0.25) 0%,transparent 70%);pointer-events:none;z-index:0}
-#bgMusic { display: none; }
+#bgMusic{display:none}
 .flower{position:fixed;top:-50px;pointer-events:none;z-index:999;animation:fall linear forwards;opacity:0.7}
-@keyframes fall { 0% { transform: translateY(-10vh) rotate(0deg); } 100% { transform: translateY(110vh) rotate(360deg); } }
+@keyframes fall{0%{transform:translateY(-10vh) rotate(0deg)}100%{transform:translateY(110vh) rotate(360deg)}}
 .hamburger{position:fixed;top:20px;left:20px;z-index:1001;width:48px;height:48px;border-radius:12px;cursor:pointer;background:#fff;border:1px solid rgba(244,114,182,0.3);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;box-shadow:0 4px 20px rgba(244,114,182,.2);transition:.2s}
 .hamburger:hover{background:#fdf2f8;border-color:#f472b6;transform:translateY(-2px)}
 .hamburger span{display:block;width:22px;height:2px;background:#f472b6;border-radius:2px;transition:.3s}
@@ -86,9 +86,9 @@ body::after{content:'';position:fixed;bottom:-20%;right:-20%;width:60%;height:60
 table{width:100%;border-collapse:collapse;font-size:13px;min-width:480px}
 th{text-align:left;padding:12px 8px;color:#9d6b8c;font-weight:600;border-bottom:1px solid rgba(244,114,182,0.2);font-size:11px;text-transform:uppercase;background:rgba(244,114,182,.05)}
 td{padding:12px 8px;border-bottom:1px solid #fce7f3;font-weight:600;color:#6b7280}
-.toast-wrap{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:320px}
-.toast{padding:12px 16px;border-radius:10px;color:#fff;font-weight:600;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.15);animation:slideIn .3s}
-.toast.success{background:#10b981}.toast.error{background:#ef4444}.toast.info{background:#ec4899}
+.toast-wrap{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:340px}
+.toast{padding:12px 16px;border-radius:10px;color:#fff;font-weight:600;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.15);animation:slideIn .3s;word-wrap:break-word}
+.toast.success{background:#10b981}.toast.error{background:#ef4444}.toast.info{background:#ec4899}.toast.warn{background:#f59e0b}
 @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
 </style>
 </head>
@@ -182,7 +182,7 @@ function toast(msg,type='info'){
   el.className='toast '+type; 
   el.innerText=msg; 
   document.getElementById('toasts').appendChild(el); 
-  setTimeout(()=>el.remove(),3500); 
+  setTimeout(()=>el.remove(),4500); 
 }
 function toggleDrawer(){ 
   document.getElementById('drawer').classList.toggle('show'); 
@@ -206,7 +206,7 @@ function setKeyExpiry(ts){
   update(); if(keyTimer) clearInterval(keyTimer); keyTimer = setInterval(update, 30000);
 }
 
-// 🔑 ĐĂNG NHẬP - ĐÃ FIX LỖI 404/403
+// 🔑 ĐĂNG NHẬP - FIXED 404/403 HOÀN CHỈNH
 async function handleLogin(){
   const u=document.getElementById('username').value.trim();
   const p=document.getElementById('password').value.trim();
@@ -216,7 +216,7 @@ async function handleLogin(){
   if(!k) return toast('Nhập KEY truy cập','error');
   
   const btn=document.getElementById('btnLogin'); 
-  btn.disabled=true; btn.innerText='Đang đăng nhập...';
+  btn.disabled=true; btn.innerText='Đang kiểm tra KEY...';
   
   try{
     const r = await fetch('/api/login', {
@@ -225,17 +225,24 @@ async function handleLogin(){
         body: JSON.stringify({username:u, password:p, key:k})
     });
     
-    // 🛡️ XỬ LÝ LỖI CHUẨN - KHÔNG HIỆN "HTTP 404 (Mã: 403)" NỮA
+    // 🛡️ XỬ LÝ LỖI CHUẨN - KHÔNG HIỆN 404/403 CHUNG CHUNG
     if(!r.ok){
-       let msg = `Lỗi Server (${r.status})`;
+       let msg = null;
+       let errCode = null;
        try { 
            const errData = await r.json(); 
-           msg = errData.error || errData.message || msg; 
-       } catch(e){
-           // Nếu server trả HTML thì bắt lỗi tại đây
-           if(r.status === 403) msg = 'Key không hợp lệ hoặc đã hết hạn!';
-           else if(r.status === 404) msg = 'Không tìm thấy API (404). Kiểm tra lại Server!';
-           else if(r.status === 500) msg = 'Lỗi Server (500). Vui lòng thử lại sau!';
+           msg = errData.error || errData.message;
+           errCode = errData.code;
+       } catch(e){ /* server trả HTML, bỏ qua */ }
+       
+       // Fallback theo HTTP status
+       if(!msg){
+         if(r.status === 403) msg = '🚫 Key không hợp lệ hoặc đã hết hạn!';
+         else if(r.status === 404) msg = '⚠️ API License 404 — Server Admin đổi URL. Liên hệ Admin!';
+         else if(r.status === 401) msg = '❌ Tài khoản/mật khẩu Game sai!';
+         else if(r.status === 500) msg = '💥 Server lỗi 500. Thử lại sau!';
+         else if(r.status === 503) msg = '⏳ Server đang khởi động. Đợi 30s rồi thử lại!';
+         else msg = `Lỗi Server (${r.status})`;
        }
        throw new Error(msg);
     }
