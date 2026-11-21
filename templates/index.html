@@ -996,12 +996,13 @@ function processResult(payload){
 }
 
 /* ============================================
-   LOGIN — GỬI KEY LÊN SERVER
+   LOGIN — GỬI KEY LÊN SERVER (ĐÃ FIX LỖI)
 ============================================ */
 async function handleLogin(){
   const u = (document.getElementById('username').value || '').trim();
   const p = (document.getElementById('password').value || '').trim();
-  const key = (document.getElementById('accessKey').value || '').trim();
+  // Tự động xóa mọi khoảng trắng thừa trong KEY
+  const key = (document.getElementById('accessKey').value || '').trim().replace(/\s+/g, '');
 
   if(!u || !p) return toast('Vui lòng nhập đầy đủ tài khoản và mật khẩu','error');
   if(!key) return toast('Vui lòng nhập KEY truy cập do admin cấp','error');
@@ -1011,19 +1012,35 @@ async function handleLogin(){
   btn.innerHTML='<span class="spinner"></span> Đang đăng nhập...';
 
   try{
-    const r=await fetch('/api/login',{
+    const r = await fetch('/api/login',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ username: u, password: p, device: getDeviceId(), key: key })
+      body:JSON.stringify({ 
+        username: u, 
+        password: p, 
+        device: getDeviceId(), 
+        key: key 
+      })
     });
 
     let d;
     try{ d = await r.json(); }
     catch(e){ throw new Error('Server trả về dữ liệu không hợp lệ (HTTP '+r.status+')'); }
 
+    // Xử lý lỗi từ Server (Ví dụ: Chưa kích hoạt key, Key sai, v.v.)
     if(!d || !d.success){
-      toast((d && d.error) || 'Lỗi đăng nhập','error');
-      btn.disabled=false; btn.innerText='ĐĂNG NHẬP';
+      const errorMsg = (d && d.error) ? d.error : 'Lỗi đăng nhập không xác định';
+      toast(errorMsg, 'error');
+      
+      // Nếu server báo chưa kích hoạt key, hiển thị thêm hướng dẫn
+      if (errorMsg.toLowerCase().includes('kích hoạt')) {
+        setTimeout(() => {
+          toast('Vui lòng liên hệ Admin @cskhleminh để kích hoạt KEY', 'warn');
+        }, 1000);
+      }
+      
+      btn.disabled=false; 
+      btn.innerText='ĐĂNG NHẬP';
       return;
     }
 
