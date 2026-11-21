@@ -574,7 +574,6 @@ function startCountdown(){
     if(countdownTime <= 0){
       clearInterval(countdownInterval);
       showForceModal('Hết thời gian', 'Phiên làm việc đã kết thúc. Vui lòng đăng nhập lại!');
-      // Xóa phiên đăng nhập
       clearSid();
       mySid = null;
       if(socket){ socket.disconnect(); }
