@@ -185,7 +185,7 @@ function toggleDrawer(){
   document.getElementById('drawerOverlay').classList.toggle('show'); 
 }
 
-// 🔑 ĐĂNG NHẬP (CHỈ CẦN TÀI KHOẢN + MẬT KHẨU)
+// 🔑 ĐĂNG NHẬP
 async function handleLogin(){
   const u=document.getElementById('username').value.trim();
   const p=document.getElementById('password').value.trim();
@@ -242,19 +242,25 @@ async function handleLogin(){
   }
 }
 
-// 🔌 KẾT NỐI SOCKET WEB
+// 🔌 KẾT NỐI SOCKET WEB (ĐÃ FIX)
 function connectSocket(sid){
   if(socket) socket.disconnect();
   socket=io(window.location.origin,{transports:['websocket','polling'],reconnection:true,reconnectionAttempts:Infinity});
-  socket.on('connect',()=>{ setTimeout(pollStats,300); });
-  socket.on('session_update',d=>{
-    document.getElementById('sessionValue').innerText='#'+d.session_id;
-    const p=document.getElementById('predValue');
-    if(d.prediction){ p.innerText=d.prediction; p.className='pred-value '+(d.prediction.startsWith('T')?'val-tai':'val-xiu'); }
-    document.getElementById('predPercent').innerText=d.ready?`(Độ tin cậy: ${d.conf}%)`:`(Đang lấy dữ liệu...)`;
-    document.getElementById('betDisplay').innerText=(d.current_bet||0).toLocaleString();
+  
+  socket.on('connect',()=>{ 
+    console.log("Socket Connected");
+    setTimeout(pollStats,300); 
   });
+
+  // Bắt sự kiện session_update (thường chứa dự đoán)
+  socket.on('session_update',d=>{
+    console.log("Session Update:", d); // Log để debug
+    handlePredictionData(d);
+  });
+
+  // Bắt sự kiện result_update (kết quả phiên trước)
   socket.on('result_update',d=>{
+    console.log("Result Update:", d);
     if(d.balance) document.getElementById('balanceDisplay').innerText=Number(d.balance).toLocaleString();
     if(d.profit_loss!==undefined){
       const pl=document.getElementById('plDisplay');
@@ -263,8 +269,64 @@ function connectSocket(sid){
     }
     if(d.history) renderHistory(d.history);
   });
+
   socket.on('stats_update',s=>applyState(s));
   socket.on('toast',d=>toast(d.msg,d.type));
+}
+
+// Hàm xử lý dữ liệu dự đoán linh hoạt
+function handlePredictionData(d){
+  if(!d) return;
+
+  // 1. Cập nhật phiên
+  if(d.session_id || d.session){
+    document.getElementById('sessionValue').innerText = '#' + (d.session_id || d.session);
+  }
+
+  // 2. Lấy giá trị dự đoán từ nhiều key khác nhau
+  let pred = d.prediction || d.du_doan || d.pred || d.result || d.bet;
+  
+  // Nếu server trả về object lồng nhau (ví dụ d.data.prediction)
+  if(!pred && d.data) {
+      pred = d.data.prediction || d.data.du_doan || d.data.pred || d.data.result;
+  }
+
+  const pEl = document.getElementById('predValue');
+  const pPercent = document.getElementById('predPercent');
+
+  if(pred){
+    // Chuẩn hóa chuỗi (Tài/Xỉu/T/X)
+    let predStr = String(pred).toUpperCase();
+    if(predStr === 'T' || predStr === 'TAI' || predStr === 'TÀI') predStr = 'TÀI';
+    if(predStr === 'X' || predStr === 'XIU' || predStr === 'XỈU') predStr = 'XỈU';
+
+    pEl.innerText = predStr;
+    
+    // Đổi màu theo kết quả
+    if(predStr.includes('TÀI') || predStr.includes('TAI')){
+        pEl.className = 'pred-value val-tai';
+    } else if(predStr.includes('XỈU') || predStr.includes('XIU')){
+        pEl.className = 'pred-value val-xiu';
+    } else {
+        pEl.className = 'pred-value'; // Mặc định
+    }
+
+    // Hiển thị độ tin cậy nếu có
+    if(d.conf || d.confidence || d.rate){
+        pPercent.innerText = `(Độ tin cậy: ${d.conf || d.confidence || d.rate}%)`;
+    } else {
+        pPercent.innerText = '(Đã có dự đoán)';
+    }
+  } else {
+    // Nếu không có dự đoán
+    // pEl.innerText = '—'; // Giữ nguyên hoặc reset
+    pPercent.innerText = '(Đang chờ dữ liệu...)';
+  }
+
+  // 3. Cập nhật tiền cược hiện tại nếu có
+  if(d.current_bet !== undefined){
+      document.getElementById('betDisplay').innerText = Number(d.current_bet).toLocaleString();
+  }
 }
 
 async function pollStats(){
@@ -306,7 +368,13 @@ function applyState(s){
   document.getElementById('winCount').innerText=s.win_count||0;
   document.getElementById('loseCount').innerText=s.lose_count||0;
   document.getElementById('betDisplay').innerText=(s.current_bet||0).toLocaleString();
+  
+  // Cập nhật phiên & dự đoán từ state (nếu có)
   if(s.session_id) document.getElementById('sessionValue').innerText='#'+s.session_id;
+  if(s.prediction || s.du_doan || s.result){
+      handlePredictionData(s); // Tái sử dụng hàm xử lý
+  }
+
   if(s.history) renderHistory(s.history);
 }
 
